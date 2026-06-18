@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      Content-Security-Policy:
+      - default-src 'self'       → no inline scripts, no external scripts
+      - img-src allows https + data URIs for favicons
+      - style-src allows 'unsafe-inline' only for Vite dev HMR styles;
+        tighten this to a nonce in production (Stage 8)
+      - font-src allows https for Google Fonts / CDN fallback (Stage 8)
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        img-src 'self' https: data:;
+        style-src 'self' 'unsafe-inline';
+        font-src 'self' https: data:;
+        connect-src 'self';
+      "
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aura</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
