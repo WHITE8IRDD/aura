@@ -1,55 +1,90 @@
-import React from 'react'
+import React, { useEffect } from 'react'
+import NinjaAvatar from './NinjaAvatar'
 
 interface Props {
   open: boolean
-  onEnable: () => void
-  onCancel: () => void
+  onClose: () => void
+  onLaunch: () => void
 }
 
 export default function NinjaModal({
-  open,
-  onEnable,
-  onCancel
+  open, onClose, onLaunch
 }: Props): React.ReactElement | null {
+  useEffect(() => {
+    if (!open) return
+    void window.aura.layout.hideView()
+    return () => { void window.aura.layout.showView() }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const handleKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [open, onClose])
+
   if (!open) return null
 
   return (
-    <div className="ninja-modal-overlay" onClick={onCancel}>
-      <div className="ninja-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="ninja-modal-icon">🥷</div>
-        <h2 className="ninja-modal-title">Ninja Mode</h2>
-        <p className="ninja-modal-desc">
-          Browse without saving anything — Aura won&apos;t remember your activity.
-        </p>
+    <>
+      <div className="ninja-modal-backdrop" onClick={onClose} />
+      <div className="ninja-modal-v2" role="dialog" aria-labelledby="ninja-title">
+        <button
+          className="ninja-modal-close"
+          onClick={onClose}
+          aria-label="Close"
+          title="Close"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
 
-        <div className="ninja-modal-cols">
-          <div className="ninja-modal-col saved">
-            <div className="ninja-modal-col-title">What IS saved</div>
-            <ul className="ninja-modal-list">
-              <li>Downloads you keep</li>
-              <li>Bookmarks you create</li>
-            </ul>
-          </div>
-          <div className="ninja-modal-col notsaved">
-            <div className="ninja-modal-col-title">What is NOT saved</div>
-            <ul className="ninja-modal-list">
-              <li>Browsing history</li>
-              <li>Cookies &amp; site data</li>
-              <li>Form &amp; search entries</li>
-              <li>Session state</li>
-            </ul>
-          </div>
+        <div className="ninja-modal-avatar">
+          <NinjaAvatar size={48} />
         </div>
 
-        <div className="ninja-modal-actions">
-          <button className="ninja-modal-cancel" onClick={onCancel}>
-            Cancel
+        <h2 id="ninja-title" className="ninja-modal-h2">Ninja Mode</h2>
+
+        <div className="ninja-modal-body">
+          <p>
+            Your privacy is important to us. When using &ldquo;Ninja&rdquo; mode, you
+            can be sure that your browsing history, cookies, and site data, as
+            well as any information entered into forms, will not be saved. This
+            ensures that other users of this device will not be able to view
+            your actions.
+          </p>
+          <p>
+            However, please note that your online activity may still be visible
+            to the websites you visit, your organization, or your internet
+            provider.
+          </p>
+          <p>
+            <strong>Please note:</strong> While your browsing remains private, all bookmarks
+            you create will be saved.
+          </p>
+        </div>
+
+        <div className="ninja-modal-buttons">
+          <button
+            className="ninja-modal-btn-secondary"
+            onClick={() => { onLaunch() }}
+            autoFocus={false}
+          >
+            Enable
           </button>
-          <button className="ninja-modal-launch" onClick={onEnable}>
-            Enable Ninja Mode
+          <button
+            className="ninja-modal-btn-primary"
+            onClick={onClose}
+            autoFocus
+          >
+            Disable
           </button>
         </div>
       </div>
-    </div>
+    </>
   )
 }

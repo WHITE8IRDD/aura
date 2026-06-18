@@ -1,18 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import type { TabState, Suggestion } from '../types'
+import type { TabState, Suggestion, Bookmark } from '../types'
 import Suggestions from './Suggestions'
+import BookmarkDialog from './BookmarkDialog'
+import ZoomIndicator from './ZoomIndicator'
+import UtilityCluster from './UtilityCluster'
+import ReaderButton from './ReaderButton'
 import {
-  IconBack,
-  IconForward,
-  IconReload,
-  IconClose,
-  IconLock,
-  IconAlert,
-  IconMic,
-  IconSparkle,
-  IconShield,
-  IconDownload,
-  IconMore
+  IconBack, IconForward, IconReload, IconClose, IconLock, IconAlert,
+  IconMic, IconSparkle, IconShield, IconBookmark
 } from './Icons'
 
 interface Props {
@@ -23,6 +18,19 @@ interface Props {
   onNavigate: (value: string) => void
   onAssistant: () => void
   focusSignal: number
+  onOpenBookmarks: () => void
+  onOpenHistory: () => void
+  onOpenDownloads: () => void
+  onOpenPrivacy: () => void
+  onOpenExtensions: () => void
+  onOpenSettings: () => void
+  onOpenProfile: () => void
+  onOpenNinja: () => void
+  onToggleVerticalTabs: () => void
+  bookmarkSignal: number
+  onToggleReader: () => void
+  readerActive: boolean
+  onSaveToReadingList: () => void
 }
 
 function isSecure(url: string): boolean {
@@ -41,15 +49,16 @@ function extractHostname(url: string): string | null {
   try { return new URL(url).hostname } catch { return null }
 }
 
-export default function Toolbar({
-  tab,
-  onBack,
-  onForward,
-  onReload,
-  onNavigate,
-  onAssistant,
-  focusSignal
-}: Props): React.ReactElement {
+export default function Toolbar(props: Props): React.ReactElement {
+  const {
+    tab, onBack, onForward, onReload, onNavigate, onAssistant, focusSignal,
+    onOpenBookmarks, onOpenHistory, onOpenDownloads, onOpenPrivacy,
+    onOpenExtensions, onOpenSettings, onOpenProfile, onOpenNinja,
+    onToggleVerticalTabs, bookmarkSignal,
+    onToggleReader, readerActive,
+    onSaveToReadingList
+  } = props
+
   const isLoading = tab?.loading ?? false
   const url = tab?.url ?? 'aura://newtab'
   const secure = isSecure(url)
@@ -61,7 +70,11 @@ export default function Toolbar({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [shieldsEnabled, setShieldsEnabled] = useState(true)
+  const [existingBookmarkId, setExistingBookmarkId] = useState<number | null>(null)
+  const [bookmarkDialogOpen, setBookmarkDialogOpen] = useState(false)
+  const [bookmarkAnchor, setBookmarkAnchor] = useState<DOMRect | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const bookmarkBtnRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!focused) setValue(url === 'aura://newtab' ? '' : url)
@@ -75,12 +88,33 @@ export default function Toolbar({
   }, [focusSignal])
 
   useEffect(() => {
-    if (!hostname || !isWebPage) {
+    if (!isWebPage) {
       setShieldsEnabled(true)
+      setExistingBookmarkId(null)
       return
     }
-    window.aura.shields.isEnabled(hostname).then(setShieldsEnabled)
-  }, [hostname, isWebPage])
+    if (hostname) window.aura.shields.isEnabled(hostname).then(setShieldsEnabled)
+    void window.aura.bookmarks.list().then((list: Bookmark[]) => {
+      const existing = list.find((b) => b.url === url)
+      setExistingBookmarkId(existing ? existing.id : null)
+    })
+  }, [url, hostname, isWebPage])
+
+  useEffect(() => {
+    if (bookmarkSignal > 0 && isWebPage) {
+      const rect = bookmarkBtnRef.current?.getBoundingClientRect() ?? null
+      setBookmarkAnchor(rect)
+      setBookmarkDialogOpen(true)
+    }
+  }, [bookmarkSignal, isWebPage])
+
+  useEffect(() => {
+    if (bookmarkDialogOpen) {
+      void window.aura.layout.hideView()
+    } else {
+      void window.aura.layout.showView()
+    }
+  }, [bookmarkDialogOpen])
 
   useEffect(() => {
     if (!focused) {
@@ -144,30 +178,35 @@ export default function Toolbar({
     setTimeout(() => onReload(), 100)
   }, [hostname, isWebPage, onReload])
 
+  const handleBookmarkClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!isWebPage) return
+    const rect = bookmarkBtnRef.current?.getBoundingClientRect() ?? null
+    setBookmarkAnchor(rect)
+    setBookmarkDialogOpen(true)
+  }, [isWebPage])
+
+  const refreshBookmarkState = useCallback(() => {
+    void window.aura.bookmarks.list().then((list: Bookmark[]) => {
+      const existing = list.find((b) => b.url === url)
+      setExistingBookmarkId(existing ? existing.id : null)
+    })
+  }, [url])
+
   return (
     <div className="toolbar">
       <div className="nav-group">
-        <button
-          className="nav-btn"
-          disabled={!tab?.canGoBack}
-          onClick={(e) => { e.currentTarget.blur(); onBack() }}
-          title="Back (Alt+←)"
-        >
+        <button className="nav-btn" disabled={!tab?.canGoBack}
+          onClick={(e) => { e.currentTarget.blur(); onBack() }} title="Back (Alt+\u2190)">
           <IconBack size={17} />
         </button>
-        <button
-          className="nav-btn"
-          disabled={!tab?.canGoForward}
-          onClick={(e) => { e.currentTarget.blur(); onForward() }}
-          title="Forward (Alt+→)"
-        >
+        <button className="nav-btn" disabled={!tab?.canGoForward}
+          onClick={(e) => { e.currentTarget.blur(); onForward() }} title="Forward (Alt+\u2192)">
           <IconForward size={17} />
         </button>
-        <button
-          className="nav-btn"
+        <button className="nav-btn"
           onClick={(e) => { e.currentTarget.blur(); onReload() }}
-          title={isLoading ? 'Stop' : 'Reload (Ctrl+R)'}
-        >
+          title={isLoading ? 'Stop' : 'Reload (Ctrl+R)'}>
           {isLoading ? <IconClose size={15} /> : <IconReload size={15} />}
         </button>
       </div>
@@ -187,16 +226,10 @@ export default function Toolbar({
               type="text"
               value={value}
               placeholder="Ask Aura or type a URL"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
+              autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              onFocus={(e) => {
-                setFocused(true)
-                e.target.select()
-              }}
+              onFocus={(e) => { setFocused(true); e.target.select() }}
               onBlur={() => {
                 setFocused(false)
                 setSuggestions([])
@@ -206,12 +239,45 @@ export default function Toolbar({
             />
 
             {isWebPage && (
+              <ReaderButton active={readerActive} onClick={onToggleReader} />
+            )}
+
+            {isWebPage && (
+              <button
+                type="button"
+                className="ab-reading-list"
+                title="Save to reading list"
+                onClick={(e) => { e.stopPropagation(); onSaveToReadingList() }}
+                tabIndex={-1}
+              >
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+              </button>
+            )}
+
+            {isWebPage && (
+              <button
+                ref={bookmarkBtnRef}
+                type="button"
+                className={`ab-bookmark${existingBookmarkId !== null ? ' active' : ''}`}
+                title={existingBookmarkId !== null ? 'Edit bookmark (Ctrl+D)' : 'Bookmark this page (Ctrl+D)'}
+                onClick={handleBookmarkClick}
+                tabIndex={-1}
+              >
+                <IconBookmark size={13} />
+              </button>
+            )}
+
+            {isWebPage && (
               <button
                 type="button"
                 className={`ab-shield${shieldsEnabled ? ' active' : ' off'}`}
                 title={
                   shieldsEnabled
-                    ? `Aura Shields ON for ${hostname}\nClick to disable for this site`
+                    ? `Aura Shields ON for ${hostname}\nClick to disable`
                     : `Aura Shields OFF for ${hostname}\nClick to re-enable`
                 }
                 onClick={handleShieldClick}
@@ -221,12 +287,7 @@ export default function Toolbar({
               </button>
             )}
 
-            <button
-              type="button"
-              className="ab-icon-btn"
-              title="Voice input"
-              tabIndex={-1}
-            >
+            <button type="button" className="ab-icon-btn" title="Voice input" tabIndex={-1}>
               <IconMic size={13} />
             </button>
           </form>
@@ -243,23 +304,46 @@ export default function Toolbar({
       </div>
 
       <div className="toolbar-actions">
-        <button className="nav-btn" title="Downloads" tabIndex={-1}
-          onClick={(e) => e.currentTarget.blur()}>
-          <IconDownload size={15} />
-        </button>
-        <button className="nav-btn" title="More" tabIndex={-1}
-          onClick={(e) => e.currentTarget.blur()}>
-          <IconMore size={15} />
-        </button>
-        <button
-          className="assistant-btn"
+        {tab && !tab.internal && tab.zoomFactor !== 1.0 && (
+          <ZoomIndicator
+            factor={tab.zoomFactor ?? 1.0}
+            onZoomIn={() => window.aura.tabs.zoomIn(tab.id)}
+            onZoomOut={() => window.aura.tabs.zoomOut(tab.id)}
+            onReset={() => window.aura.tabs.zoomReset(tab.id)}
+          />
+        )}
+
+        <UtilityCluster
+          onOpenBookmarks={onOpenBookmarks}
+          onOpenHistory={onOpenHistory}
+          onOpenDownloads={onOpenDownloads}
+          onOpenPrivacy={onOpenPrivacy}
+          onOpenExtensions={onOpenExtensions}
+          onOpenSettings={onOpenSettings}
+          onOpenProfile={onOpenProfile}
+          onOpenNinja={onOpenNinja}
+          onToggleVerticalTabs={onToggleVerticalTabs}
+        />
+
+        <button className="assistant-btn"
           onClick={(e) => { e.currentTarget.blur(); onAssistant() }}
-          title="Open Aura assistant"
-        >
+          title="Open Aura assistant">
           <IconSparkle size={13} />
           <span>Assistant</span>
         </button>
       </div>
+
+      {bookmarkDialogOpen && isWebPage && (
+        <BookmarkDialog
+          url={url}
+          initialTitle={tab?.title || url}
+          anchorRect={bookmarkAnchor}
+          existingBookmarkId={existingBookmarkId}
+          onSaved={refreshBookmarkState}
+          onRemoved={refreshBookmarkState}
+          onClose={() => setBookmarkDialogOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -283,14 +367,8 @@ async function buildSuggestions(input: string): Promise<Suggestion[]> {
   const history = await window.aura.suggest.query(q)
   for (const h of history) {
     let hn = h.url
-    try { hn = new URL(h.url).hostname.replace(/^www\./, '') } catch { /* keep raw */ }
-    out.push({
-      type: 'history',
-      label: h.title || h.url,
-      hint: hn,
-      url: h.url
-    })
+    try { hn = new URL(h.url).hostname.replace(/^www\./, '') } catch {}
+    out.push({ type: 'history', label: h.title || h.url, hint: hn, url: h.url })
   }
-
   return out
 }

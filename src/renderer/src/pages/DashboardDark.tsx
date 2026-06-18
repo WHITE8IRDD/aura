@@ -1,180 +1,116 @@
-import React, { useState } from 'react'
-import { IconSearch, IconShield, IconLock, IconUser } from '../components/Icons'
-import QuickLink from '../components/QuickLink'
+import React, { useEffect, useRef, useState } from 'react'
+import GlassyOrb from '../components/GlassyOrb'
 
 interface Props {
   onNavigate: (url: string) => void
   onSwitchLayout: () => void
 }
 
-const FAVORITES = [
-  { label: 'GitHub', url: 'https://github.com' },
-  { label: 'YouTube', url: 'https://youtube.com' },
-  { label: 'Wikipedia', url: 'https://wikipedia.org' },
-  { label: 'Hacker News', url: 'https://news.ycombinator.com' },
-  { label: 'Reddit', url: 'https://reddit.com' },
-  { label: 'Twitter', url: 'https://twitter.com' },
-  { label: 'ChatGPT', url: 'https://chatgpt.com' },
-  { label: 'Gmail', url: 'https://mail.google.com' }
-]
-
-const DOCK_APPS = [
-  { label: 'GitHub', url: 'https://github.com' },
-  { label: 'YouTube', url: 'https://youtube.com' },
-  { label: 'Wikipedia', url: 'https://wikipedia.org' },
-  { label: 'Hacker News', url: 'https://news.ycombinator.com' },
-  { label: 'Reddit', url: 'https://reddit.com' },
-  { label: 'Twitter', url: 'https://twitter.com' }
-]
-
-// Stage 5.9: Health removed per user request
-const CATEGORIES = [
-  'Top Stories',
-  'Weather',
-  'Dining',
-  'Entertainment',
-  'Travel',
-  'Sports'
-]
-
-const MOCK_STORIES = [
-  { category: 'Top Stories', title: 'Markets close at record highs amid tech rally', source: 'Reuters' },
-  { category: 'Weather', title: 'Cold front sweeps across the Pacific Northwest this weekend', source: 'AP' },
-  { category: 'Entertainment', title: 'A24 announces three new releases for the spring slate', source: 'Variety' },
-  { category: 'Travel', title: 'These five hidden European towns are trending for fall 2025', source: 'CN Traveler' },
-  { category: 'Sports', title: 'Underdog team stuns the league with overtime comeback', source: 'ESPN' },
-  { category: 'Dining', title: 'The James Beard Award winners changing American cuisine', source: 'Eater' }
-]
-
 export default function DashboardDark({
   onNavigate,
   onSwitchLayout
 }: Props): React.ReactElement {
   const [query, setQuery] = useState('')
-  const [activeCategory, setActiveCategory] = useState('Top Stories')
+  const [userName] = useState<string>(() => {
+    try {
+      return localStorage.getItem('aura:userName') || 'there'
+    } catch {
+      return 'there'
+    }
+  })
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  const handleSearch = (e: React.FormEvent): void => {
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 120)
+  }, [])
+
+  const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault()
     const trimmed = query.trim()
     if (!trimmed) return
-    onNavigate(`https://duckduckgo.com/?q=${encodeURIComponent(trimmed)}`)
+
+    const isUrl =
+      /^https?:\/\//i.test(trimmed) ||
+      (/^[^\s]+\.[a-zA-Z]{2,}/.test(trimmed) && !trimmed.includes(' '))
+
+    if (isUrl) {
+      const url = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+      onNavigate(url)
+    } else {
+      onNavigate(`https://duckduckgo.com/?q=${encodeURIComponent(trimmed)}`)
+    }
+    setQuery('')
   }
 
-  const filteredStories =
-    activeCategory === 'Top Stories'
-      ? MOCK_STORIES
-      : MOCK_STORIES.filter((s) => s.category === activeCategory)
-
   return (
-    <div className="dash-dark">
-      <aside className="app-dock">
-        {DOCK_APPS.map((f) => (
-          <button
-            key={f.url}
-            className="dock-app"
-            onClick={() => onNavigate(f.url)}
-            title={f.label}
-          >
-            <DockFavicon url={f.url} label={f.label} />
-          </button>
-        ))}
-      </aside>
+    <div className="aurora-newtab">
+      <div className="aurora-bg-glow" />
+      <div className="aurora-bg-glow-secondary" />
 
-      <div className="dash-dark-main">
-        <header className="dash-dark-header">
-          <div className="dash-dark-top-actions">
-            <button className="dash-dark-icon-btn" title="Privacy">
-              <IconShield size={16} />
-            </button>
-            <button className="dash-dark-icon-btn" title="Profile">
-              <IconUser size={16} />
-            </button>
-            <button className="layout-toggle" onClick={onSwitchLayout}>
-              Switch layout
-            </button>
-          </div>
-        </header>
+      <button
+        className="aurora-layout-toggle"
+        onClick={onSwitchLayout}
+        title="Switch layout"
+      >
+        Switch layout
+      </button>
 
-        <div className="dash-dark-center">
-          <div className="privacy-badges">
-            <span className="badge"><IconLock size={11} /> Confidential Search</span>
-            <span className="badge"><IconShield size={11} /> Tracker Blocking</span>
-            <span className="badge"><IconLock size={11} /> Site Encryption</span>
-          </div>
-
-          <form className="dark-search" onSubmit={handleSearch}>
-            <IconSearch size={16} />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search privately…"
-              spellCheck={false}
-            />
-            <button type="submit" className="dark-search-btn">Search</button>
-          </form>
-
-          <div className="favorites-grid">
-            {FAVORITES.map((f) => (
-              <QuickLink key={f.url} label={f.label} url={f.url} onClick={onNavigate} />
-            ))}
-          </div>
-
-          <div className="stories-section">
-            <div className="category-pills">
-              {CATEGORIES.map((c) => (
-                <button
-                  key={c}
-                  className={`category-pill${c === activeCategory ? ' active' : ''}`}
-                  onClick={() => setActiveCategory(c)}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-
-            <div className="stories-list">
-              {filteredStories.map((s, i) => (
-                <article key={i} className="story-card">
-                  <div className="story-thumb" />
-                  <div className="story-meta">
-                    <span className="story-category">{s.category}</span>
-                    <h3 className="story-title">{s.title}</h3>
-                    <span className="story-source">{s.source}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
+      <div className="aurora-center">
+        <div className="aurora-orb-wrap">
+          <GlassyOrb size={140} />
         </div>
+
+        <div className="aurora-greeting">
+          Happy to see you, {userName}
+        </div>
+
+        <h1 className="aurora-question">
+          How can I help you?
+        </h1>
+
+        <form className="aurora-searchbar" onSubmit={handleSubmit}>
+          <div className="aurora-cursor-bar" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search now"
+            spellCheck={false}
+            autoComplete="off"
+          />
+
+          <button
+            type="button"
+            className="aurora-scan-btn"
+            title="Visual search (coming soon)"
+            tabIndex={-1}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+              <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+              <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+              <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+              <rect x="7" y="7" width="10" height="10" rx="1" />
+            </svg>
+          </button>
+
+          <button
+            type="submit"
+            className="aurora-mic-btn"
+            title="Search"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="23" />
+              <line x1="8" y1="23" x2="16" y2="23" />
+            </svg>
+          </button>
+        </form>
       </div>
     </div>
   )
-}
-
-/**
- * Tiny inline favicon for dock apps — fetches via Aura's local favicon
- * API. Falls back to a colored letter circle if the fetch fails.
- */
-function DockFavicon({ url, label }: { url: string; label: string }): React.ReactElement {
-  const [src, setSrc] = React.useState<string | null>(null)
-  const [failed, setFailed] = React.useState(false)
-
-  React.useEffect(() => {
-    let cancelled = false
-    window.aura.favicons
-      .fetch(url)
-      .then((data) => {
-        if (cancelled) return
-        if (data) setSrc(data)
-        else setFailed(true)
-      })
-      .catch(() => !cancelled && setFailed(true))
-    return () => { cancelled = true }
-  }, [url])
-
-  if (failed || !src) {
-    return <span className="dock-app-initial">{label[0]}</span>
-  }
-  return <img src={src} alt={label} />
 }

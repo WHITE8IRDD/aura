@@ -1,6 +1,6 @@
 import React from 'react'
-import DashboardLight from './DashboardLight'
 import DashboardDark from './DashboardDark'
+import DashboardLight from './DashboardLight'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 
 type LayoutMode = 'light' | 'dark'

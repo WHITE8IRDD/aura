@@ -6,17 +6,39 @@ import WindowControls from './components/WindowControls'
 import CommandPalette from './components/CommandPalette'
 import ProgressBar from './components/ProgressBar'
 import PermissionPrompt from './components/PermissionPrompt'
+import BookmarksBar from './components/BookmarksBar'
+import FindBar from './components/FindBar'
+import TabSearchPalette from './components/TabSearchPalette'
+import ReaderPage from './pages/ReaderPage'
 import NewTabDashboard from './pages/NewTabDashboard'
 import NinjaNewTab from './pages/NinjaNewTab'
 import NinjaModal from './components/NinjaModal'
 import PrivacyDashboard from './pages/PrivacyDashboard'
+import HistoryPage from './pages/HistoryPage'
+import BookmarksPage from './pages/BookmarksPage'
+import DownloadsPage from './pages/DownloadsPage'
+import ReadingListPage from './pages/ReadingListPage'
+import BoostsPage from './pages/BoostsPage'
+import AssistantPanel from './ai/AssistantPanel'
 import { useKeyboard } from './hooks/useKeyboard'
+import { useLocalStorage } from './hooks/useLocalStorage'
+import { useResize } from './hooks/useResize'
 import type { TabState } from './types'
 
-const SIDEBAR_WIDTH_EXPANDED = 184
-const SIDEBAR_WIDTH_COLLAPSED = 52
+// STAGE 8.7-hotfix: updated to match new CSS heights
+//   .chrome-top-row    = 36px (tabs row)
+//   .toolbar           = 44px (address bar row)
+//   .bookmarks-bar     = 30px (only when visible)
+//   .chrome-top-row.compact = 30px (vertical-tabs mode)
+const SIDEBAR_WIDTH_HORIZONTAL = 44   // matches new sidebar width
+const SIDEBAR_WIDTH_VERTICAL_DEFAULT = 220
+const SIDEBAR_WIDTH_VERTICAL_MIN = 160
+const SIDEBAR_WIDTH_VERTICAL_MAX = 400
+const CHROME_HEIGHT_BASE = 80                  // 36 (tabs) + 44 (toolbar)
+const BOOKMARKS_BAR_HEIGHT = 30                // .bookmarks-bar height
+const CHROME_HEIGHT_VERTICAL_COMPACT = 74      // 30 (compact top) + 44 (toolbar)
 
-type ChromePage = null | 'privacy'
+type ChromePage = null | 'privacy' | 'history' | 'bookmarks' | 'downloads' | 'readingList' | 'boosts'
 
 export default function App(): React.ReactElement {
   const [tabs, setTabs] = useState<TabState[]>([])
@@ -28,11 +50,47 @@ export default function App(): React.ReactElement {
   const [isPrivate, setIsPrivate] = useState(false)
   const [ninjaModalOpen, setNinjaModalOpen] = useState(false)
   const [chromePage, setChromePage] = useState<ChromePage>(null)
+  const [verticalTabs, setVerticalTabs] = useLocalStorage<boolean>('aura:verticalTabs', false)
+  const [bookmarkSignal, setBookmarkSignal] = useState(0)
+  const [findBarOpen, setFindBarOpen] = useState(false)
+  const [tabSearchOpen, setTabSearchOpen] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const [readerActive, setReaderActive] = useState(false)
+  const [bookmarksBarVisible, setBookmarksBarVisible] = useLocalStorage<boolean>(
+    'aura:bookmarksBarVisible',
+    true
+  )
+  const [hasBarBookmarks, setHasBarBookmarks] = useState(false)
+
+  const [persistedVerticalWidth, setPersistedVerticalWidth] = useLocalStorage<number>(
+    'aura:sidebarWidth',
+    SIDEBAR_WIDTH_VERTICAL_DEFAULT
+  )
+
+  const {
+    width: verticalWidth,
+    startDrag: onResizeStart,
+    isDragging: isResizing,
+    setWidth: setVerticalWidth
+  } = useResize({
+    initial: persistedVerticalWidth,
+    min: SIDEBAR_WIDTH_VERTICAL_MIN,
+    max: SIDEBAR_WIDTH_VERTICAL_MAX,
+    onChange: (w) => {
+      void window.aura.layout.setSidebarWidth(w)
+    },
+    onCommit: (w) => {
+      setPersistedVerticalWidth(w)
+    }
+  })
 
   useEffect(() => {
-    window.aura.tabs.getState().then(({ tabs: t, activeId: a }) => {
-      if (t.length > 0) { setTabs(t); setActiveId(a) }
-    })
+    if (verticalTabs && persistedVerticalWidth !== verticalWidth) {
+      setVerticalWidth(persistedVerticalWidth)
+    }
+  }, [verticalTabs])
+
+  useEffect(() => {
     return window.aura.tabs.onUpdate((t, a) => {
       setTabs(t)
       setActiveId(a)
@@ -46,8 +104,7 @@ export default function App(): React.ReactElement {
   }, [])
 
   useEffect(() => {
-    window.aura.ninja
-      .isPrivate()
+    window.aura.ninja.isPrivate()
       .then((priv) => {
         setIsPrivate(priv)
         document.documentElement.setAttribute('data-ninja', priv ? 'true' : 'false')
@@ -60,25 +117,89 @@ export default function App(): React.ReactElement {
   }, [])
 
   useEffect(() => {
-    const width = sidebarCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED
-    window.aura.layout.setSidebarWidth(width)
-  }, [sidebarCollapsed])
-
-  // Hide WebContentsView when any modal/overlay opens so React content
-  // appears ABOVE the web content (otherwise Electron layers it behind)
-  useEffect(() => {
-    const anyOverlay = ninjaModalOpen || paletteOpen || chromePage !== null
-    if (anyOverlay) {
-      window.aura.layout.hideView()
-    } else {
-      window.aura.layout.showView()
+    const load = (): void => {
+      window.aura.bookmarks.listBar()
+        .then((list) => setHasBarBookmarks(list.length > 0))
+        .catch(() => setHasBarBookmarks(false))
     }
-  }, [ninjaModalOpen, paletteOpen, chromePage])
+    load()
+    return window.aura.bookmarks.onUpdate(load)
+  }, [])
+
+  useEffect(() => {
+    if (verticalTabs) {
+      void window.aura.layout.setSidebarWidth(verticalWidth)
+    } else {
+      void window.aura.layout.setSidebarWidth(SIDEBAR_WIDTH_HORIZONTAL)
+    }
+  }, [verticalTabs, verticalWidth])
 
   const activeTab = tabs.find((t) => t.id === activeId)
+  const showBookmarksBar = bookmarksBarVisible && hasBarBookmarks && !!activeTab && !activeTab.internal && chromePage === null
+  const chromeHeight =
+    (verticalTabs ? CHROME_HEIGHT_VERTICAL_COMPACT : CHROME_HEIGHT_BASE) +
+    (showBookmarksBar ? BOOKMARKS_BAR_HEIGHT : 0)
+
+  useEffect(() => {
+    window.aura.layout.setChromeHeight(chromeHeight)
+  }, [chromeHeight])
+
+  useEffect(() => {
+    document.documentElement.setAttribute(
+      'data-vertical-tabs',
+      verticalTabs ? 'true' : 'false'
+    )
+  }, [verticalTabs])
+
+  useEffect(() => {
+    const anyOverlay =
+      ninjaModalOpen ||
+      paletteOpen ||
+      chromePage !== null ||
+      readerActive ||
+      findBarOpen ||
+      tabSearchOpen ||
+      assistantOpen
+    if (anyOverlay) void window.aura.layout.hideView()
+    else void window.aura.layout.showView()
+  }, [ninjaModalOpen, paletteOpen, chromePage, readerActive, findBarOpen, tabSearchOpen, assistantOpen])
+
+  useEffect(() => {
+    if (isResizing) void window.aura.layout.hideView()
+    else if (
+      !ninjaModalOpen &&
+      !paletteOpen &&
+      chromePage === null &&
+      !readerActive &&
+      !findBarOpen &&
+      !tabSearchOpen &&
+      !assistantOpen
+    ) {
+      void window.aura.layout.showView()
+    }
+  }, [isResizing, ninjaModalOpen, paletteOpen, chromePage, readerActive, findBarOpen, tabSearchOpen, assistantOpen])
+
+  useEffect(() => {
+    setReaderActive(false)
+  }, [activeId])
 
   useEffect(() => {
     if (activeTab && !activeTab.internal) setChromePage(null)
+  }, [activeTab])
+
+  const handleChangeGroup = useCallback(async (tabId: number, groupId: string | null) => {
+    if (groupId === null) {
+      await window.aura.groups.removeTab(tabId)
+    } else {
+      await window.aura.groups.addTab(groupId, tabId)
+    }
+  }, [])
+
+  const handleSaveToReadingList = useCallback(async () => {
+    if (!activeTab || activeTab.internal) return
+    await window.aura.readingList.add(activeTab.url, activeTab.title)
+    setPanelMessage('Saved to reading list')
+    setTimeout(() => setPanelMessage(null), 2000)
   }, [activeTab])
 
   const handleNavigate = useCallback(
@@ -93,23 +214,36 @@ export default function App(): React.ReactElement {
     window.aura.tabs.create('aura://newtab')
   }, [])
 
+  const handleClose = useCallback((id: number) => {
+    window.aura.tabs.close(id)
+  }, [])
+
+  const handleSelect = useCallback((id: number) => {
+    window.aura.tabs.activate(id)
+  }, [])
+
   const handleSidebarAction = useCallback((action: SidebarAction) => {
-    if (action === 'privacy') {
-      setChromePage('privacy')
+    if (action === 'privacy') return setChromePage('privacy')
+    if (action === 'history') return setChromePage('history')
+    if (action === 'bookmarks') return setChromePage('bookmarks')
+    if (action === 'downloads') return setChromePage('downloads')
+    if (action === 'readingList') return setChromePage('readingList')
+    if (action === 'boosts') return setChromePage('boosts')
+    if (action === 'verticalTabs') {
+      setVerticalTabs((v) => !v)
       return
     }
-    const labels: Record<SidebarAction, string> = {
-      bookmarks: 'Bookmarks arrives in Stage 6',
-      history: 'History arrives in Stage 6',
-      downloads: 'Downloads arrives in Stage 6',
-      privacy: '',
-      extensions: 'Extensions page arrives in Stage 8',
-      settings: 'Settings arrives in Stage 8',
-      profile: 'Profile switcher arrives in Stage 8'
+    const labels: Partial<Record<SidebarAction, string>> = {
+      extensions: 'Extensions page arrives in Stage 10',
+      settings: 'Settings arrives in Stage 10',
+      profile: 'Profile switcher arrives in Stage 10'
     }
-    setPanelMessage(labels[action])
-    setTimeout(() => setPanelMessage(null), 2500)
-  }, [])
+    const label = labels[action]
+    if (label) {
+      setPanelMessage(label)
+      setTimeout(() => setPanelMessage(null), 2500)
+    }
+  }, [setVerticalTabs])
 
   useKeyboard({
     onFocusAddress: () => setFocusSignal((n) => n + 1),
@@ -122,38 +256,158 @@ export default function App(): React.ReactElement {
         : (idx + 1) % tabs.length
       window.aura.tabs.activate(tabs[next].id)
     },
-    onSwitchTab: (i) => {
-      if (tabs[i]) window.aura.tabs.activate(tabs[i].id)
-    },
+    onSwitchTab: (i) => { if (tabs[i]) window.aura.tabs.activate(tabs[i].id) },
     onToggleSidebar: () => setSidebarCollapsed((c) => !c)
   })
+
+  useEffect(() => {
+    return window.aura.shortcuts.onToggleVerticalTabs(() => {
+      setVerticalTabs((v) => !v)
+    })
+  }, [setVerticalTabs])
 
   useEffect(() => {
     return window.aura.shortcuts.onNinjaModal(() => setNinjaModalOpen(true))
   }, [])
 
+  useEffect(() => {
+    return window.aura.shortcuts.onBookmark(() => setBookmarkSignal((n) => n + 1))
+  }, [])
+
+  useEffect(() => {
+    return window.aura.shortcuts.onReopenClosed(() => {
+      void window.aura.tabs.reopenClosed()
+    })
+  }, [])
+
+  useEffect(() => {
+    return window.aura.shortcuts.onTabSearch(() => setTabSearchOpen(true))
+  }, [])
+
+  useEffect(() => {
+    return window.aura.shortcuts.onToggleAssistant(() => setAssistantOpen((v) => !v))
+  }, [])
+
+  useEffect(() => {
+    return window.aura.shortcuts.onScreenshot(async () => {
+      if (activeId === null || !activeTab || activeTab.internal) return
+      const result = await window.aura.tabs.screenshot(activeId, 'save')
+      if (result === 'clipboard') {
+        setPanelMessage('Screenshot copied to clipboard')
+      } else if (result) {
+        setPanelMessage('Screenshot saved')
+      }
+      setTimeout(() => setPanelMessage(null), 2500)
+    })
+  }, [activeId, activeTab])
+
+  useEffect(() => {
+    return window.aura.shortcuts.onReaderMode(() => {
+      if (activeTab && !activeTab.internal) setReaderActive((v) => !v)
+    })
+  }, [activeTab])
+
+  useEffect(() => {
+    return window.aura.shortcuts.onToggleBookmarksBar(() => {
+      setBookmarksBarVisible((v) => !v)
+    })
+  }, [setBookmarksBarVisible])
+
+  useEffect(() => {
+    return window.aura.shortcuts.onFindInPage(() => {
+      if (activeTab && !activeTab.internal) setFindBarOpen(true)
+    })
+  }, [activeTab])
+
+  useEffect(() => {
+    return window.aura.shortcuts.onEscape(() => {
+      if (findBarOpen) {
+        setFindBarOpen(false)
+        if (activeId !== null) void window.aura.tabs.stopFind(activeId)
+      }
+    })
+  }, [findBarOpen, activeId])
+
+  useEffect(() => {
+    if (findBarOpen) {
+      setFindBarOpen(false)
+      if (activeId !== null) void window.aura.tabs.stopFind(activeId)
+    }
+  }, [activeId])
+
+  // STAGE 8.8 — listen for fullscreen enter/exit from main process
+  useEffect(() => {
+    const unsubEnter = window.aura.shortcuts.onFullscreenEnter(() => {
+      document.documentElement.setAttribute('data-fullscreen', 'true')
+    })
+    const unsubExit = window.aura.shortcuts.onFullscreenExit(() => {
+      document.documentElement.setAttribute('data-fullscreen', 'false')
+    })
+    return () => {
+      unsubEnter()
+      unsubExit()
+    }
+  }, [])
+
+  const renderChromePage = (): React.ReactElement | null => {
+    if (chromePage === 'privacy') return <PrivacyDashboard />
+    if (chromePage === 'history') return <HistoryPage onNavigate={handleNavigate} />
+    if (chromePage === 'bookmarks') return <BookmarksPage onNavigate={handleNavigate} />
+    if (chromePage === 'downloads') return <DownloadsPage />
+    if (chromePage === 'readingList') return <ReadingListPage onNavigate={handleNavigate} />
+    if (chromePage === 'boosts') return <BoostsPage />
+    return null
+  }
+
   return (
     <div className="app-root">
       <Sidebar
         collapsed={sidebarCollapsed}
+        verticalTabsMode={verticalTabs}
+        width={verticalWidth}
+        resizing={isResizing}
         onToggle={() => setSidebarCollapsed((c) => !c)}
         onAction={handleSidebarAction}
-      />
+        onResizeStart={onResizeStart}
+      >
+        {verticalTabs && (
+          <TabBar
+            tabs={tabs}
+            activeId={activeId}
+            onSelect={handleSelect}
+            onClose={handleClose}
+            onNew={handleNew}
+            isPrivate={isPrivate}
+            vertical
+            onChangeGroup={handleChangeGroup}
+          />
+        )}
+      </Sidebar>
 
       <div className="main-area">
         <div className="chrome">
-          <div className="chrome-top-row">
-            <TabBar
-              tabs={tabs}
-              activeId={activeId}
-              onSelect={(id) => window.aura.tabs.activate(id)}
-              onClose={(id) => window.aura.tabs.close(id)}
-              onNew={handleNew}
-              isPrivate={isPrivate}
-            />
-            <div className="drag-spacer" />
-            <WindowControls />
-          </div>
+          {!verticalTabs && (
+            <div className="chrome-top-row">
+              <TabBar
+                tabs={tabs}
+                activeId={activeId}
+                onSelect={handleSelect}
+                onClose={handleClose}
+                onNew={handleNew}
+                isPrivate={isPrivate}
+                onChangeGroup={handleChangeGroup}
+              />
+              <div className="drag-spacer" />
+              <WindowControls />
+            </div>
+          )}
+
+          {verticalTabs && (
+            <div className="chrome-top-row compact">
+              <div className="drag-spacer" />
+              <WindowControls />
+            </div>
+          )}
 
           <Toolbar
             tab={activeTab}
@@ -161,31 +415,75 @@ export default function App(): React.ReactElement {
             onForward={() => activeId !== null && window.aura.tabs.goForward(activeId)}
             onReload={() => activeId !== null && window.aura.tabs.reload(activeId)}
             onNavigate={handleNavigate}
-            onAssistant={() => setPanelMessage('AI assistant arrives in Stage 7')}
+            onAssistant={() => setAssistantOpen((v) => !v)}
             focusSignal={focusSignal}
+            onOpenBookmarks={() => setChromePage('bookmarks')}
+            onOpenHistory={() => setChromePage('history')}
+            onOpenDownloads={() => setChromePage('downloads')}
+            onOpenPrivacy={() => setChromePage('privacy')}
+            onOpenExtensions={() => {
+              setPanelMessage('Extensions page arrives in Stage 10')
+              setTimeout(() => setPanelMessage(null), 2500)
+            }}
+            onOpenSettings={() => {
+              setPanelMessage('Settings arrives in Stage 10')
+              setTimeout(() => setPanelMessage(null), 2500)
+            }}
+            onOpenProfile={() => {
+              setPanelMessage('Profile switcher arrives in Stage 10')
+              setTimeout(() => setPanelMessage(null), 2500)
+            }}
+            onOpenNinja={() => setNinjaModalOpen(true)}
+            onToggleVerticalTabs={() => setVerticalTabs((v) => !v)}
+            bookmarkSignal={bookmarkSignal}
+            onToggleReader={() => {
+              if (activeTab && !activeTab.internal) setReaderActive((v) => !v)
+            }}
+            readerActive={readerActive}
+            onSaveToReadingList={handleSaveToReadingList}
+          />
+
+          {/* STAGE 8.7: Hide bookmarks bar on internal pages (new tab, settings, etc.)
+              — matches Safari/Arc/Brave behavior. Bookmarks bar only appears
+              when you're actively browsing a real site. */}
+          <BookmarksBar
+            visible={showBookmarksBar && !!activeTab && !activeTab.internal && chromePage === null}
+            onNavigate={handleNavigate}
+            onOpenBookmarksPage={() => setChromePage('bookmarks')}
+            onToggleVisible={() => setBookmarksBarVisible((v) => !v)}
           />
         </div>
 
         <ProgressBar loading={activeTab?.loading ?? false} />
 
         <div className="content">
-          {chromePage === 'privacy' ? (
-            <PrivacyDashboard />
-          ) : activeTab?.internal ? (
-            isPrivate ? (
-              <NinjaNewTab onNavigate={handleNavigate} />
-            ) : (
-              <NewTabDashboard onNavigate={handleNavigate} />
-            )
-          ) : null}
+          {readerActive && activeId !== null && activeTab && !activeTab.internal ? (
+            <ReaderPage tabId={activeId} onExit={() => setReaderActive(false)} />
+          ) : chromePage !== null
+            ? renderChromePage()
+            : activeTab?.internal
+              ? isPrivate
+                ? <NinjaNewTab onNavigate={handleNavigate} />
+                : <NewTabDashboard onNavigate={handleNavigate} />
+              : null}
         </div>
 
-        {panelMessage && (
-          <div className="toast" key={panelMessage}>
-            {panelMessage}
-          </div>
-        )}
+        <FindBar
+          visible={findBarOpen}
+          matches={activeTab?.findMatches ?? null}
+          onSearch={(q, forward) => {
+            if (activeId !== null) void window.aura.tabs.find(activeId, q, forward)
+          }}
+          onNext={(forward) => {
+            if (activeId !== null) void window.aura.tabs.findNext(activeId, forward)
+          }}
+          onClose={() => {
+            setFindBarOpen(false)
+            if (activeId !== null) void window.aura.tabs.stopFind(activeId)
+          }}
+        />
 
+        {panelMessage && <div className="toast" key={panelMessage}>{panelMessage}</div>}
         <PermissionPrompt />
       </div>
 
@@ -198,12 +496,33 @@ export default function App(): React.ReactElement {
 
       <NinjaModal
         open={ninjaModalOpen}
-        onCancel={() => setNinjaModalOpen(false)}
-        onEnable={() => {
+        onClose={() => setNinjaModalOpen(false)}
+        onLaunch={() => {
           window.aura.ninja.launch()
           setNinjaModalOpen(false)
         }}
       />
+
+      <TabSearchPalette
+        open={tabSearchOpen}
+        tabs={tabs}
+        onClose={() => setTabSearchOpen(false)}
+        onSelect={(id) => window.aura.tabs.activate(id)}
+        onClose_={(id) => window.aura.tabs.close(id)}
+      />
+
+      <AssistantPanel
+        open={assistantOpen}
+        activeTab={activeTab}
+        onClose={() => setAssistantOpen(false)}
+      />
+
+      {isResizing && (
+        <div
+          className="resize-preview-line"
+          style={{ left: `${verticalWidth - 1}px` }}
+        />
+      )}
     </div>
   )
 }

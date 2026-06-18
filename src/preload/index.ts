@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { TabState } from '../main/tabs'
 import type { HistoryEntry } from '../main/history'
+import type { Bookmark, BookmarkFolder } from '../main/bookmarks'
+import type { DownloadRecord } from '../main/downloads'
+import type { ReadingItem } from '../main/reading-list'
+import type { Boost } from '../main/boosts'
+import type { SidebarPanel } from '../main/sidebar-panels'
+import type { TabGroup } from '../main/tab-groups'
 
 interface PrivacyStats {
   trackersBlocked: number
@@ -32,6 +38,31 @@ const api = {
       ipcRenderer.invoke('tabs:getState'),
     reorder: (fromId: number, toIndex: number): Promise<void> =>
       ipcRenderer.invoke('tabs:reorder', fromId, toIndex),
+    pin: (id: number): Promise<void> => ipcRenderer.invoke('tabs:pin', id),
+    unpin: (id: number): Promise<void> => ipcRenderer.invoke('tabs:unpin', id),
+    mute: (id: number): Promise<void> => ipcRenderer.invoke('tabs:mute', id),
+    duplicate: (id: number): Promise<number | null> => ipcRenderer.invoke('tabs:duplicate', id),
+    unload: (id: number): Promise<void> => ipcRenderer.invoke('tabs:unload', id),
+    closeOthers: (id: number): Promise<void> => ipcRenderer.invoke('tabs:closeOthers', id),
+    closeToRight: (id: number): Promise<void> => ipcRenderer.invoke('tabs:closeToRight', id),
+    closeDuplicates: (): Promise<void> => ipcRenderer.invoke('tabs:closeDuplicates'),
+    reopenClosed: (): Promise<number | null> => ipcRenderer.invoke('tabs:reopenClosed'),
+    find: (id: number, query: string, forward: boolean): Promise<void> =>
+      ipcRenderer.invoke('tabs:find', id, query, forward),
+    findNext: (id: number, forward: boolean): Promise<void> =>
+      ipcRenderer.invoke('tabs:findNext', id, forward),
+    stopFind: (id: number): Promise<void> => ipcRenderer.invoke('tabs:stopFind', id),
+    setZoom: (id: number, factor: number): Promise<void> =>
+      ipcRenderer.invoke('tabs:setZoom', id, factor),
+    zoomIn: (id: number): Promise<void> => ipcRenderer.invoke('tabs:zoomIn', id),
+    zoomOut: (id: number): Promise<void> => ipcRenderer.invoke('tabs:zoomOut', id),
+    zoomReset: (id: number): Promise<void> => ipcRenderer.invoke('tabs:zoomReset', id),
+    print: (id: number): Promise<void> => ipcRenderer.invoke('tabs:print', id),
+    pip: (id: number): Promise<boolean> => ipcRenderer.invoke('tabs:pip', id),
+    readerExtract: (id: number): Promise<{ url: string; title: string; html: string } | null> =>
+      ipcRenderer.invoke('tabs:readerExtract', id),
+    screenshot: (id: number, action: 'save' | 'copy'): Promise<string | null> =>
+      ipcRenderer.invoke('tabs:screenshot', id, action),
     onUpdate: (cb: (tabs: TabState[], activeId: number | null) => void): (() => void) => {
       const listener = (
         _e: Electron.IpcRendererEvent,
@@ -58,6 +89,8 @@ const api = {
   layout: {
     setSidebarWidth: (width: number): Promise<void> =>
       ipcRenderer.invoke('layout:setSidebarWidth', width),
+    setChromeHeight: (height: number): Promise<void> =>
+      ipcRenderer.invoke('layout:setChromeHeight', height),
     hideView: (): Promise<void> => ipcRenderer.invoke('layout:hideView'),
     showView: (): Promise<void> => ipcRenderer.invoke('layout:showView')
   },
@@ -104,36 +137,236 @@ const api = {
       ipcRenderer.invoke('shields:isEnabled', hostname)
   },
 
+  // STAGE 6
+  history: {
+    all: (limit?: number): Promise<HistoryEntry[]> => ipcRenderer.invoke('history:all', limit),
+    search: (q: string): Promise<HistoryEntry[]> => ipcRenderer.invoke('history:search', q),
+    delete: (url: string): Promise<void> => ipcRenderer.invoke('history:delete', url),
+    clear: (): Promise<void> => ipcRenderer.invoke('history:clear'),
+    count: (): Promise<number> => ipcRenderer.invoke('history:count')
+  },
+
+  bookmarks: {
+    list: (folderId?: number | null): Promise<Bookmark[]> =>
+      ipcRenderer.invoke('bookmarks:list', folderId),
+    listBar: (): Promise<Bookmark[]> => ipcRenderer.invoke('bookmarks:listBar'),
+    reorder: (orderedIds: number[]): Promise<void> =>
+      ipcRenderer.invoke('bookmarks:reorder', orderedIds),
+    addSeparator: (folderId?: number | null): Promise<Bookmark> =>
+      ipcRenderer.invoke('bookmarks:addSeparator', folderId),
+    add: (url: string, title: string, folderId?: number | null): Promise<Bookmark> =>
+      ipcRenderer.invoke('bookmarks:add', url, title, folderId),
+    delete: (id: number): Promise<void> => ipcRenderer.invoke('bookmarks:delete', id),
+    update: (
+      id: number,
+      changes: { url?: string; title?: string; folderId?: number | null }
+    ): Promise<void> => ipcRenderer.invoke('bookmarks:update', id, changes),
+    isBookmarked: (url: string): Promise<boolean> =>
+      ipcRenderer.invoke('bookmarks:isBookmarked', url),
+    listFolders: (): Promise<BookmarkFolder[]> => ipcRenderer.invoke('bookmarks:listFolders'),
+    addFolder: (name: string): Promise<BookmarkFolder> =>
+      ipcRenderer.invoke('bookmarks:addFolder', name),
+    deleteFolder: (id: number): Promise<void> =>
+      ipcRenderer.invoke('bookmarks:deleteFolder', id),
+    onUpdate: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('bookmarks:update', l)
+      return () => ipcRenderer.removeListener('bookmarks:update', l)
+    }
+  },
+
+  downloads: {
+    list: (): Promise<DownloadRecord[]> => ipcRenderer.invoke('downloads:list'),
+    cancel: (id: number): Promise<void> => ipcRenderer.invoke('downloads:cancel', id),
+    open: (savePath: string): Promise<void> => ipcRenderer.invoke('downloads:open', savePath),
+    reveal: (savePath: string): Promise<void> =>
+      ipcRenderer.invoke('downloads:reveal', savePath),
+    deleteRecord: (id: number): Promise<void> =>
+      ipcRenderer.invoke('downloads:deleteRecord', id),
+    clearCompleted: (): Promise<void> => ipcRenderer.invoke('downloads:clearCompleted'),
+    onUpdate: (cb: () => void): (() => void) => {
+      const listener = (): void => cb()
+      ipcRenderer.on('downloads:update', listener)
+      return () => ipcRenderer.removeListener('downloads:update', listener)
+    }
+  },
+
   shortcuts: {
     onFocusAddress: (cb: () => void): (() => void) => {
-      const listener = (): void => cb()
-      ipcRenderer.on('shortcut:focusAddress', listener)
-      return () => ipcRenderer.removeListener('shortcut:focusAddress', listener)
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:focusAddress', l)
+      return () => ipcRenderer.removeListener('shortcut:focusAddress', l)
     },
     onCommandPalette: (cb: () => void): (() => void) => {
-      const listener = (): void => cb()
-      ipcRenderer.on('shortcut:commandPalette', listener)
-      return () => ipcRenderer.removeListener('shortcut:commandPalette', listener)
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:commandPalette', l)
+      return () => ipcRenderer.removeListener('shortcut:commandPalette', l)
     },
     onNextTab: (cb: (reverse: boolean) => void): (() => void) => {
-      const listener = (_e: Electron.IpcRendererEvent, r: boolean): void => cb(r)
-      ipcRenderer.on('shortcut:nextTab', listener)
-      return () => ipcRenderer.removeListener('shortcut:nextTab', listener)
+      const l = (_e: Electron.IpcRendererEvent, r: boolean): void => cb(r)
+      ipcRenderer.on('shortcut:nextTab', l)
+      return () => ipcRenderer.removeListener('shortcut:nextTab', l)
     },
     onSwitchTab: (cb: (index: number) => void): (() => void) => {
-      const listener = (_e: Electron.IpcRendererEvent, i: number): void => cb(i)
-      ipcRenderer.on('shortcut:switchTab', listener)
-      return () => ipcRenderer.removeListener('shortcut:switchTab', listener)
+      const l = (_e: Electron.IpcRendererEvent, i: number): void => cb(i)
+      ipcRenderer.on('shortcut:switchTab', l)
+      return () => ipcRenderer.removeListener('shortcut:switchTab', l)
     },
     onToggleSidebar: (cb: () => void): (() => void) => {
-      const listener = (): void => cb()
-      ipcRenderer.on('shortcut:toggleSidebar', listener)
-      return () => ipcRenderer.removeListener('shortcut:toggleSidebar', listener)
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:toggleSidebar', l)
+      return () => ipcRenderer.removeListener('shortcut:toggleSidebar', l)
     },
     onNinjaModal: (cb: () => void): (() => void) => {
-      const listener = (): void => cb()
-      ipcRenderer.on('shortcut:ninjaModal', listener)
-      return () => ipcRenderer.removeListener('shortcut:ninjaModal', listener)
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:ninjaModal', l)
+      return () => ipcRenderer.removeListener('shortcut:ninjaModal', l)
+    },
+    onToggleVerticalTabs: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:toggleVerticalTabs', l)
+      return () => ipcRenderer.removeListener('shortcut:toggleVerticalTabs', l)
+    },
+    onReopenClosed: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:reopenClosed', l)
+      return () => ipcRenderer.removeListener('shortcut:reopenClosed', l)
+    },
+    onBookmark: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:bookmark', l)
+      return () => ipcRenderer.removeListener('shortcut:bookmark', l)
+    },
+    onToggleBookmarksBar: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:toggleBookmarksBar', l)
+      return () => ipcRenderer.removeListener('shortcut:toggleBookmarksBar', l)
+    },
+    onFindInPage: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:findInPage', l)
+      return () => ipcRenderer.removeListener('shortcut:findInPage', l)
+    },
+    onEscape: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:escape', l)
+      return () => ipcRenderer.removeListener('shortcut:escape', l)
+    },
+    onTabSearch: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:tabSearch', l)
+      return () => ipcRenderer.removeListener('shortcut:tabSearch', l)
+    },
+    onScreenshot: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:screenshot', l)
+      return () => ipcRenderer.removeListener('shortcut:screenshot', l)
+    },
+    onReaderMode: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:readerMode', l)
+      return () => ipcRenderer.removeListener('shortcut:readerMode', l)
+    },
+    onFullscreenEnter: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('fullscreen:enter', l)
+      return () => ipcRenderer.removeListener('fullscreen:enter', l)
+    },
+    onFullscreenExit: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('fullscreen:exit', l)
+      return () => ipcRenderer.removeListener('fullscreen:exit', l)
+    },
+    onToggleAssistant: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:toggleAssistant', l)
+      return () => ipcRenderer.removeListener('shortcut:toggleAssistant', l)
+    }
+  },
+
+  groups: {
+    create: (name: string, color: string) => ipcRenderer.invoke('groups:create', name, color),
+    delete: (id: string) => ipcRenderer.invoke('groups:delete', id),
+    rename: (id: string, name: string) => ipcRenderer.invoke('groups:rename', id, name),
+    setColor: (id: string, color: string) => ipcRenderer.invoke('groups:setColor', id, color),
+    toggleCollapsed: (id: string) => ipcRenderer.invoke('groups:toggleCollapsed', id),
+    addTab: (groupId: string, tabId: number) => ipcRenderer.invoke('groups:addTab', groupId, tabId),
+    removeTab: (tabId: number) => ipcRenderer.invoke('groups:removeTab', tabId),
+    list: () => ipcRenderer.invoke('groups:list'),
+    snapshot: () => ipcRenderer.invoke('groups:snapshot')
+  },
+
+  readingList: {
+    add: (url: string, title: string, excerpt?: string) =>
+      ipcRenderer.invoke('readingList:add', url, title, excerpt),
+    delete: (id: number) => ipcRenderer.invoke('readingList:delete', id),
+    markRead: (id: number, read: boolean) => ipcRenderer.invoke('readingList:markRead', id, read),
+    list: (filter?: 'all' | 'unread' | 'read') => ipcRenderer.invoke('readingList:list', filter),
+    clearRead: () => ipcRenderer.invoke('readingList:clearRead'),
+    onUpdate: (cb: () => void) => {
+      const l = () => cb()
+      ipcRenderer.on('readingList:update', l)
+      return () => ipcRenderer.removeListener('readingList:update', l)
+    }
+  },
+
+  boosts: {
+    add: (host: string, name: string, css: string) => ipcRenderer.invoke('boosts:add', host, name, css),
+    update: (id: number, changes: { host?: string; name?: string; css?: string; enabled?: boolean }) =>
+      ipcRenderer.invoke('boosts:update', id, changes),
+    delete: (id: number) => ipcRenderer.invoke('boosts:delete', id),
+    list: () => ipcRenderer.invoke('boosts:list'),
+    onUpdate: (cb: () => void) => {
+      const l = () => cb()
+      ipcRenderer.on('boosts:update', l)
+      return () => ipcRenderer.removeListener('boosts:update', l)
+    }
+  },
+
+  ai: {
+    getConfig: () => ipcRenderer.invoke('ai:getConfig'),
+    setProvider: (config: {
+      id: 'mock' | 'openai' | 'anthropic' | 'ollama'
+      apiKey?: string
+      baseUrl?: string
+      defaultModel?: string
+    }) => ipcRenderer.invoke('ai:setProvider', config),
+    listModels: () => ipcRenderer.invoke('ai:listModels'),
+    isReady: () => ipcRenderer.invoke('ai:isReady'),
+
+    createConversation: (title: string, pageUrl: string | null, pageTitle: string | null) =>
+      ipcRenderer.invoke('ai:createConversation', title, pageUrl, pageTitle),
+    listConversations: () => ipcRenderer.invoke('ai:listConversations'),
+    getMessages: (id: number) => ipcRenderer.invoke('ai:getMessages', id),
+    deleteConversation: (id: number) => ipcRenderer.invoke('ai:deleteConversation', id),
+    renameConversation: (id: number, title: string) =>
+      ipcRenderer.invoke('ai:renameConversation', id, title),
+
+    stream: (payload: {
+      streamId: string
+      conversationId: number | null
+      userMessage: string
+      includePageContext: boolean
+      tabId?: number
+    }) => ipcRenderer.invoke('ai:stream', payload),
+
+    onStreamChunk: (cb: (data: { streamId: string; chunk: string }) => void) => {
+      const l = (_e: Electron.IpcRendererEvent, data: { streamId: string; chunk: string }) =>
+        cb(data)
+      ipcRenderer.on('ai:stream:chunk', l)
+      return () => ipcRenderer.removeListener('ai:stream:chunk', l)
+    },
+    onStreamDone: (cb: (data: { streamId: string; conversationId: number }) => void) => {
+      const l = (_e: Electron.IpcRendererEvent, data: { streamId: string; conversationId: number }) =>
+        cb(data)
+      ipcRenderer.on('ai:stream:done', l)
+      return () => ipcRenderer.removeListener('ai:stream:done', l)
+    },
+    onStreamError: (cb: (data: { streamId: string; error: string }) => void) => {
+      const l = (_e: Electron.IpcRendererEvent, data: { streamId: string; error: string }) =>
+        cb(data)
+      ipcRenderer.on('ai:stream:error', l)
+      return () => ipcRenderer.removeListener('ai:stream:error', l)
     }
   }
 }

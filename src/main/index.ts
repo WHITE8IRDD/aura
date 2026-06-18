@@ -3,7 +3,14 @@ import { join } from 'path'
 import { TabManager } from './tabs'
 import { registerWindowControls, wireMaximizeEvents } from './window-controls'
 import { registerShortcuts } from './shortcuts'
-import { search as searchHistory, recent as recentHistory } from './history'
+import {
+  search as searchHistory,
+  recent as recentHistory,
+  all as allHistory,
+  deleteEntry as deleteHistoryEntry,
+  clear as clearHistory,
+  count as historyCount
+} from './history'
 import { preconnect } from './preconnect'
 import { getPrivacyStats } from './privacy-stats'
 import { NinjaWindowManager } from './ninja'
@@ -19,18 +26,73 @@ import { setupAntiFingerprintFlags, setupSessionFingerprintDefenses } from './se
 import { setupPermissionPrompts, respondToPermission } from './security/permissions'
 import { isPhishingDomain } from './blocker/phishing'
 import { fetchFavicon } from './favicons'
+import { getDb, closeDb } from './db'
+import {
+  addBookmark, deleteBookmark, updateBookmark, listBookmarks, isBookmarked,
+  addFolder, deleteFolder, listFolders, listBarBookmarks, reorderBookmarks, addSeparator
+} from './bookmarks'
+import {
+  setupDownloads, attachDownloadHandler, listDownloads,
+  cancelDownload, openDownloadedFile, revealDownloadedFile,
+  deleteDownloadRecord, clearCompletedDownloads
+} from './downloads'
+import { captureTab, saveScreenshot, copyScreenshotToClipboard } from './screenshot'
+import { getReaderPayload } from './reader'
+import {
+  addReadingItem, deleteReadingItem, markRead, listReadingItems, clearRead
+} from './reading-list'
+import {
+  addBoost, updateBoost, deleteBoost, listBoosts
+} from './boosts'
+import {
+  createGroup, deleteGroup, renameGroup, setGroupColor, toggleCollapsed,
+  addTabToGroup, removeTabFromAnyGroup, listGroups, snapshot as snapshotGroups
+} from './tab-groups'
+import { aiManager } from './ai/manager'
+import { extractPageContext } from './ai/page-context'
+import {
+  createConversation, addMessage, listConversations, getMessages,
+  deleteConversation, renameConversation
+} from './ai/conversations'
+import type { AiMessage } from './ai/types'
+
+// ============================================================
+// STAGE 8.5 — PERFORMANCE HARDENING
+// Enable hardware video decode + GPU acceleration BEFORE app.ready
+// ============================================================
+
+app.commandLine.appendSwitch('enable-features', [
+  'VaapiVideoDecoder',
+  'VaapiVideoEncoder',
+  'PlatformHEVCDecoderSupport',
+  'CanvasOopRasterization',
+  'AcceleratedVideoDecodeLinuxGL',
+  'UseSkiaRenderer',
+  'UseChromeOSDirectVideoDecoder'
+].join(','))
 
 app.commandLine.appendSwitch('enable-gpu-rasterization')
 app.commandLine.appendSwitch('enable-zero-copy')
 app.commandLine.appendSwitch('enable-accelerated-video-decode')
+app.commandLine.appendSwitch('enable-accelerated-mjpeg-decode')
+app.commandLine.appendSwitch('enable-accelerated-2d-canvas')
 
-// IMPORTANT: For Widevine DRM video playback (YouTube, Netflix, Hulu)
-// to work, you need to either:
-//   1. Use @castlabs/electron-releases instead of stock electron
-//      (replace "electron" with "@castlabs/electron-releases" in package.json)
-//   2. Or accept that DRM-protected video won't play in Aura
-// Without Widevine, YouTube's player shows a blank white screen.
-// Documented in SECURITY.md as a known v1 limitation.
+app.commandLine.appendSwitch('disable-renderer-backgrounding')
+app.commandLine.appendSwitch('disable-background-timer-throttling')
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+
+app.commandLine.appendSwitch('shared-array-buffer-allowed-for-electron')
+
+app.commandLine.appendSwitch('ignore-gpu-blocklist')
+
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('use-angle', 'd3d11')
+  app.commandLine.appendSwitch('enable-features', 'D3D11VideoDecoder')
+}
+
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('enable-features', 'VideoToolboxVp9Decoding')
+}
 
 setupAntiFingerprintFlags()
 
@@ -45,17 +107,22 @@ let mainWindow: BrowserWindow | null = null
 let tabs: TabManager | null = null
 let ninja: NinjaWindowManager | null = null
 
-const blockerReady = app.whenReady().then(async () => {
+const startupReady = app.whenReady().then(async () => {
+  console.log('[Aura] Opening database…')
+  getDb()
   console.log('[Aura] Pre-initializing blocker engine…')
   await setupDefaultSessionBlocking()
   setupHttpsOnly(session.defaultSession)
   setupSessionFingerprintDefenses(session.defaultSession)
   setupPermissionPrompts(session.defaultSession)
-  console.log('[Aura] Blocker engine ready')
+  setupDownloads()
+  await aiManager.init()
+  console.log('[Aura/ai] Manager ready, active provider:', aiManager.getActive().label)
+  console.log('[Aura] Ready')
 })
 
 async function createWindow(): Promise<void> {
-  await blockerReady
+  await startupReady
 
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -116,23 +183,79 @@ function getTabsForEvent(e: Electron.IpcMainInvokeEvent): TabManager | null {
   return ninjaAny.getManager?.(win.id) ?? ninjaAny.getTabsForWindow?.(win) ?? null
 }
 
+// ---- Tab IPC ----
 ipcMain.handle('tabs:create', (e, url?: string) => getTabsForEvent(e)?.create(url))
 ipcMain.handle('tabs:close', (e, id: number) => getTabsForEvent(e)?.close(id))
 ipcMain.handle('tabs:activate', (e, id: number) => getTabsForEvent(e)?.activate(id))
 ipcMain.handle('tabs:navigate', (e, id: number, url: string) =>
-  getTabsForEvent(e)?.navigate(id, url)
-)
+  getTabsForEvent(e)?.navigate(id, url))
 ipcMain.handle('tabs:goBack', (e, id: number) => getTabsForEvent(e)?.goBack(id))
 ipcMain.handle('tabs:goForward', (e, id: number) => getTabsForEvent(e)?.goForward(id))
 ipcMain.handle('tabs:reload', (e, id: number) => getTabsForEvent(e)?.reload(id))
 ipcMain.handle('tabs:getState', (e) => getTabsForEvent(e)?.getState())
 ipcMain.handle('tabs:reorder', (e, fromId: number, toIndex: number) =>
-  getTabsForEvent(e)?.reorder(fromId, toIndex)
-)
-ipcMain.handle('layout:setSidebarWidth', (e, width: number) =>
-  getTabsForEvent(e)?.setSidebarWidth(width)
-)
+  getTabsForEvent(e)?.reorder(fromId, toIndex))
+ipcMain.handle('tabs:pin', (e, id: number) => getTabsForEvent(e)?.pin(id))
+ipcMain.handle('tabs:unpin', (e, id: number) => getTabsForEvent(e)?.unpin(id))
+ipcMain.handle('tabs:mute', (e, id: number) => getTabsForEvent(e)?.toggleMute(id))
+ipcMain.handle('tabs:duplicate', (e, id: number) => getTabsForEvent(e)?.duplicate(id))
+ipcMain.handle('tabs:unload', (e, id: number) => getTabsForEvent(e)?.unload(id))
+ipcMain.handle('tabs:closeOthers', (e, id: number) => getTabsForEvent(e)?.closeOthers(id))
+ipcMain.handle('tabs:closeToRight', (e, id: number) => getTabsForEvent(e)?.closeToRight(id))
+ipcMain.handle('tabs:closeDuplicates', (e) => getTabsForEvent(e)?.closeDuplicates())
+ipcMain.handle('tabs:reopenClosed', (e) => getTabsForEvent(e)?.reopenLastClosed())
 
+ipcMain.handle('tabs:find', (e, id: number, query: string, forward: boolean) =>
+  getTabsForEvent(e)?.findInPage(id, query, forward))
+ipcMain.handle('tabs:findNext', (e, id: number, forward: boolean) =>
+  getTabsForEvent(e)?.findNext(id, forward))
+ipcMain.handle('tabs:stopFind', (e, id: number) => getTabsForEvent(e)?.stopFindInPage(id))
+
+ipcMain.handle('tabs:setZoom', (e, id: number, factor: number) =>
+  getTabsForEvent(e)?.setZoom(id, factor))
+ipcMain.handle('tabs:zoomIn', (e, id: number) => getTabsForEvent(e)?.zoomIn(id))
+ipcMain.handle('tabs:zoomOut', (e, id: number) => getTabsForEvent(e)?.zoomOut(id))
+ipcMain.handle('tabs:zoomReset', (e, id: number) => getTabsForEvent(e)?.zoomReset(id))
+ipcMain.handle('tabs:print', (e, id: number) => getTabsForEvent(e)?.print(id))
+ipcMain.handle('tabs:pip', (e, id: number) => getTabsForEvent(e)?.pictureInPicture(id))
+
+ipcMain.handle('tabs:readerExtract', async (e, id: number) => {
+  const tm = getTabsForEvent(e); if (!tm) return null
+  const wcId = tm.getWebContentsId(id); if (wcId === null) return null
+  const { webContents } = require('electron')
+  const wc = webContents.fromId(wcId); if (!wc) return null
+  return getReaderPayload(wc)
+})
+
+ipcMain.handle('tabs:screenshot', async (e, id: number, action: 'save' | 'copy') => {
+  const tm = getTabsForEvent(e); if (!tm) return null
+  const wcId = tm.getWebContentsId(id); if (wcId === null) return null
+  const win = BrowserWindow.fromWebContents(e.sender); if (!win) return null
+  const dataUrl = await captureTab({ win, webContentsId: wcId })
+  if (!dataUrl) return null
+  if (action === 'copy') { copyScreenshotToClipboard(dataUrl); return 'clipboard' }
+  return await saveScreenshot(win, dataUrl, 'screenshot')
+})
+
+// STAGE 8.5: zoom-wheel via proper IPC (replaces console-message hack)
+ipcMain.on('tab:wheelZoom', (e, direction: 'in' | 'out') => {
+  const tm = getTabsForEvent(e as unknown as Electron.IpcMainInvokeEvent)
+  if (!tm) return
+  const wcId = e.sender.id
+  const allTabs = (tm as unknown as { records: Map<number, { view: { webContents: { id: number } } | null }> }).records
+  for (const [tabId, rec] of allTabs.entries()) {
+    if (rec.view?.webContents.id === wcId) {
+      if (direction === 'in') tm.zoomIn(tabId)
+      else tm.zoomOut(tabId)
+      return
+    }
+  }
+})
+
+ipcMain.handle('layout:setSidebarWidth', (e, width: number) =>
+  getTabsForEvent(e)?.setSidebarWidth(width))
+ipcMain.handle('layout:setChromeHeight', (e, height: number) =>
+  getTabsForEvent(e)?.setChromeHeight(height))
 ipcMain.handle('layout:hideView', (e) => getTabsForEvent(e)?.hideActiveView())
 ipcMain.handle('layout:showView', (e) => getTabsForEvent(e)?.showActiveView())
 
@@ -159,9 +282,7 @@ ipcMain.handle('ninja:launch', () => ninja?.launch())
 ipcMain.handle('ninja:isPrivate', (e) => {
   const win = BrowserWindow.fromWebContents(e.sender)
   if (!win || !ninja) return false
-  const ninjaAny = ninja as unknown as {
-    isNinjaWindow?: (arg: BrowserWindow | number) => boolean
-  }
+  const ninjaAny = ninja as unknown as { isNinjaWindow?: (arg: BrowserWindow | number) => boolean }
   if (typeof ninjaAny.isNinjaWindow === 'function') {
     try { return ninjaAny.isNinjaWindow(win.id) } catch {}
     try { return ninjaAny.isNinjaWindow(win) } catch {}
@@ -175,18 +296,173 @@ ipcMain.handle('shields:toggle', (_e, hostname: string) => {
 })
 ipcMain.handle('shields:isEnabled', (_e, hostname: string) => areShieldsEnabledFor(hostname))
 
-app.whenReady().then(() => {
-  void createWindow()
+ipcMain.handle('history:all', (_e, limit?: number) => allHistory(limit ?? 500))
+ipcMain.handle('history:search', (_e, q: string) => searchHistory(q, 50))
+ipcMain.handle('history:delete', (_e, url: string) => deleteHistoryEntry(url))
+ipcMain.handle('history:clear', () => clearHistory())
+ipcMain.handle('history:count', () => historyCount())
+
+ipcMain.handle('bookmarks:list', (_e, folderId?: number | null) =>
+  listBookmarks(folderId ?? null))
+ipcMain.handle('bookmarks:add', (_e, url: string, title: string, folderId?: number | null) =>
+  addBookmark(url, title, folderId ?? null))
+ipcMain.handle('bookmarks:delete', (_e, id: number) => deleteBookmark(id))
+ipcMain.handle('bookmarks:update',
+  (_e, id: number, changes: { url?: string; title?: string; folderId?: number | null }) =>
+    updateBookmark(id, changes))
+ipcMain.handle('bookmarks:isBookmarked', (_e, url: string) => isBookmarked(url))
+ipcMain.handle('bookmarks:listFolders', () => listFolders())
+ipcMain.handle('bookmarks:addFolder', (_e, name: string) => addFolder(name))
+ipcMain.handle('bookmarks:deleteFolder', (_e, id: number) => deleteFolder(id))
+ipcMain.handle('bookmarks:listBar', () => listBarBookmarks())
+ipcMain.handle('bookmarks:reorder', (_e, orderedIds: number[]) => reorderBookmarks(orderedIds))
+ipcMain.handle('bookmarks:addSeparator', (_e, folderId?: number | null) =>
+  addSeparator(folderId ?? null))
+
+ipcMain.handle('downloads:list', () => listDownloads())
+ipcMain.handle('downloads:cancel', (_e, id: number) => cancelDownload(id))
+ipcMain.handle('downloads:open', (_e, savePath: string) => openDownloadedFile(savePath))
+ipcMain.handle('downloads:reveal', (_e, savePath: string) => revealDownloadedFile(savePath))
+ipcMain.handle('downloads:deleteRecord', (_e, id: number) => deleteDownloadRecord(id))
+ipcMain.handle('downloads:clearCompleted', () => clearCompletedDownloads())
+
+ipcMain.handle('readingList:add', (_e, url: string, title: string, excerpt?: string) =>
+  addReadingItem(url, title, excerpt))
+ipcMain.handle('readingList:delete', (_e, id: number) => deleteReadingItem(id))
+ipcMain.handle('readingList:markRead', (_e, id: number, read: boolean) => markRead(id, read))
+ipcMain.handle('readingList:list', (_e, filter?: 'all' | 'unread' | 'read') =>
+  listReadingItems(filter ?? 'all'))
+ipcMain.handle('readingList:clearRead', () => clearRead())
+
+ipcMain.handle('boosts:add', (_e, host: string, name: string, css: string) =>
+  addBoost(host, name, css))
+ipcMain.handle('boosts:update',
+  (_e, id: number, changes: { host?: string; name?: string; css?: string; enabled?: boolean }) =>
+    updateBoost(id, changes))
+ipcMain.handle('boosts:delete', (_e, id: number) => deleteBoost(id))
+ipcMain.handle('boosts:list', () => listBoosts())
+
+ipcMain.handle('groups:create', (_e, name: string, color: string) => createGroup(name, color))
+ipcMain.handle('groups:delete', (_e, id: string) => deleteGroup(id))
+ipcMain.handle('groups:rename', (_e, id: string, name: string) => renameGroup(id, name))
+ipcMain.handle('groups:setColor', (_e, id: string, color: string) => setGroupColor(id, color))
+ipcMain.handle('groups:toggleCollapsed', (_e, id: string) => toggleCollapsed(id))
+ipcMain.handle('groups:addTab', (_e, groupId: string, tabId: number) => addTabToGroup(groupId, tabId))
+ipcMain.handle('groups:removeTab', (_e, tabId: number) => removeTabFromAnyGroup(tabId))
+ipcMain.handle('groups:list', () => listGroups())
+ipcMain.handle('groups:snapshot', () => snapshotGroups())
+
+// ====================================================================
+// STAGE 9 — AI Assistant
+// ====================================================================
+
+ipcMain.handle('ai:getConfig', () => aiManager.getConfig())
+ipcMain.handle('ai:setProvider', (_e, config) => aiManager.setProvider(config))
+ipcMain.handle('ai:listModels', () => aiManager.listModels())
+ipcMain.handle('ai:isReady', () => aiManager.getActive().isReady())
+
+ipcMain.handle('ai:createConversation', (_e, title: string, pageUrl: string | null, pageTitle: string | null) =>
+  createConversation(title, pageUrl, pageTitle))
+ipcMain.handle('ai:listConversations', () => listConversations())
+ipcMain.handle('ai:getMessages', (_e, id: number) => getMessages(id))
+ipcMain.handle('ai:deleteConversation', (_e, id: number) => deleteConversation(id))
+ipcMain.handle('ai:renameConversation', (_e, id: number, title: string) =>
+  renameConversation(id, title))
+
+ipcMain.handle('ai:stream', async (e, payload: {
+  streamId: string
+  conversationId: number | null
+  userMessage: string
+  includePageContext: boolean
+  tabId?: number
+}) => {
+  const sender = e.sender
+  const { streamId, conversationId, userMessage, includePageContext, tabId } = payload
+
+  const history: AiMessage[] = []
+
+  if (includePageContext && tabId !== undefined) {
+    const tm = getTabsForEvent(e)
+    const wcId = tm?.getWebContentsId(tabId)
+    if (wcId !== null && wcId !== undefined) {
+      const { webContents } = require('electron')
+      const wc = webContents.fromId(wcId)
+      if (wc) {
+        const ctx = await extractPageContext(wc)
+        if (ctx && ctx.text) {
+          history.push({
+            role: 'system',
+            content: `You are an AI assistant inside the Aura web browser. The user is currently viewing this page:
+
+URL: ${ctx.url}
+TITLE: ${ctx.title}
+
+PAGE CONTENT:
+${ctx.text}
+
+Answer questions based on this content. If the answer isn't in the page, say so.`
+          })
+        }
+      }
+    }
+  }
+
+  if (conversationId !== null) {
+    const prevMessages = getMessages(conversationId)
+    for (const m of prevMessages) {
+      if (m.role !== 'system') {
+        history.push({ role: m.role, content: m.content })
+      }
+    }
+  }
+
+  history.push({ role: 'user', content: userMessage })
+
+  let convId = conversationId
+  if (convId === null) {
+    const conv = createConversation(
+      userMessage.slice(0, 60),
+      null,
+      null
+    )
+    convId = conv.id
+  }
+  addMessage(convId, 'user', userMessage)
+
+  const provider = aiManager.getActive()
+  let assembled = ''
+
+  try {
+    for await (const chunk of provider.complete({ messages: history })) {
+      assembled += chunk
+      if (!sender.isDestroyed()) {
+        sender.send('ai:stream:chunk', { streamId, chunk })
+      }
+    }
+    if (assembled.trim()) {
+      addMessage(convId, 'assistant', assembled)
+    }
+    if (!sender.isDestroyed()) {
+      sender.send('ai:stream:done', { streamId, conversationId: convId })
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn('[Aura/ai] Stream error:', message)
+    if (!sender.isDestroyed()) {
+      sender.send('ai:stream:error', { streamId, error: message })
+    }
+  }
 })
+
+app.whenReady().then(() => { void createWindow() })
 
 app.on('window-all-closed', () => {
+  closeDb()
   if (process.platform !== 'darwin') app.quit()
 })
-
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) void createWindow()
 })
-
 app.on('web-contents-created', (_e, contents) => {
   contents.on('will-navigate', (event, url) => {
     if (url.startsWith('javascript:') || url.startsWith('data:text/html')) {
@@ -201,4 +477,5 @@ export async function setupNinjaSession(s: Electron.Session): Promise<void> {
   setupHttpsOnly(s)
   setupSessionFingerprintDefenses(s)
   setupPermissionPrompts(s)
+  attachDownloadHandler(s, true)  // STAGE 9.5: isPrivate=true — downloads don't get persisted
 }

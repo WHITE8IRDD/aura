@@ -51,9 +51,83 @@ export function registerShortcuts(win: BrowserWindow, tabs: TabManager): void {
       win.webContents.send('shortcut:toggleSidebar')
     }
 
+    // Ctrl+Shift+E → toggle vertical tabs
+    if (ctrl && shift && key === 'e') {
+      win.webContents.send('shortcut:toggleVerticalTabs')
+    }
+
+    // Ctrl+Shift+T → reopen last closed tab
+    if (ctrl && shift && key === 't') {
+      win.webContents.send('shortcut:reopenClosed')
+    }
+
+    // Ctrl+D → bookmark current page
+    if (ctrl && !shift && key === 'd') {
+      win.webContents.send('shortcut:bookmark')
+    }
+
+    // Ctrl+Shift+B → toggle bookmarks bar visibility
+    if (ctrl && shift && key === 'b') {
+      win.webContents.send('shortcut:toggleBookmarksBar')
+    }
+
     // Ctrl+Shift+N → open ninja modal
     if (ctrl && shift && key === 'n') {
       win.webContents.send('ninja:openModal')
+    }
+
+    // STAGE 7A — Find in page (Ctrl+F)
+    if (ctrl && !shift && key === 'f') {
+      win.webContents.send('shortcut:findInPage')
+    }
+
+    // STAGE 7A — Print (Ctrl+P)
+    if (ctrl && !shift && key === 'p') {
+      const active = tabs.getActiveId()
+      if (active !== null) tabs.print(active)
+    }
+
+    // STAGE 7A — Zoom in (Ctrl+= and Ctrl++)
+    if (ctrl && !shift && (key === '=' || key === '+')) {
+      const active = tabs.getActiveId()
+      if (active !== null) tabs.zoomIn(active)
+    }
+
+    // STAGE 7A — Zoom out (Ctrl+-)
+    if (ctrl && !shift && key === '-') {
+      const active = tabs.getActiveId()
+      if (active !== null) tabs.zoomOut(active)
+    }
+
+    // STAGE 7A — Zoom reset (Ctrl+0)
+    if (ctrl && !shift && key === '0') {
+      const active = tabs.getActiveId()
+      if (active !== null) tabs.zoomReset(active)
+    }
+
+    // STAGE 7B — Tab search (Ctrl+Shift+A)
+    if (ctrl && shift && key === 'a') {
+      win.webContents.send('shortcut:tabSearch')
+    }
+
+    // STAGE 7B — Screenshot (Ctrl+Shift+S)
+    if (ctrl && shift && key === 's') {
+      win.webContents.send('shortcut:screenshot')
+    }
+
+    // STAGE 7B — Reader mode toggle (Ctrl+Shift+R)
+    if (ctrl && shift && key === 'r') {
+      win.webContents.send('shortcut:readerMode')
+    }
+
+    // STAGE 9 — Ctrl+J → toggle AI assistant panel
+    if (ctrl && !shift && key === 'j') {
+      win.webContents.send('shortcut:toggleAssistant')
+    }
+
+    // Escape closes overlays (find-in-page, etc.)
+    if (key === 'escape') {
+      win.webContents.send('shortcut:escape')
     }
 
     // Alt+Left → back

@@ -1,19 +1,16 @@
 import React from 'react'
 import Logo from './Logo'
-import {
-  IconHistory,
-  IconBookmark,
-  IconDownload,
-  IconShield,
-  IconExtension,
-  IconSettings,
-  IconUser
-} from './Icons'
+import { IconSidebar } from './Icons'
 
 interface Props {
   collapsed: boolean
+  verticalTabsMode: boolean
+  width: number
+  resizing: boolean
   onToggle: () => void
   onAction: (action: SidebarAction) => void
+  onResizeStart: (e: React.MouseEvent) => void
+  children?: React.ReactNode
 }
 
 export type SidebarAction =
@@ -24,88 +21,103 @@ export type SidebarAction =
   | 'extensions'
   | 'settings'
   | 'profile'
-  | 'ninja'
+  | 'verticalTabs'
+  | 'readingList'
+  | 'boosts'
 
-interface NavItem {
-  id: SidebarAction
-  label: string
-  icon: React.ReactElement
-}
+/**
+ * Sidebar — Stage 8.8.
+ *
+ * Horizontal mode (default, collapsed):
+ *   - Aura orb at top (does nothing on click — pure brand)
+ *   - "Switch to vertical tabs" icon at the bottom (discoverable toggle)
+ *
+ * Vertical-tabs mode:
+ *   - Aura orb at top
+ *   - Tab list in the middle
+ *   - "Switch to horizontal tabs" labeled button at the bottom
+ *   - Drag-to-resize handle on right edge
+ */
+export default function Sidebar({
+  collapsed,
+  verticalTabsMode,
+  width,
+  resizing,
+  onToggle,
+  onAction,
+  onResizeStart,
+  children
+}: Props): React.ReactElement {
+  const isExpanded = verticalTabsMode || !collapsed
 
-const TOP_ITEMS: NavItem[] = [
-  { id: 'bookmarks', label: 'Bookmarks', icon: <IconBookmark size={17} /> },
-  { id: 'history', label: 'History', icon: <IconHistory size={17} /> },
-  { id: 'downloads', label: 'Downloads', icon: <IconDownload size={17} /> },
-  { id: 'privacy', label: 'Privacy', icon: <IconShield size={17} /> },
-  { id: 'ninja', label: 'Ninja Mode', icon: <span style={{ fontSize: 17, lineHeight: 1 }}>🥷</span> },
-  { id: 'extensions', label: 'Extensions', icon: <IconExtension size={17} /> }
-]
+  const style: React.CSSProperties = verticalTabsMode
+    ? { width: `${width}px` }
+    : {}
 
-const BOTTOM_ITEMS: NavItem[] = [
-  { id: 'settings', label: 'Settings', icon: <IconSettings size={17} /> },
-  { id: 'profile', label: 'Profile', icon: <IconUser size={17} /> }
-]
-
-export default function Sidebar({ collapsed, onToggle, onAction }: Props): React.ReactElement {
   return (
-    <aside className={`sidebar${collapsed ? ' collapsed' : ''}`} aria-label="Main navigation">
+    <aside
+      className={[
+        'sidebar unified',
+        !isExpanded && 'collapsed',
+        verticalTabsMode && 'vertical-mode',
+        resizing && 'resizing'
+      ].filter(Boolean).join(' ')}
+      style={style}
+      aria-label="Navigation"
+    >
       <div className="sidebar-top">
         <button
           className="sidebar-brand"
           onClick={onToggle}
-          title="Toggle sidebar (Ctrl+B)"
-          aria-label="Toggle sidebar"
+          title={verticalTabsMode ? 'Aura' : 'Toggle expanded sidebar'}
+          aria-label="Aura"
         >
-          <Logo size={24} />
+          <Logo size={22} />
         </button>
-
-        <nav className="sidebar-nav">
-          {TOP_ITEMS.map((item) => (
-            <SidebarButton
-              key={item.id}
-              item={item}
-              collapsed={collapsed}
-              onAction={onAction}
-            />
-          ))}
-        </nav>
       </div>
 
+      {/* Tabs area only in vertical mode */}
+      {verticalTabsMode && (
+        <div className="sidebar-tabs-area">
+          {children}
+        </div>
+      )}
+
+      {/* STAGE 8.8: Bottom toggle — ALWAYS visible so users can switch modes */}
       <div className="sidebar-bottom">
-        {BOTTOM_ITEMS.map((item) => (
-          <SidebarButton
-            key={item.id}
-            item={item}
-            collapsed={collapsed}
-            onAction={onAction}
-          />
-        ))}
+        <button
+          className="sidebar-item sidebar-vt-toggle"
+          onClick={(e) => {
+            e.currentTarget.blur()
+            onAction('verticalTabs')
+          }}
+          title={
+            verticalTabsMode
+              ? 'Switch to horizontal tabs (Ctrl+Shift+E)'
+              : 'Switch to vertical tabs (Ctrl+Shift+E)'
+          }
+          aria-label="Toggle tabs layout"
+        >
+          <span className="sidebar-icon"><IconSidebar size={16} /></span>
+          {isExpanded && (
+            <span className="sidebar-label">
+              {verticalTabsMode ? 'Horizontal Tabs' : 'Vertical Tabs'}
+            </span>
+          )}
+        </button>
       </div>
-    </aside>
-  )
-}
 
-function SidebarButton({
-  item,
-  collapsed,
-  onAction
-}: {
-  item: NavItem
-  collapsed: boolean
-  onAction: (a: SidebarAction) => void
-}): React.ReactElement {
-  return (
-    <button
-      className="sidebar-item"
-      onClick={(e) => {
-        e.currentTarget.blur()
-        onAction(item.id)
-      }}
-      title={item.label}
-      aria-label={item.label}
-    >
-      <span className="sidebar-icon">{item.icon}</span>
-      {!collapsed && <span className="sidebar-label">{item.label}</span>}
-    </button>
+      {/* Drag-to-resize handle on the right edge — only in vertical mode */}
+      {verticalTabsMode && (
+        <div
+          className="sidebar-resize-handle"
+          onMouseDown={onResizeStart}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          title="Drag to resize"
+        />
+      )}
+    </aside>
   )
 }
