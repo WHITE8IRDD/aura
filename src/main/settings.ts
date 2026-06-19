@@ -28,6 +28,8 @@ export interface AuraSettings {
   systemRunInBackground: boolean
   systemProxyMode: 'system' | 'direct'
   systemMemorySaver: 'off' | 'balanced' | 'aggressive'
+  perfEnergySaver: 'off' | 'onBattery' | 'always'
+  perfTabUnloadThresholdMB: number
   autoplayAllowed: boolean
   smoothScrolling: boolean
   ctrlWheelZoom: boolean
@@ -96,6 +98,8 @@ const DEFAULTS: AuraSettings = {
   systemRunInBackground: false,
   systemProxyMode: 'system',
   systemMemorySaver: 'off',
+  perfEnergySaver: 'off',
+  perfTabUnloadThresholdMB: 0,
   autoplayAllowed: true,
   smoothScrolling: true,
   ctrlWheelZoom: true,

@@ -10,6 +10,7 @@ import { LanguagesSection } from './settings/LanguagesSection'
 import { DownloadsSection } from './settings/DownloadsSection'
 import { AccessibilitySection } from './settings/AccessibilitySection'
 import { SystemSection } from './settings/SystemSection'
+import { PerformanceSection } from './settings/PerformanceSection'
 import { AboutSection } from './settings/AboutSection'
 import { Button } from './settings/SettingsControls'
 import { useSettings } from '../hooks/useSettings'
@@ -79,6 +80,11 @@ const SECTION_ICONS: Record<string, JSX.Element> = {
       <line x1="12" y1="17" x2="12" y2="21"/>
     </svg>
   ),
+  performance: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+    </svg>
+  ),
   ai: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2L9.5 7.5l-6 .9 4.4 4.2-1 6 5.1-2.7 5.1 2.7-1-6 4.4-4.2-6-.9L12 2z"/>
@@ -109,6 +115,7 @@ const SECTIONS: Section[] = [
   { id: 'privacy', label: 'Privacy & Security' },
   { id: 'accessibility', label: 'Accessibility' },
   { id: 'system', label: 'System' },
+  { id: 'performance', label: 'Performance' },
   { id: 'ai', label: 'AI Assistant' },
   { id: 'languages', label: 'Languages' },
   { id: 'about', label: 'About' }
@@ -180,6 +187,7 @@ export default function SettingsPage({ onClose }: Props): React.ReactElement {
           {activeSection === 'privacy' && <PrivacySection />}
           {activeSection === 'accessibility' && <AccessibilitySection />}
           {activeSection === 'system' && <SystemSection />}
+          {activeSection === 'performance' && <PerformanceSection />}
           {activeSection === 'ai' && <AiSection />}
           {activeSection === 'languages' && <LanguagesSection />}
           {activeSection === 'about' && <AboutSection />}

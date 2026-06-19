@@ -71,6 +71,7 @@ import {
 import type { AiMessage } from './ai/types'
 import { registerAboutIPC } from './about'
 import { initSystemIntegration, applyStartOnLogin, applyProxyMode, applyBackgroundMode } from './systemIntegration'
+import { initPerformance, applyEnergySaverToAll } from './performance'
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
 applyStartupFlags()
@@ -187,6 +188,7 @@ async function createWindow(): Promise<void> {
 
   iconPath = join(__dirname, '../../resources/icon.png')
   initSystemIntegration(mainWindow, iconPath)
+  initPerformance()
 
   registerWindowControls(() => BrowserWindow.getFocusedWindow() ?? mainWindow)
   wireMaximizeEvents(mainWindow)
@@ -560,6 +562,7 @@ ipcMain.handle('settings:set', (_e, key: string, value: unknown) => {
   if (key === 'systemStartOnLogin') applyStartOnLogin()
   if (key === 'systemProxyMode') applyProxyMode()
   if (key === 'systemRunInBackground') applyBackgroundMode(mainWindow!, iconPath)
+  if (key === 'perfEnergySaver') applyEnergySaverToAll()
 })
 ipcMain.handle('settings:reset', () => resetSettings())
 

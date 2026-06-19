@@ -480,6 +480,12 @@ const api = {
     openDataFolder: () => { void ipcRenderer.invoke('about:openDataFolder') },
     openLogsFolder: () => { void ipcRenderer.invoke('about:openLogsFolder') },
     copySystemInfo: () => { void ipcRenderer.invoke('about:copySystemInfo') }
+  },
+
+  performance: {
+    getGPU: (): Promise<any> => ipcRenderer.invoke('perf:getGPU'),
+    getTabMetrics: (): Promise<any[]> => ipcRenderer.invoke('perf:getTabMetrics'),
+    discardSleepingTabs: (): Promise<number> => ipcRenderer.invoke('perf:discardSleepingTabs')
   }
 }
 

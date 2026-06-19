@@ -155,6 +155,8 @@ export interface AuraSettings {
   systemRunInBackground: boolean
   systemProxyMode: 'system' | 'direct'
   systemMemorySaver: 'off' | 'balanced' | 'aggressive'
+  perfEnergySaver: 'off' | 'onBattery' | 'always'
+  perfTabUnloadThresholdMB: number
   autoplayAllowed: boolean
   smoothScrolling: boolean
   ctrlWheelZoom: boolean
