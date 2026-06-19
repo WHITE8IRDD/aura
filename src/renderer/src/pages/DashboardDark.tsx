@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import GlassyOrb from '../components/GlassyOrb'
+import { showNativeInputMenu } from '../lib/buildInputMenu'
 
 interface Props {
   onNavigate: (url: string) => void
@@ -78,6 +79,14 @@ export default function DashboardDark({
             placeholder="Search now"
             spellCheck={false}
             autoComplete="off"
+            onContextMenu={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              showNativeInputMenu(e.currentTarget, {
+                isAddressBar: true,
+                navigateFn: onNavigate
+              })
+            }}
           />
 
           <button
@@ -111,6 +120,7 @@ export default function DashboardDark({
           </button>
         </form>
       </div>
+
     </div>
   )
 }

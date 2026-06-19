@@ -5,6 +5,7 @@ import { recordVisit, updateTitle } from './history'
 import { getZoomForHost, setZoomForHost } from './zoom'
 import { getGroupForTab, removeTabFromAnyGroup } from './tab-groups'
 import { attachContextMenu } from './contextMenu'
+import { saveTabs } from './sessions'
 
 export interface TabState {
   id: number
@@ -26,7 +27,7 @@ export interface TabState {
   fullscreen: boolean
 }
 
-interface TabRecord {
+export interface TabRecord {
   id: number
   view: WebContentsView | null
   url: string
@@ -79,11 +80,12 @@ export class TabManager {
   private activeId: number | null = null
   private chromeHeight: number
   private sidebarWidth: number = 0
-  private isPrivate: boolean
+  private _isPrivate: boolean
   private emitTimer: NodeJS.Timeout | null = null
   private viewHidden = false
   private closedStack: ClosedTab[] = []
   private sleepTimer: NodeJS.Timeout | null = null
+  private saveTimeout: NodeJS.Timeout | null = null
   // STAGE 8.8: track the tab currently in HTML5 fullscreen
   private fullscreenTabId: number | null = null
 
@@ -93,12 +95,14 @@ export class TabManager {
     isPrivate: boolean = false
   ) {
     this.chromeHeight = chromeHeight
-    this.isPrivate = isPrivate
+    this._isPrivate = isPrivate
     win.on('resize', () => this.layout())
     win.on('enter-full-screen', () => this.layout())
     win.on('leave-full-screen', () => this.layout())
     win.on('closed', () => {
       if (this.sleepTimer) clearInterval(this.sleepTimer)
+      if (this.saveTimeout) { clearTimeout(this.saveTimeout); this.saveTimeout = null }
+      if (!this.isPrivate) this.flushSession()
       if (this.isPrivate) this.closedStack = []
     })
 
@@ -108,6 +112,8 @@ export class TabManager {
       console.log('[Aura/tabs] TabManager initialized in PRIVATE mode — all writes blocked')
     }
   }
+
+  get isPrivate(): boolean { return this._isPrivate }
 
   getActiveId(): number | null { return this.activeId }
   setSidebarWidth(w: number): void { this.sidebarWidth = Math.max(0, w); this.layout() }
@@ -613,6 +619,34 @@ export class TabManager {
     return { tabs, activeId: this.activeId }
   }
 
+  private scheduleSessionSave(): void {
+    if (this.isPrivate) return
+    if (this.saveTimeout) clearTimeout(this.saveTimeout)
+    this.saveTimeout = setTimeout(() => {
+      this.saveTimeout = null
+      this.flushSession()
+    }, 500)
+  }
+
+  private flushSession(): void {
+    this.doFlushSession()
+  }
+
+  forceFlushSession(): void {
+    this.doFlushSession()
+  }
+
+  private doFlushSession(): void {
+    const persistable = this.order
+      .map((id, idx) => {
+        const r = this.records.get(id)
+        if (!r) return null
+        return { url: r.url, title: r.title, pinned: r.pinned, active: id === this.activeId, order: idx }
+      })
+      .filter((t): t is NonNullable<typeof t> => t !== null)
+    saveTabs(persistable)
+  }
+
   private emit(): void {
     if (this.win.isDestroyed()) return
     if (this.emitTimer) return
@@ -621,6 +655,7 @@ export class TabManager {
       if (this.win.isDestroyed()) return
       const { tabs, activeId } = this.snapshot()
       this.win.webContents.send('tabs:update', tabs, activeId)
+      this.scheduleSessionSave()
     }, 16)
   }
 }

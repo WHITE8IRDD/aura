@@ -3,12 +3,22 @@ import type { Bookmark } from '../types'
 import BookmarkBarItem from './BookmarkBarItem'
 import BookmarkContextMenu, { type BookmarkMenuItem } from './BookmarkContextMenu'
 import { IconBookmark } from './Icons'
+import { showToolbarMenu } from '../lib/showToolbarMenu'
+
+interface ToolbarMenuHandlers {
+  bookmarksBarVisible: boolean
+  sidebarVisible: boolean
+  onToggleBookmarksBar: () => void
+  onToggleSidebar: () => void
+  onOpenSettings: () => void
+}
 
 interface Props {
   visible: boolean
   onNavigate: (url: string) => void
   onOpenBookmarksPage: () => void
   onToggleVisible: () => void
+  toolbarMenuHandlers: ToolbarMenuHandlers
 }
 
 interface ContextMenuState {
@@ -18,7 +28,7 @@ interface ContextMenuState {
 }
 
 export default function BookmarksBar({
-  visible, onNavigate, onOpenBookmarksPage, onToggleVisible
+  visible, onNavigate, onOpenBookmarksPage, onToggleVisible, toolbarMenuHandlers
 }: Props): React.ReactElement | null {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
@@ -257,7 +267,7 @@ export default function BookmarksBar({
   if (bookmarks.length === 0) return null
 
   return (
-    <div className="bookmarks-bar" onContextMenu={handleBarContextMenu}>
+    <div className="bookmarks-bar" onContextMenu={(e) => showToolbarMenu(e, toolbarMenuHandlers)}>
       <div className="bm-scroll">
         {bookmarks.map((b) => (
           <BookmarkBarItem

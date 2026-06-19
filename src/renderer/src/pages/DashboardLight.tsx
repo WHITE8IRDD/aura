@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import GlassyOrb from '../components/GlassyOrb'
 import { IconSparkle, IconMic, IconPlus, IconMore } from '../components/Icons'
 import WidgetGrid from '../widgets/WidgetGrid'
+import { showNativeInputMenu } from '../lib/buildInputMenu'
 
 interface Props {
   onNavigate: (url: string) => void
@@ -73,6 +74,14 @@ export default function DashboardLight({
                 handleSubmit(e)
               }
             }}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              showNativeInputMenu(e.currentTarget, {
+                isAddressBar: true,
+                navigateFn: onNavigate
+              })
+            }}
             placeholder="Ask me anything, search the web, or type a URL&hellip;"
             rows={2}
           />
@@ -114,6 +123,7 @@ export default function DashboardLight({
 
         <WidgetGrid onNavigate={onNavigate} editing={editing} />
       </div>
+
     </div>
   )
 }

@@ -90,6 +90,24 @@ const MIGRATIONS: Migration[] = [
         updated_at INTEGER NOT NULL
       );
     `)
+  },
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS tab_sessions (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        window_id    INTEGER NOT NULL DEFAULT 0,
+        tab_order    INTEGER NOT NULL,
+        url          TEXT NOT NULL,
+        title        TEXT,
+        pinned       INTEGER NOT NULL DEFAULT 0,
+        group_id     INTEGER,
+        updated_at   INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+      CREATE INDEX IF NOT EXISTS idx_tab_sessions_order
+        ON tab_sessions(window_id, tab_order);
+      CREATE INDEX IF NOT EXISTS idx_tab_sessions_pinned
+        ON tab_sessions(pinned, tab_order);
+    `)
   }
 ]
 

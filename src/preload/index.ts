@@ -95,9 +95,29 @@ const api = {
     showView: (): Promise<void> => ipcRenderer.invoke('layout:showView')
   },
 
+  inputContextMenu: {
+    show: (ctx: {
+      hasSelection: boolean
+      selectedText: string
+      fullValue: string
+      selectionStart: number
+      selectionEnd: number
+      isAddressBar: boolean
+    }): Promise<{ type: string; text?: string } | null> =>
+      ipcRenderer.invoke('inputCtx:show', ctx)
+  },
+
   suggest: {
     query: (q: string): Promise<HistoryEntry[]> => ipcRenderer.invoke('suggest:query', q),
     preconnect: (url: string): Promise<void> => ipcRenderer.invoke('suggest:preconnect', url)
+  },
+
+  toolbarContextMenu: {
+    show: (ctx: {
+      bookmarksBarVisible: boolean
+      sidebarVisible: boolean
+    }): Promise<{ type: string } | null> =>
+      ipcRenderer.invoke('toolbarCtx:show', ctx)
   },
 
   privacy: {

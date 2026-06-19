@@ -1,6 +1,15 @@
 import React from 'react'
 import Logo from './Logo'
 import { IconSidebar } from './Icons'
+import { showToolbarMenu } from '../lib/showToolbarMenu'
+
+interface ToolbarMenuHandlers {
+  bookmarksBarVisible: boolean
+  sidebarVisible: boolean
+  onToggleBookmarksBar: () => void
+  onToggleSidebar: () => void
+  onOpenSettings: () => void
+}
 
 interface Props {
   collapsed: boolean
@@ -11,6 +20,7 @@ interface Props {
   onAction: (action: SidebarAction) => void
   onResizeStart: (e: React.MouseEvent) => void
   children?: React.ReactNode
+  toolbarMenuHandlers: ToolbarMenuHandlers
 }
 
 export type SidebarAction =
@@ -46,7 +56,8 @@ export default function Sidebar({
   onToggle,
   onAction,
   onResizeStart,
-  children
+  children,
+  toolbarMenuHandlers
 }: Props): React.ReactElement {
   const isExpanded = verticalTabsMode || !collapsed
 
@@ -64,6 +75,7 @@ export default function Sidebar({
       ].filter(Boolean).join(' ')}
       style={style}
       aria-label="Navigation"
+      onContextMenu={(e) => showToolbarMenu(e, toolbarMenuHandlers)}
     >
       <div className="sidebar-top">
         <button

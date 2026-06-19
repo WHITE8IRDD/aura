@@ -259,6 +259,14 @@ export default function App(): React.ReactElement {
     setTimeout(() => setPanelMessage(null), 2000)
   }, [activeTab])
 
+  const toolbarMenuHandlers = React.useMemo(() => ({
+    bookmarksBarVisible: bookmarksBarVisible,
+    sidebarVisible: !sidebarCollapsed,
+    onToggleBookmarksBar: () => setBookmarksBarVisible((v) => !v),
+    onToggleSidebar: () => setSidebarCollapsed((c) => !c),
+    onOpenSettings: () => setChromePage('settings')
+  }), [bookmarksBarVisible, sidebarCollapsed])
+
   const handleNavigate = useCallback(
     (value: string) => {
       setChromePage(null)
@@ -431,6 +439,7 @@ export default function App(): React.ReactElement {
   return (
     <div className="app-root">
       <Sidebar
+        toolbarMenuHandlers={toolbarMenuHandlers}
         collapsed={sidebarCollapsed}
         verticalTabsMode={verticalTabs}
         width={verticalWidth}
@@ -479,6 +488,7 @@ export default function App(): React.ReactElement {
           )}
 
           <Toolbar
+            toolbarMenuHandlers={toolbarMenuHandlers}
             tab={activeTab}
             onBack={() => activeId !== null && window.aura.tabs.goBack(activeId)}
             onForward={() => activeId !== null && window.aura.tabs.goForward(activeId)}
@@ -513,6 +523,7 @@ export default function App(): React.ReactElement {
               — matches Safari/Arc/Brave behavior. Bookmarks bar only appears
               when you're actively browsing a real site. */}
           <BookmarksBar
+            toolbarMenuHandlers={toolbarMenuHandlers}
             visible={showBookmarksBar && !!activeTab && !activeTab.internal && chromePage === null}
             onNavigate={handleNavigate}
             onOpenBookmarksPage={() => setChromePage('bookmarks')}

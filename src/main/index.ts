@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, session, shell } from 'electron'
 import { join } from 'path'
 import { TabManager } from './tabs'
+import { registerInputContextMenuIPC } from './inputContextMenu'
+import { registerToolbarContextMenuIPC } from './toolbarContextMenu'
 import { registerWindowControls, wireMaximizeEvents } from './window-controls'
 import { registerShortcuts } from './shortcuts'
 import {
@@ -53,6 +55,7 @@ import { extractPageContext } from './ai/page-context'
 import { getAllSettings, getSetting, setSetting, resetSettings, getDefaults } from './settings'
 import { setAsDefaultBrowser, isDefaultBrowser } from './default-browser'
 import { registerSession, broadcastSettingChange, applyStartupFlags, applyHardwareAccelLater } from './settings-bridge'
+import { loadTabs, loadPinnedTabsOnly } from './sessions'
 import {
   createConversation, addMessage, listConversations, getMessages,
   deleteConversation, renameConversation
@@ -156,6 +159,10 @@ async function createWindow(): Promise<void> {
   mainWindow.on('page-title-updated', (e) => e.preventDefault())
   mainWindow.once('ready-to-show', () => mainWindow?.show())
 
+  mainWindow.webContents.on('context-menu', (event, _params) => {
+    event.preventDefault()
+  })
+
   tabs = new TabManager(mainWindow, CHROME_HEIGHT, false)
   tabs.setSidebarWidth(SIDEBAR_WIDTH_DEFAULT)
 
@@ -172,7 +179,38 @@ async function createWindow(): Promise<void> {
   }
 
   mainWindow.webContents.once('did-finish-load', () => {
-    tabs?.create('aura://newtab')
+    if (!tabs) return
+    const startupBehavior = getSetting('startupBehavior') as string
+    let openedAny = false
+
+    if (startupBehavior === 'restoreSession') {
+      const saved = loadTabs(0)
+      if (saved.length > 0) {
+        for (const tab of saved) {
+          const tabId = tabs.create(tab.url)
+          if (tab.pinned) tabs.pin(tabId)
+        }
+        openedAny = true
+      }
+    } else {
+      const pinned = loadPinnedTabsOnly(0)
+      for (const tab of pinned) {
+        const tabId = tabs.create(tab.url)
+        tabs.pin(tabId)
+        openedAny = true
+      }
+    }
+
+    if (startupBehavior === 'newtab' || !openedAny) {
+      tabs.create('aura://newtab')
+    } else if (startupBehavior === 'specificUrl') {
+      const url = getSetting('startupUrl') as string
+      if (url && /^https?:\/\//i.test(url)) {
+        tabs.create(url)
+      } else if (!openedAny) {
+        tabs.create('aura://newtab')
+      }
+    }
   })
 
   mainWindow.on('closed', () => {
@@ -191,6 +229,9 @@ function getTabsForEvent(e: Electron.IpcMainInvokeEvent): TabManager | null {
   }
   return ninjaAny.getManager?.(win.id) ?? ninjaAny.getTabsForWindow?.(win) ?? null
 }
+
+registerInputContextMenuIPC()
+registerToolbarContextMenuIPC()
 
 // ---- Tab IPC ----
 ipcMain.handle('tabs:create', (e, url?: string) => getTabsForEvent(e)?.create(url))
@@ -492,6 +533,20 @@ ipcMain.handle('app:openUserDataFolder', () => {
 ipcMain.handle('app:getVersion', () => app.getVersion())
 
 app.whenReady().then(() => { void createWindow() })
+
+app.on('before-quit', () => {
+  for (const win of BrowserWindow.getAllWindows()) {
+    const ninjaAny = ninja as unknown as {
+      isNinjaWindow?: (id: number) => boolean
+      getManager?: (id: number) => TabManager | null
+    }
+    if (ninjaAny.isNinjaWindow?.(win.id)) continue
+    const tm = win === mainWindow ? tabs : ninjaAny.getManager?.(win.id)
+    if (tm && !tm.isPrivate) {
+      try { tm.forceFlushSession?.() } catch {}
+    }
+  }
+})
 
 app.on('window-all-closed', () => {
   closeDb()

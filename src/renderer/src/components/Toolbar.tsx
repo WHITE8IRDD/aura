@@ -6,11 +6,21 @@ import ZoomIndicator from './ZoomIndicator'
 import UtilityCluster from './UtilityCluster'
 import ReaderButton from './ReaderButton'
 import SearchEnginePicker from './SearchEnginePicker'
+import { showNativeInputMenu } from '../lib/buildInputMenu'
+import { showToolbarMenu } from '../lib/showToolbarMenu'
 import { useSettings } from '../hooks/useSettings'
 import {
   IconBack, IconForward, IconReload, IconClose, IconLock, IconAlert,
   IconMic, IconSparkle, IconShield, IconBookmark
 } from './Icons'
+
+interface ToolbarMenuHandlers {
+  bookmarksBarVisible: boolean
+  sidebarVisible: boolean
+  onToggleBookmarksBar: () => void
+  onToggleSidebar: () => void
+  onOpenSettings: () => void
+}
 
 interface Props {
   tab: TabState | undefined
@@ -33,6 +43,7 @@ interface Props {
   onSaveToReadingList: () => void
   onToggleReader?: () => void
   readerActive?: boolean
+  toolbarMenuHandlers: ToolbarMenuHandlers
 }
 
 function isSecure(url: string): boolean {
@@ -73,12 +84,14 @@ function engineDisplayName(engine: string): string {
 }
 
 export default function Toolbar(props: Props): React.ReactElement {
+
+
   const {
     tab, onBack, onForward, onReload, onNavigate, onAssistant, focusSignal,
     onOpenBookmarks, onOpenHistory, onOpenDownloads, onOpenPrivacy,
     onOpenExtensions, onOpenSettings, onOpenProfile, onOpenNinja,
     onToggleVerticalTabs, bookmarkSignal, onSaveToReadingList,
-    onToggleReader, readerActive
+    onToggleReader, readerActive, toolbarMenuHandlers
   } = props
 
   const { settings, set } = useSettings()
@@ -224,7 +237,7 @@ export default function Toolbar(props: Props): React.ReactElement {
   }, [url])
 
   return (
-    <div className="toolbar">
+    <div className="toolbar" onContextMenu={(e) => showToolbarMenu(e, toolbarMenuHandlers)}>
       <div className="nav-group">
         <button className="nav-btn" disabled={!tab?.canGoBack}
           onClick={(e) => { e.currentTarget.blur(); onBack() }} title="Back (Alt+\u2190)">
@@ -273,6 +286,14 @@ export default function Toolbar(props: Props): React.ReactElement {
                 setFocused(false)
                 setSuggestions([])
                 setValue(url === 'aura://newtab' ? '' : url)
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                showNativeInputMenu(e.currentTarget, {
+                  isAddressBar: true,
+                  navigateFn: onNavigate
+                })
               }}
               aria-label="Address bar"
             />
@@ -367,6 +388,7 @@ export default function Toolbar(props: Props): React.ReactElement {
           onClose={() => setBookmarkDialogOpen(false)}
         />
       )}
+
     </div>
   )
 }
