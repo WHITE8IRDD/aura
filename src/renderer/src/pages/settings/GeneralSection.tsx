@@ -18,11 +18,6 @@ export function GeneralSection(): React.ReactElement {
     { value: 'vertical' as const, label: 'Vertical' }
   ]
 
-  const themeOptions = [
-    { value: 'dark' as const, label: 'Dark' },
-    { value: 'auto' as const, label: 'System default' }
-  ]
-
   const fontSizeOptions = [
     { value: 'small' as const, label: 'Small' },
     { value: 'medium' as const, label: 'Medium' },
@@ -54,7 +49,13 @@ export function GeneralSection(): React.ReactElement {
             <div className="sett-field-label">Startup URL</div>
             <input className="sett-text-input" type="text" value={settings.startupUrl}
               placeholder="https://example.com"
-              onChange={(e) => set('startupUrl', e.target.value)} />
+              onChange={(e) => set('startupUrl', e.target.value)}
+              onBlur={(e) => {
+                const val = e.target.value.trim()
+                if (val && !/^https?:\/\//i.test(val)) {
+                  set('startupUrl', 'https://' + val)
+                }
+              }} />
           </div>
         )}
       </div>
@@ -77,8 +78,6 @@ export function GeneralSection(): React.ReactElement {
         <h3 className="sett-card-title">Appearance</h3>
         <Toggle label="Show bookmarks bar" description="Display the bookmarks bar below the address bar"
           checked={settings.showBookmarksBar} onChange={(v) => set('showBookmarksBar', v)} />
-        <RadioGroup label="Theme" value={settings.theme} options={themeOptions}
-          onChange={(v) => set('theme', v as AuraSettings['theme'])} />
         <Select label="Font size" value={settings.fontSize} options={fontSizeOptions}
           onChange={(v) => set('fontSize', v as AuraSettings['fontSize'])} />
       </div>

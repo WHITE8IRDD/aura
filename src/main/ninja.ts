@@ -48,6 +48,7 @@ export class NinjaWindowManager {
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
+        additionalArguments: ['--ninja-window'],
         session: privateSession
       }
     })

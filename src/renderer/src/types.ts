@@ -93,7 +93,7 @@ export interface HistoryEntry {
 }
 
 export interface Suggestion {
-  type: 'history' | 'search' | 'url'
+  type: 'history' | 'search' | 'url' | 'bookmark' | 'open-tab'
   label: string
   hint?: string
   url: string
@@ -137,14 +137,24 @@ export interface AuraSettings {
   askBeforeClosingMultipleTabs: boolean
   tabsLayout: 'horizontal' | 'vertical'
   showBookmarksBar: boolean
-  theme: 'light' | 'dark' | 'auto'
+  themeMode: 'light' | 'dark' | 'auto'
+  themePreset: string
   fontSize: 'small' | 'medium' | 'large'
   downloadsFolder: string
   alwaysAskWhereToSave: boolean
   deleteDownloadsAfterPrivateClose: boolean
+  downloadPath: string
+  downloadAskWhereToSave: boolean
+  downloadShowPillWhileActive: boolean
+  downloadClearOnQuit: boolean
+  downloadHistoryRetention: 'forever' | '30days' | '7days' | '24hours' | 'never'
   hardwareAcceleration: boolean
   sleepingTabsEnabled: boolean
   sleepingTabsMinutes: number
+  systemStartOnLogin: boolean
+  systemRunInBackground: boolean
+  systemProxyMode: 'system' | 'direct'
+  systemMemorySaver: 'off' | 'balanced' | 'aggressive'
   autoplayAllowed: boolean
   smoothScrolling: boolean
   ctrlWheelZoom: boolean
@@ -164,4 +174,24 @@ export interface AuraSettings {
   defaultSearchEngine: 'duckduckgo' | 'google' | 'brave' | 'startpage'
   aiIncludePageContextDefault: boolean
   aiRememberConversations: boolean
+  forceDarkOnWebsites: boolean
+  spellcheckEnabled: boolean
+  spellcheckLanguages: string[]
+  preferredLanguages: string[]
+  ntpLayout: 'default' | 'minimal' | 'off'
+  ntpShowGreeting: boolean
+  ntpShowMascot: boolean
+  ntpSearchBarPosition: 'center' | 'top'
+  searchPickerVisible: boolean
+  searchSuggestionsEnabled: boolean
+  searchSuggestSourceBookmarks: boolean
+  searchSuggestSourceHistory: boolean
+  searchSuggestSourceOpenTabs: boolean
+  searchAutocompleteFromHistory: boolean
+  a11yDefaultZoom: number
+  a11yMinFontSize: number
+  a11yReduceMotion: boolean
+  a11yCaretBrowsing: boolean
+  a11yAlwaysShowFocus: boolean
+  a11yLargerCursor: boolean
 }

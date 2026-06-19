@@ -10,9 +10,9 @@
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  color: var(--text-secondary, #999);
+  background: var(--hover-bg);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -22,8 +22,8 @@
 }
 
 .chrome-page-back-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-primary, #fff);
+  background: var(--active-bg);
+  color: var(--text-primary);
   transform: translateX(-1px);
 }
 
@@ -46,8 +46,8 @@
   font-weight: 600;
   padding: 4px 10px;
   border-radius: 6px;
-  background: rgba(99, 102, 241, 0.12);
-  color: #a5b4fc;
+  background: var(--accent-soft);
+  color: var(--selected-text);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }

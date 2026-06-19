@@ -28,13 +28,14 @@ import { setupAntiFingerprintFlags, setupSessionFingerprintDefenses } from './se
 import { setupPermissionPrompts, respondToPermission } from './security/permissions'
 import { isPhishingDomain } from './blocker/phishing'
 import { fetchFavicon } from './favicons'
+import { applyZoomToAllTabs } from './accessibility'
 import { getDb, closeDb } from './db'
 import {
   addBookmark, deleteBookmark, updateBookmark, listBookmarks, isBookmarked,
   addFolder, deleteFolder, listFolders, listBarBookmarks, reorderBookmarks, addSeparator
 } from './bookmarks'
 import {
-  setupDownloads, attachDownloadHandler, listDownloads,
+  setupDownloads, listDownloads,
   cancelDownload, openDownloadedFile, revealDownloadedFile,
   deleteDownloadRecord, clearCompletedDownloads
 } from './downloads'
@@ -53,14 +54,23 @@ import {
 import { aiManager } from './ai/manager'
 import { extractPageContext } from './ai/page-context'
 import { getAllSettings, getSetting, setSetting, resetSettings, getDefaults } from './settings'
+import { initThemeManager, getResolvedTheme, handleThemeSettingChange } from './themeManager'
 import { setAsDefaultBrowser, isDefaultBrowser } from './default-browser'
-import { registerSession, broadcastSettingChange, applyStartupFlags, applyHardwareAccelLater } from './settings-bridge'
+import { registerSession, broadcastSettingChange, applyStartupFlags, applyHardwareAccelLater, applyForceDarkFlag } from './settings-bridge'
+import { initLanguages } from './languages'
+import {
+  registerDownloadsSettingsIPC,
+  startRetentionScheduler,
+  maybeClearOnQuit
+} from './downloadsSettings'
 import { loadTabs, loadPinnedTabsOnly } from './sessions'
 import {
   createConversation, addMessage, listConversations, getMessages,
   deleteConversation, renameConversation
 } from './ai/conversations'
 import type { AiMessage } from './ai/types'
+import { registerAboutIPC } from './about'
+import { initSystemIntegration, applyStartOnLogin, applyProxyMode, applyBackgroundMode } from './systemIntegration'
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
 applyStartupFlags()
@@ -77,7 +87,8 @@ app.commandLine.appendSwitch('enable-features', [
   'CanvasOopRasterization',
   'AcceleratedVideoDecodeLinuxGL',
   'UseSkiaRenderer',
-  'UseChromeOSDirectVideoDecoder'
+  'UseChromeOSDirectVideoDecoder',
+  'WebContentsForceDark'
 ].join(','))
 
 app.commandLine.appendSwitch('enable-gpu-rasterization')
@@ -115,11 +126,13 @@ const SIDEBAR_WIDTH_DEFAULT = 52
 let mainWindow: BrowserWindow | null = null
 let tabs: TabManager | null = null
 let ninja: NinjaWindowManager | null = null
+let iconPath = ''
 
 const startupReady = app.whenReady().then(async () => {
   console.log('[Aura] Opening database…')
   getDb()
   applyHardwareAccelLater()
+  applyForceDarkFlag()
   console.log('[Aura/settings] Loaded settings')
   console.log('[Aura] Pre-initializing blocker engine…')
   await setupDefaultSessionBlocking()
@@ -127,7 +140,10 @@ const startupReady = app.whenReady().then(async () => {
   setupSessionFingerprintDefenses(session.defaultSession)
   setupPermissionPrompts(session.defaultSession)
   registerSession(session.defaultSession)
+  initLanguages()
   setupDownloads()
+  registerDownloadsSettingsIPC()
+  startRetentionScheduler()
   await aiManager.init()
   console.log('[Aura/ai] Manager ready, active provider:', aiManager.getActive().label)
   console.log('[Aura] Ready')
@@ -135,6 +151,7 @@ const startupReady = app.whenReady().then(async () => {
 
 async function createWindow(): Promise<void> {
   await startupReady
+  initThemeManager()
 
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -167,6 +184,9 @@ async function createWindow(): Promise<void> {
   tabs.setSidebarWidth(SIDEBAR_WIDTH_DEFAULT)
 
   ninja = new NinjaWindowManager(CHROME_HEIGHT, SIDEBAR_WIDTH_DEFAULT)
+
+  iconPath = join(__dirname, '../../resources/icon.png')
+  initSystemIntegration(mainWindow, iconPath)
 
   registerWindowControls(() => BrowserWindow.getFocusedWindow() ?? mainWindow)
   wireMaximizeEvents(mainWindow)
@@ -201,7 +221,7 @@ async function createWindow(): Promise<void> {
       }
     }
 
-    if (startupBehavior === 'newtab' || !openedAny) {
+    if (startupBehavior === 'newtab' || (startupBehavior !== 'specificUrl' && !openedAny)) {
       tabs.create('aura://newtab')
     } else if (startupBehavior === 'specificUrl') {
       const url = getSetting('startupUrl') as string
@@ -217,6 +237,7 @@ async function createWindow(): Promise<void> {
     mainWindow = null
     tabs = null
   })
+
 }
 
 function getTabsForEvent(e: Electron.IpcMainInvokeEvent): TabManager | null {
@@ -268,6 +289,12 @@ ipcMain.handle('tabs:zoomOut', (e, id: number) => getTabsForEvent(e)?.zoomOut(id
 ipcMain.handle('tabs:zoomReset', (e, id: number) => getTabsForEvent(e)?.zoomReset(id))
 ipcMain.handle('tabs:print', (e, id: number) => getTabsForEvent(e)?.print(id))
 ipcMain.handle('tabs:pip', (e, id: number) => getTabsForEvent(e)?.pictureInPicture(id))
+ipcMain.handle('tabs:reloadAll', (e) => {
+  const tm = getTabsForEvent(e); if (!tm) return
+  for (const [, rec] of (tm as unknown as { records: Map<number, { view: { webContents: { reload: () => void } } | null }> }).records) {
+    if (rec.view) try { rec.view.webContents.reload() } catch {}
+  }
+})
 
 ipcMain.handle('tabs:readerExtract', async (e, id: number) => {
   const tm = getTabsForEvent(e); if (!tm) return null
@@ -521,16 +548,36 @@ ipcMain.handle('settings:set', (_e, key: string, value: unknown) => {
   } catch (err) {
     console.warn('[Aura/settings] broadcastSettingChange failed for', key, err)
   }
+  if (key === 'a11yDefaultZoom') {
+    applyZoomToAllTabs()
+  }
+  if (key === 'a11yMinFontSize') {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('a11y:reloadHint', 'minFontSize')
+    }
+  }
+  if (key === 'themeMode' || key === 'theme') handleThemeSettingChange()
+  if (key === 'systemStartOnLogin') applyStartOnLogin()
+  if (key === 'systemProxyMode') applyProxyMode()
+  if (key === 'systemRunInBackground') applyBackgroundMode(mainWindow!, iconPath)
 })
 ipcMain.handle('settings:reset', () => resetSettings())
 
 ipcMain.handle('browser:setDefault', () => setAsDefaultBrowser())
 ipcMain.handle('browser:isDefault', () => isDefaultBrowser())
 
+ipcMain.handle('theme:getResolved', () => getResolvedTheme())
+
 ipcMain.handle('app:openUserDataFolder', () => {
   shell.openPath(app.getPath('userData'))
 })
 ipcMain.handle('app:getVersion', () => app.getVersion())
+ipcMain.handle('app:relaunch', () => {
+  app.relaunch()
+  app.exit(0)
+})
+
+registerAboutIPC()
 
 app.whenReady().then(() => { void createWindow() })
 
@@ -546,6 +593,7 @@ app.on('before-quit', () => {
       try { tm.forceFlushSession?.() } catch {}
     }
   }
+  maybeClearOnQuit()
 })
 
 app.on('window-all-closed', () => {
@@ -562,13 +610,3 @@ app.on('web-contents-created', (_e, contents) => {
     }
   })
 })
-
-export async function setupNinjaSession(s: Electron.Session): Promise<void> {
-  await initBlocker()
-  installBlocker(s)
-  setupHttpsOnly(s)
-  setupSessionFingerprintDefenses(s)
-  setupPermissionPrompts(s)
-  attachDownloadHandler(s, true)
-  registerSession(s)
-}

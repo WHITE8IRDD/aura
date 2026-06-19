@@ -4,6 +4,7 @@ import { isInternal, normalizeInput } from './url'
 import { recordVisit, updateTitle } from './history'
 import { getZoomForHost, setZoomForHost } from './zoom'
 import { getGroupForTab, removeTabFromAnyGroup } from './tab-groups'
+import { getAccessibilityWebPreferences, applyDefaultZoom } from './accessibility'
 import { attachContextMenu } from './contextMenu'
 import { saveTabs } from './sessions'
 
@@ -58,6 +59,9 @@ const SLEEP_CHECK_INTERVAL_MS = 60 * 1000
 function getSleepAfterMs(): number {
   try {
     const { getSetting } = require('./settings')
+    const saver = getSetting('systemMemorySaver') as string
+    if (saver === 'aggressive') return 5 * 60 * 1000
+    if (saver === 'balanced') return 30 * 60 * 1000
     if (!getSetting('sleepingTabsEnabled')) return Infinity
     const minutes = getSetting('sleepingTabsMinutes') as number
     return Math.max(1, minutes) * 60 * 1000
@@ -463,14 +467,16 @@ export class TabManager {
         contextIsolation: true,
         nodeIntegration: false,
         backgroundThrottling: false,
-        spellcheck: true,
         plugins: true,
         webgl: true,
-        experimentalFeatures: true
+        experimentalFeatures: true,
+        ...getAccessibilityWebPreferences()
       }
     })
     rec.view = view
     if (rec.muted) view.webContents.setAudioMuted(true)
+
+    applyDefaultZoom(view.webContents)
 
     const host = hostnameOf(url)
     if (host && !this.isPrivate) {

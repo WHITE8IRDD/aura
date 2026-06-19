@@ -1,0 +1,68 @@
+.dl-folder-display {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 12px 14px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+}
+
+.dl-folder-path {
+  font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.dl-folder-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dl-btn {
+  padding: 7px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--stroke);
+  background: var(--bg-elev-2);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+
+.dl-btn:hover {
+  background: var(--bg-elev-3);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.dl-btn.secondary {
+  background: transparent;
+}
+
+.dl-btn.danger {
+  border-color: var(--red);
+  color: var(--red);
+  background: transparent;
+}
+
+.dl-btn.danger:hover {
+  background: rgba(241, 122, 139, 0.1);
+}
+
+.dl-btn.danger-confirm {
+  background: var(--red);
+  color: white;
+  border-color: var(--red);
+}
+
+.dl-btn.danger-confirm:hover {
+  opacity: 0.9;
+}

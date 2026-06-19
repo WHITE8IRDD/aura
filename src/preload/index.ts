@@ -1,4 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
+
+const isNinjaWindow = process.argv.includes('--ninja-window')
 import type { TabState } from '../main/tabs'
 import type { HistoryEntry } from '../main/history'
 import type { Bookmark, BookmarkFolder } from '../main/bookmarks'
@@ -23,6 +25,7 @@ interface PermissionRequest {
 }
 
 const api = {
+  isNinjaWindow,
   platform: (): Promise<NodeJS.Platform> => ipcRenderer.invoke('app:platform'),
 
   tabs: {
@@ -205,6 +208,11 @@ const api = {
     deleteRecord: (id: number): Promise<void> =>
       ipcRenderer.invoke('downloads:deleteRecord', id),
     clearCompleted: (): Promise<void> => ipcRenderer.invoke('downloads:clearCompleted'),
+    pickFolder: (): Promise<string | null> => ipcRenderer.invoke('downloads:pickFolder'),
+    openFolder: (): Promise<void> => ipcRenderer.invoke('downloads:openFolder'),
+    getCurrentFolder: (): Promise<string> => ipcRenderer.invoke('downloads:getCurrentFolder'),
+    clearHistory: (): Promise<boolean> => ipcRenderer.invoke('downloads:clearHistory'),
+    applyRetention: () => ipcRenderer.invoke('downloads:applyRetention'),
     onUpdate: (cb: () => void): (() => void) => {
       const listener = (): void => cb()
       ipcRenderer.on('downloads:update', listener)
@@ -420,7 +428,25 @@ const api = {
 
   app: {
     openUserDataFolder: (): void => { void ipcRenderer.invoke('app:openUserDataFolder') },
-    getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion')
+    getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+    relaunch: (): void => { void ipcRenderer.invoke('app:relaunch') }
+  },
+
+  theme: {
+    getResolved: (): Promise<'light' | 'dark'> => ipcRenderer.invoke('theme:getResolved'),
+    onChanged: (cb: (theme: 'light' | 'dark') => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, t: 'light' | 'dark'): void => cb(t)
+      ipcRenderer.on('theme:resolved', listener)
+      return () => ipcRenderer.removeListener('theme:resolved', listener)
+    }
+  },
+
+  accessibility: {
+    onReloadHint: (cb: (reason: string) => void): (() => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, reason: string): void => cb(reason)
+      ipcRenderer.on('a11y:reloadHint', handler)
+      return () => ipcRenderer.removeListener('a11y:reloadHint', handler)
+    }
   },
 
   contextMenu: {
@@ -429,6 +455,31 @@ const api = {
       ipcRenderer.on('cm:openInNinja', handler)
       return () => ipcRenderer.removeListener('cm:openInNinja', handler)
     }
+  },
+
+  languages: {
+    getAvailableDictionaries: (): Promise<string[]> =>
+      ipcRenderer.invoke('languages:getAvailableDictionaries')
+  },
+
+  about: {
+    getInfo: (): Promise<{
+      appName: string
+      appVersion: string
+      electronVersion: string
+      chromiumVersion: string
+      nodeVersion: string
+      v8Version: string
+      osPlatform: string
+      osVersion: string
+      osArch: string
+      userDataPath: string
+      logsPath: string
+      buildDate: string
+    }> => ipcRenderer.invoke('about:getInfo'),
+    openDataFolder: () => { void ipcRenderer.invoke('about:openDataFolder') },
+    openLogsFolder: () => { void ipcRenderer.invoke('about:openLogsFolder') },
+    copySystemInfo: () => { void ipcRenderer.invoke('about:copySystemInfo') }
   }
 }
 

@@ -11,7 +11,7 @@ import { showToolbarMenu } from '../lib/showToolbarMenu'
 import { useSettings } from '../hooks/useSettings'
 import {
   IconBack, IconForward, IconReload, IconClose, IconLock, IconAlert,
-  IconMic, IconSparkle, IconShield, IconBookmark
+  IconSearch, IconMic, IconSparkle, IconShield, IconBookmark, IconHome
 } from './Icons'
 
 interface ToolbarMenuHandlers {
@@ -30,17 +30,18 @@ interface Props {
   onNavigate: (value: string) => void
   onAssistant: () => void
   focusSignal: number
-  onOpenBookmarks: () => void
   onOpenHistory: () => void
   onOpenDownloads: () => void
-  onOpenPrivacy: () => void
   onOpenExtensions: () => void
   onOpenSettings: () => void
   onOpenProfile: () => void
   onOpenNinja: () => void
+  onOpenCommandPalette: () => void
   onToggleVerticalTabs: () => void
+  verticalTabs: boolean
   bookmarkSignal: number
   onSaveToReadingList: () => void
+  onOpenFindBar?: () => void
   onToggleReader?: () => void
   readerActive?: boolean
   toolbarMenuHandlers: ToolbarMenuHandlers
@@ -88,10 +89,11 @@ export default function Toolbar(props: Props): React.ReactElement {
 
   const {
     tab, onBack, onForward, onReload, onNavigate, onAssistant, focusSignal,
-    onOpenBookmarks, onOpenHistory, onOpenDownloads, onOpenPrivacy,
+    onOpenHistory, onOpenDownloads,
     onOpenExtensions, onOpenSettings, onOpenProfile, onOpenNinja,
-    onToggleVerticalTabs, bookmarkSignal, onSaveToReadingList,
-    onToggleReader, readerActive, toolbarMenuHandlers
+    onOpenCommandPalette,
+    onToggleVerticalTabs, verticalTabs, bookmarkSignal, onSaveToReadingList,
+    onOpenFindBar, onToggleReader, readerActive, toolbarMenuHandlers
   } = props
 
   const { settings, set } = useSettings()
@@ -113,6 +115,11 @@ export default function Toolbar(props: Props): React.ReactElement {
   const [bookmarkAnchor, setBookmarkAnchor] = useState<DOMRect | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const bookmarkBtnRef = useRef<HTMLButtonElement>(null)
+
+  const handleHome = useCallback(() => {
+    const homeUrl = settings?.startupUrl || 'aura://newtab'
+    onNavigate(homeUrl)
+  }, [onNavigate, settings])
 
   useEffect(() => {
     if (!focused) setValue(url === 'aura://newtab' ? '' : url)
@@ -157,11 +164,15 @@ export default function Toolbar(props: Props): React.ReactElement {
       setSuggestions([])
       return
     }
+    if (!settings?.searchSuggestionsEnabled) {
+      setSuggestions([])
+      return
+    }
     const handle = setTimeout(() => {
-      void buildSuggestions(value, currentEngine).then(setSuggestions)
+      void buildSuggestions(value, currentEngine, settings).then(setSuggestions)
     }, 80)
     return () => clearTimeout(handle)
-  }, [value, focused, currentEngine])
+  }, [value, focused, currentEngine, settings])
 
   useEffect(() => { setSelectedIndex(0) }, [suggestions.length])
 
@@ -239,19 +250,25 @@ export default function Toolbar(props: Props): React.ReactElement {
   return (
     <div className="toolbar" onContextMenu={(e) => showToolbarMenu(e, toolbarMenuHandlers)}>
       <div className="nav-group">
-        <button className="nav-btn" disabled={!tab?.canGoBack}
+        <button className="nav-btn toolbar-nav-btn" disabled={!tab?.canGoBack}
           onClick={(e) => { e.currentTarget.blur(); onBack() }} title="Back (Alt+\u2190)">
           <IconBack size={17} />
         </button>
-        <button className="nav-btn" disabled={!tab?.canGoForward}
+        <button className="nav-btn toolbar-nav-btn" disabled={!tab?.canGoForward}
           onClick={(e) => { e.currentTarget.blur(); onForward() }} title="Forward (Alt+\u2192)">
           <IconForward size={17} />
         </button>
-        <button className="nav-btn"
+        <button className="nav-btn toolbar-nav-btn"
           onClick={(e) => { e.currentTarget.blur(); onReload() }}
           title={isLoading ? 'Stop' : 'Reload (Ctrl+R)'}>
           {isLoading ? <IconClose size={15} /> : <IconReload size={15} />}
         </button>
+        <button className="nav-btn toolbar-nav-btn"
+          onClick={(e) => { e.currentTarget.blur(); handleHome() }}
+          title="Home (Alt+Home)">
+          <IconHome size={16} />
+        </button>
+        <div className="nav-divider" />
       </div>
 
       <div className="addressbar-wrap">
@@ -264,7 +281,7 @@ export default function Toolbar(props: Props): React.ReactElement {
               {secure ? <IconLock size={12} /> : <IconAlert size={12} />}
             </span>
 
-            {settings && (
+            {settings?.searchPickerVisible && settings && (
               <SearchEnginePicker
                 current={currentEngine}
                 onChange={(engine) => {
@@ -298,6 +315,14 @@ export default function Toolbar(props: Props): React.ReactElement {
               aria-label="Address bar"
             />
 
+            <button type="button" className="ab-icon-btn urlbar-icon-btn"
+              title="Find in page (Ctrl+F)"
+              onClick={(e) => { e.currentTarget.blur(); onOpenFindBar?.() }}
+              tabIndex={-1}
+            >
+              <IconSearch size={13} />
+            </button>
+
             {onToggleReader && (
               <ReaderButton active={!!readerActive} onClick={onToggleReader} />
             )}
@@ -306,7 +331,7 @@ export default function Toolbar(props: Props): React.ReactElement {
               <button
                 ref={bookmarkBtnRef}
                 type="button"
-                className={`ab-bookmark${existingBookmarkId !== null ? ' active' : ''}`}
+                className={`ab-bookmark urlbar-icon-btn${existingBookmarkId !== null ? ' active' : ''}`}
                 title={existingBookmarkId !== null ? 'Edit bookmark (Ctrl+D)' : 'Bookmark this page (Ctrl+D)'}
                 onClick={handleBookmarkClick}
                 tabIndex={-1}
@@ -318,7 +343,7 @@ export default function Toolbar(props: Props): React.ReactElement {
             {isWebPage && (
               <button
                 type="button"
-                className={`ab-shield${shieldsEnabled ? ' active' : ' off'}`}
+                className={`ab-shield urlbar-icon-btn${shieldsEnabled ? ' active' : ' off'}`}
                 title={
                   shieldsEnabled
                     ? `Aura Shields ON for ${hostname}\nClick to disable`
@@ -331,12 +356,12 @@ export default function Toolbar(props: Props): React.ReactElement {
               </button>
             )}
 
-            <button type="button" className="ab-icon-btn" title="Voice input" tabIndex={-1}>
+            <button type="button" className="ab-icon-btn urlbar-icon-btn" title="Voice input" tabIndex={-1}>
               <IconMic size={13} />
             </button>
           </form>
 
-          {focused && suggestions.length > 0 && (
+          {focused && settings?.searchSuggestionsEnabled && suggestions.length > 0 && (
             <Suggestions
               items={suggestions}
               selectedIndex={selectedIndex}
@@ -358,17 +383,43 @@ export default function Toolbar(props: Props): React.ReactElement {
         )}
 
         <UtilityCluster
-          onOpenBookmarks={onOpenBookmarks}
           onOpenHistory={onOpenHistory}
           onOpenDownloads={onOpenDownloads}
-          onOpenPrivacy={onOpenPrivacy}
           onOpenExtensions={onOpenExtensions}
           onOpenSettings={onOpenSettings}
           onOpenProfile={onOpenProfile}
           onOpenNinja={onOpenNinja}
+          onOpenCommandPalette={onOpenCommandPalette}
           onToggleVerticalTabs={onToggleVerticalTabs}
+          verticalTabs={verticalTabs}
         />
 
+        <div className="toolbar-group-separator" />
+        <button
+          className="util-btn"
+          onClick={() => {
+            const next = settings?.tabsLayout === 'vertical' ? 'horizontal' : 'vertical'
+            window.aura.settings.set('tabsLayout', next)
+          }}
+          title={settings?.tabsLayout === 'vertical'
+            ? 'Switch to horizontal tabs'
+            : 'Switch to vertical tabs'}
+          aria-label="Toggle tab layout"
+        >
+          {settings?.tabsLayout === 'vertical' ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="6" rx="1"/>
+              <rect x="3" y="12" width="18" height="9" rx="1"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="18" rx="1"/>
+              <rect x="13" y="3" width="8" height="18" rx="1"/>
+            </svg>
+          )}
+        </button>
         <button className="assistant-btn"
           onClick={(e) => { e.currentTarget.blur(); onAssistant() }}
           title="Open Aura assistant">
@@ -393,7 +444,11 @@ export default function Toolbar(props: Props): React.ReactElement {
   )
 }
 
-async function buildSuggestions(input: string, engine: string): Promise<Suggestion[]> {
+async function buildSuggestions(
+  input: string,
+  engine: string,
+  s?: Record<string, unknown>
+): Promise<Suggestion[]> {
   const q = input.trim()
   const out: Suggestion[] = []
 
@@ -422,16 +477,68 @@ async function buildSuggestions(input: string, engine: string): Promise<Suggesti
     })
   }
 
-  const history = await window.aura.suggest.query(q)
-  for (const h of history) {
-    let hn = h.url
-    try { hn = new URL(h.url).hostname.replace(/^www\./, '') } catch {}
-    out.push({
-      type: 'history',
-      label: h.title || h.url,
-      hint: hn,
-      url: h.url
-    })
+  const includeHistory = (s?.searchSuggestSourceHistory as boolean) ?? true
+  const includeBookmarks = (s?.searchSuggestSourceBookmarks as boolean) ?? true
+  const includeOpenTabs = (s?.searchSuggestSourceOpenTabs as boolean) ?? true
+  const seen = new Set<string>()
+
+  if (includeHistory && q) {
+    const history = await window.aura.suggest.query(q)
+    for (const h of history) {
+      if (seen.has(h.url)) continue
+      seen.add(h.url)
+      let hn = h.url
+      try { hn = new URL(h.url).hostname.replace(/^www\./, '') } catch {}
+      out.push({
+        type: 'history',
+        label: h.title || h.url,
+        hint: hn,
+        url: h.url
+      })
+    }
   }
+
+  if (includeBookmarks && q) {
+    const ql = q.toLowerCase()
+    const bookmarks = await window.aura.bookmarks.list()
+    for (const b of bookmarks) {
+      if (b.url && (b.title?.toLowerCase().includes(ql) || b.url.toLowerCase().includes(ql))) {
+        if (seen.has(b.url)) continue
+        seen.add(b.url)
+        let hn = b.url
+        try { hn = new URL(b.url).hostname.replace(/^www\./, '') } catch {}
+        out.push({
+          type: 'bookmark',
+          label: b.title || b.url,
+          hint: hn,
+          url: b.url
+        })
+      }
+    }
+  }
+
+  if (includeOpenTabs && q) {
+    const ql = q.toLowerCase()
+    const state = await window.aura.tabs.getState()
+    if (state) {
+      for (const tab of state.tabs) {
+        const tabUrl = tab.url || ''
+        const tabTitle = tab.title || ''
+        if (tabTitle.toLowerCase().includes(ql) || tabUrl.toLowerCase().includes(ql)) {
+          if (seen.has(tabUrl)) continue
+          seen.add(tabUrl)
+          let hn = tabUrl
+          try { hn = new URL(tabUrl).hostname.replace(/^www\./, '') } catch {}
+          out.push({
+            type: 'open-tab',
+            label: tabTitle || tabUrl,
+            hint: hn ? `Switch to ${hn}` : 'Switch to tab',
+            url: tabUrl
+          })
+        }
+      }
+    }
+  }
+
   return out
 }

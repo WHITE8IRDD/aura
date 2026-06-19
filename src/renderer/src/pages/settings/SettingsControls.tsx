@@ -29,16 +29,18 @@ interface RadioGroupProps {
   value: string
   options: { value: string; label: string }[]
   onChange: (v: string) => void
+  disabled?: boolean
 }
-export function RadioGroup({ label, description, value, options, onChange }: RadioGroupProps) {
+export function RadioGroup({ label, description, value, options, onChange, disabled }: RadioGroupProps) {
   return (
-    <div className="sett-field">
+    <div className={`sett-field${disabled ? ' disabled' : ''}`}>
       <div className="sett-field-label">{label}</div>
       {description && <div className="sett-field-desc">{description}</div>}
       <div className="sett-radio-group">
         {options.map((o) => (
-          <label key={o.value} className={`sett-radio${value === o.value ? ' active' : ''}`}
-            onClick={() => onChange(o.value)}>
+          <label key={o.value}
+            className={`sett-radio${value === o.value ? ' active' : ''}${disabled ? ' disabled' : ''}`}
+            onClick={() => { if (!disabled) onChange(o.value) }}>
             <div className="sett-radio-dot">
               {value === o.value && <div className="sett-radio-fill" />}
             </div>

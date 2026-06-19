@@ -1,4 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { useTheme } from './lib/useTheme'
+import { useAccessibility } from './lib/useAccessibility'
+import { useSettings } from './hooks/useSettings'
 import TabBar from './components/TabBar'
 import Toolbar from './components/Toolbar'
 import Sidebar, { type SidebarAction } from './components/Sidebar'
@@ -31,7 +34,6 @@ import type { TabState } from './types'
 //   .toolbar           = 44px (address bar row)
 //   .bookmarks-bar     = 30px (only when visible)
 //   .chrome-top-row.compact = 30px (vertical-tabs mode)
-const SIDEBAR_WIDTH_HORIZONTAL = 44   // matches new sidebar width
 const SIDEBAR_WIDTH_VERTICAL_DEFAULT = 220
 const SIDEBAR_WIDTH_VERTICAL_MIN = 160
 const SIDEBAR_WIDTH_VERTICAL_MAX = 400
@@ -42,6 +44,22 @@ const CHROME_HEIGHT_VERTICAL_COMPACT = 74      // 30 (compact top) + 44 (toolbar
 type ChromePage = null | 'privacy' | 'history' | 'bookmarks' | 'downloads' | 'readingList' | 'boosts' | 'settings'
 
 export default function App(): React.ReactElement {
+  useTheme()
+  useAccessibility()
+  const { settings } = useSettings()
+
+  // One-time migration: copy aura:verticalTabs from localStorage to settings DB
+  useEffect(() => {
+    const legacy = localStorage.getItem('aura:verticalTabs')
+    if (legacy === null) return
+    const legacyBool = legacy === 'true'
+    const layoutValue = legacyBool ? 'vertical' : 'horizontal'
+    window.aura.settings.set('tabsLayout', layoutValue).then(() => {
+      localStorage.removeItem('aura:verticalTabs')
+    }).catch(() => {})
+  }, [])
+
+  const verticalTabs = settings?.tabsLayout === 'vertical'
   const [tabs, setTabs] = useState<TabState[]>([])
   const [activeId, setActiveId] = useState<number | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
@@ -51,7 +69,6 @@ export default function App(): React.ReactElement {
   const [isPrivate, setIsPrivate] = useState(false)
   const [ninjaModalOpen, setNinjaModalOpen] = useState(false)
   const [chromePage, setChromePage] = useState<ChromePage>(null)
-  const [verticalTabs, setVerticalTabs] = useLocalStorage<boolean>('aura:verticalTabs', false)
   const [bookmarkSignal, setBookmarkSignal] = useState(0)
   const [findBarOpen, setFindBarOpen] = useState(false)
   const [tabSearchOpen, setTabSearchOpen] = useState(false)
@@ -62,6 +79,15 @@ export default function App(): React.ReactElement {
     true
   )
   const [hasBarBookmarks, setHasBarBookmarks] = useState(false)
+  const [reloadHint, setReloadHint] = useState<string | null>(null)
+
+  useEffect(() => {
+    const unsub = window.aura.accessibility?.onReloadHint?.((reason) => {
+      setReloadHint(reason)
+      setTimeout(() => setReloadHint(null), 8000)
+    })
+    return unsub
+  }, [])
 
   const [persistedVerticalWidth, setPersistedVerticalWidth] = useLocalStorage<number>(
     'aura:sidebarWidth',
@@ -127,16 +153,14 @@ export default function App(): React.ReactElement {
     return window.aura.bookmarks.onUpdate(load)
   }, [])
 
+  const effectiveSidebarWidth = verticalTabs ? verticalWidth : 0
+
   useEffect(() => {
-    if (verticalTabs) {
-      void window.aura.layout.setSidebarWidth(verticalWidth)
-    } else {
-      void window.aura.layout.setSidebarWidth(SIDEBAR_WIDTH_HORIZONTAL)
-    }
-  }, [verticalTabs, verticalWidth])
+    void window.aura.layout.setSidebarWidth(effectiveSidebarWidth)
+  }, [effectiveSidebarWidth])
 
   const activeTab = tabs.find((t) => t.id === activeId)
-  const showBookmarksBar = bookmarksBarVisible && hasBarBookmarks && !!activeTab && !activeTab.internal && chromePage === null
+  const showBookmarksBar = bookmarksBarVisible && hasBarBookmarks && !!activeTab && chromePage === null
   const chromeHeight =
     (verticalTabs ? CHROME_HEIGHT_VERTICAL_COMPACT : CHROME_HEIGHT_BASE) +
     (showBookmarksBar ? BOOKMARKS_BAR_HEIGHT : 0)
@@ -296,7 +320,7 @@ export default function App(): React.ReactElement {
     if (action === 'boosts') return setChromePage((p) => p === 'boosts' ? null : 'boosts')
     if (action === 'settings') return setChromePage((p) => p === 'settings' ? null : 'settings')
     if (action === 'verticalTabs') {
-      setVerticalTabs((v) => !v)
+      window.aura.settings.set('tabsLayout', settings?.tabsLayout === 'vertical' ? 'horizontal' : 'vertical')
       return
     }
     const labels: Partial<Record<SidebarAction, string>> = {
@@ -308,7 +332,7 @@ export default function App(): React.ReactElement {
       setPanelMessage(label)
       setTimeout(() => setPanelMessage(null), 2500)
     }
-  }, [setVerticalTabs])
+  }, [settings])
 
   useKeyboard({
     onFocusAddress: () => setFocusSignal((n) => n + 1),
@@ -327,9 +351,9 @@ export default function App(): React.ReactElement {
 
   useEffect(() => {
     return window.aura.shortcuts.onToggleVerticalTabs(() => {
-      setVerticalTabs((v) => !v)
+      window.aura.settings.set('tabsLayout', settings?.tabsLayout === 'vertical' ? 'horizontal' : 'vertical')
     })
-  }, [setVerticalTabs])
+  }, [settings])
 
   useEffect(() => {
     return window.aura.shortcuts.onNinjaModal(() => setNinjaModalOpen(true))
@@ -438,17 +462,17 @@ export default function App(): React.ReactElement {
 
   return (
     <div className="app-root">
-      <Sidebar
-        toolbarMenuHandlers={toolbarMenuHandlers}
-        collapsed={sidebarCollapsed}
-        verticalTabsMode={verticalTabs}
-        width={verticalWidth}
-        resizing={isResizing}
-        onToggle={() => setSidebarCollapsed((c) => !c)}
-        onAction={handleSidebarAction}
-        onResizeStart={onResizeStart}
-      >
-        {verticalTabs && (
+      {verticalTabs && (
+        <Sidebar
+          toolbarMenuHandlers={toolbarMenuHandlers}
+          collapsed={sidebarCollapsed}
+          verticalTabsMode={verticalTabs}
+          width={verticalWidth}
+          resizing={isResizing}
+          onToggle={() => setSidebarCollapsed((c) => !c)}
+          onAction={handleSidebarAction}
+          onResizeStart={onResizeStart}
+        >
           <TabBar
             tabs={tabs}
             activeId={activeId}
@@ -459,8 +483,8 @@ export default function App(): React.ReactElement {
             vertical
             onChangeGroup={handleChangeGroup}
           />
-        )}
-      </Sidebar>
+        </Sidebar>
+      )}
 
       <div className="main-area">
         <div className="chrome">
@@ -496,10 +520,8 @@ export default function App(): React.ReactElement {
             onNavigate={handleNavigate}
             onAssistant={() => setAssistantOpen((v) => !v)}
             focusSignal={focusSignal}
-            onOpenBookmarks={() => setChromePage(chromePage === 'bookmarks' ? null : 'bookmarks')}
             onOpenHistory={() => setChromePage(chromePage === 'history' ? null : 'history')}
             onOpenDownloads={() => setChromePage(chromePage === 'downloads' ? null : 'downloads')}
-            onOpenPrivacy={() => setChromePage(chromePage === 'privacy' ? null : 'privacy')}
             onOpenExtensions={() => {
               setPanelMessage('Extensions page arrives in Stage 10')
               setTimeout(() => setPanelMessage(null), 2500)
@@ -510,8 +532,11 @@ export default function App(): React.ReactElement {
               setTimeout(() => setPanelMessage(null), 2500)
             }}
             onOpenNinja={() => setNinjaModalOpen(true)}
-            onToggleVerticalTabs={() => setVerticalTabs((v) => !v)}
+            onOpenCommandPalette={() => setPaletteOpen(true)}
+            onToggleVerticalTabs={() => window.aura.settings.set('tabsLayout', settings?.tabsLayout === 'vertical' ? 'horizontal' : 'vertical')}
+            verticalTabs={verticalTabs}
             bookmarkSignal={bookmarkSignal}
+            onOpenFindBar={() => setFindBarOpen(true)}
             onToggleReader={() => {
               if (activeTab && !activeTab.internal) setReaderActive((v) => !v)
             }}
@@ -524,7 +549,7 @@ export default function App(): React.ReactElement {
               when you're actively browsing a real site. */}
           <BookmarksBar
             toolbarMenuHandlers={toolbarMenuHandlers}
-            visible={showBookmarksBar && !!activeTab && !activeTab.internal && chromePage === null}
+            visible={showBookmarksBar}
             onNavigate={handleNavigate}
             onOpenBookmarksPage={() => setChromePage('bookmarks')}
             onToggleVisible={() => setBookmarksBarVisible((v) => !v)}
@@ -561,6 +586,14 @@ export default function App(): React.ReactElement {
         />
 
         {panelMessage && <div className="toast" key={panelMessage}>{panelMessage}</div>}
+        {reloadHint && (
+          <div className="a11y-reload-hint">
+            Reload your tabs to apply the new {reloadHint === 'minFontSize' ? 'font size' : 'setting'}.
+            <button onClick={() => { void window.aura.tabs.reloadAll?.(); setReloadHint(null) }}>
+              Reload all
+            </button>
+          </div>
+        )}
         <PermissionPrompt />
       </div>
 
@@ -569,6 +602,11 @@ export default function App(): React.ReactElement {
         onClose={() => setPaletteOpen(false)}
         onNavigate={handleNavigate}
         onNewTab={handleNew}
+        onNinja={() => setNinjaModalOpen(true)}
+        onOpenPage={(page) => setChromePage(page as ChromePage)}
+        onToggleSidebar={() => setSidebarCollapsed((c) => !c)}
+        onToggleBookmarksBar={() => setBookmarksBarVisible((v) => !v)}
+        onQuit={() => window.close()}
       />
 
       <NinjaModal

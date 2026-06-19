@@ -1,5 +1,8 @@
-import { BrowserWindow, shell, session, type DownloadItem } from 'electron'
+import { app, BrowserWindow, shell, session, type DownloadItem } from 'electron'
+import * as path from 'path'
+import * as fs from 'fs'
 import { getDb } from './db'
+import { getSetting } from './settings'
 
 export interface DownloadRecord {
   id: number
@@ -22,6 +25,20 @@ function broadcast(): void {
   }
 }
 
+function ensureUniqueFilename(filePath: string): string {
+  if (!fs.existsSync(filePath)) return filePath
+  const dir = path.dirname(filePath)
+  const ext = path.extname(filePath)
+  const base = path.basename(filePath, ext)
+  let counter = 1
+  let candidate = filePath
+  while (fs.existsSync(candidate)) {
+    candidate = path.join(dir, `${base} (${counter})${ext}`)
+    counter++
+  }
+  return candidate
+}
+
 export function attachDownloadHandler(
   targetSession: Electron.Session,
   isPrivate: boolean = false
@@ -29,6 +46,20 @@ export function attachDownloadHandler(
   targetSession.on('will-download', (_e, item) => {
     const url = item.getURL()
     const filename = item.getFilename()
+
+    const askWhereToSave = getSetting('downloadAskWhereToSave') as boolean
+    if (!askWhereToSave) {
+      const customPath = getSetting('downloadPath') as string
+      let saveFolder: string
+      if (customPath && fs.existsSync(customPath)) {
+        saveFolder = customPath
+      } else {
+        saveFolder = app.getPath('downloads')
+      }
+      const fullPath = path.join(saveFolder, filename)
+      const finalPath = ensureUniqueFilename(fullPath)
+      item.setSavePath(finalPath)
+    }
 
     if (isPrivate) {
       console.log('[Aura/downloads] Ninja download — not persisting:', filename)

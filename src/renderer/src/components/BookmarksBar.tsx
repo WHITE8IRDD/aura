@@ -296,6 +296,7 @@ export default function BookmarksBar({
 
       {contextMenu && (
         <BookmarkContextMenu
+          key={`bm-${contextMenu.x}-${contextMenu.y}`}
           x={contextMenu.x}
           y={contextMenu.y}
           items={contextMenu.items}
