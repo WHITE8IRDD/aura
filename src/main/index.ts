@@ -72,6 +72,8 @@ import type { AiMessage } from './ai/types'
 import { registerAboutIPC } from './about'
 import { initSystemIntegration, applyStartOnLogin, applyProxyMode, applyBackgroundMode } from './systemIntegration'
 import { initPerformance, applyEnergySaverToAll } from './performance'
+import { registerDefaultBrowserIPC } from './defaultBrowser'
+import { registerResetIPC } from './resetSettings'
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
 applyStartupFlags()
@@ -581,6 +583,8 @@ ipcMain.handle('app:relaunch', () => {
 })
 
 registerAboutIPC()
+registerDefaultBrowserIPC()
+registerResetIPC()
 
 app.whenReady().then(() => { void createWindow() })
 

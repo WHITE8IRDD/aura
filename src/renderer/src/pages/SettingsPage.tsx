@@ -11,10 +11,12 @@ import { DownloadsSection } from './settings/DownloadsSection'
 import { AccessibilitySection } from './settings/AccessibilitySection'
 import { SystemSection } from './settings/SystemSection'
 import { PerformanceSection } from './settings/PerformanceSection'
+import { DefaultBrowserSection } from './settings/DefaultBrowserSection'
 import { AboutSection } from './settings/AboutSection'
 import { Button } from './settings/SettingsControls'
 import { useSettings } from '../hooks/useSettings'
 import { ChromePageHeader } from '../components/ChromePageHeader'
+import { ResetConfirmModal } from '../components/ResetConfirmModal'
 
 interface Props {
   onClose: () => void
@@ -85,6 +87,13 @@ const SECTION_ICONS: Record<string, JSX.Element> = {
       <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
     </svg>
   ),
+  defaultBrowser: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="2" y1="12" x2="22" y2="12"/>
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+    </svg>
+  ),
   ai: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2L9.5 7.5l-6 .9 4.4 4.2-1 6 5.1-2.7 5.1 2.7-1-6 4.4-4.2-6-.9L12 2z"/>
@@ -116,6 +125,7 @@ const SECTIONS: Section[] = [
   { id: 'accessibility', label: 'Accessibility' },
   { id: 'system', label: 'System' },
   { id: 'performance', label: 'Performance' },
+  { id: 'defaultBrowser', label: 'Default browser' },
   { id: 'ai', label: 'AI Assistant' },
   { id: 'languages', label: 'Languages' },
   { id: 'about', label: 'About' }
@@ -126,6 +136,22 @@ export default function SettingsPage({ onClose }: Props): React.ReactElement {
   const [search, setSearch] = useState('')
 
   const { reset } = useSettings()
+
+  const [resetModalOpen, setResetModalOpen] = useState(false)
+  const [resetResult, setResetResult] = useState<string | null>(null)
+
+  const handleResetAll = async () => {
+    const result = await window.aura.settings.resetAll()
+    setResetModalOpen(false)
+
+    if (result.success) {
+      setResetResult(`\u2713 Reset ${result.resetCount} settings to defaults`)
+      setTimeout(() => setResetResult(null), 5000)
+    } else {
+      setResetResult(`Failed: ${result.error}`)
+      setTimeout(() => setResetResult(null), 8000)
+    }
+  }
 
   const filtered: SearchEntry[] = useMemo(() => {
     if (!search.trim()) return []
@@ -188,18 +214,32 @@ export default function SettingsPage({ onClose }: Props): React.ReactElement {
           {activeSection === 'accessibility' && <AccessibilitySection />}
           {activeSection === 'system' && <SystemSection />}
           {activeSection === 'performance' && <PerformanceSection />}
+          {activeSection === 'defaultBrowser' && <DefaultBrowserSection />}
           {activeSection === 'ai' && <AiSection />}
           {activeSection === 'languages' && <LanguagesSection />}
           {activeSection === 'about' && <AboutSection />}
 
           <div className="sett-footer">
             <Button label="Reset all settings to defaults" variant="danger"
-              onClick={() => {
-                if (confirm('Reset all settings to defaults? This cannot be undone.')) reset()
-              }} />
+              onClick={() => setResetModalOpen(true)} />
           </div>
         </div>
       </div>
+
+      <ResetConfirmModal
+        open={resetModalOpen}
+        title="Reset all settings?"
+        description="This will restore every Aura setting to its default value. Your bookmarks, history, downloads, and saved tabs will NOT be affected \u2014 only preferences and toggles are reset."
+        confirmWord="RESET"
+        confirmLabel="Reset all settings"
+        danger={true}
+        onConfirm={handleResetAll}
+        onCancel={() => setResetModalOpen(false)}
+      />
+
+      {resetResult && (
+        <div className="settings-reset-toast">{resetResult}</div>
+      )}
     </div>
   )
 }

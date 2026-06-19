@@ -1,6 +1,6 @@
 {
   "name": "aura",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Aura — the fastest and most secure consumer browser, with AI built in.",
   "author": "Aura",
   "main": "out/main/index.js",

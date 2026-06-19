@@ -413,6 +413,21 @@ const api = {
     set: <K extends keyof import('../renderer/src/types').AuraSettings>(key: K, value: import('../renderer/src/types').AuraSettings[K]):
       Promise<void> => ipcRenderer.invoke('settings:set', key, value),
     reset: (): Promise<void> => ipcRenderer.invoke('settings:reset'),
+    resetAll: (): Promise<{
+      success: boolean
+      resetCount: number
+      error?: string
+    }> => ipcRenderer.invoke('settings:resetAll'),
+    resetByKeys: (keys: string[]): Promise<{
+      success: boolean
+      resetCount: number
+      error?: string
+    }> => ipcRenderer.invoke('settings:resetByKeys', keys),
+    onFullReset: (cb: () => void): (() => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('settings:fullReset', handler)
+      return () => ipcRenderer.removeListener('settings:fullReset', handler)
+    },
     onChanged: (cb: (data: { key: string; value: unknown }) => void): (() => void) => {
       const l = (_e: Electron.IpcRendererEvent, data: { key: string; value: unknown }) =>
         cb(data)
@@ -486,6 +501,21 @@ const api = {
     getGPU: (): Promise<any> => ipcRenderer.invoke('perf:getGPU'),
     getTabMetrics: (): Promise<any[]> => ipcRenderer.invoke('perf:getTabMetrics'),
     discardSleepingTabs: (): Promise<number> => ipcRenderer.invoke('perf:discardSleepingTabs')
+  },
+
+  defaultBrowser: {
+    getStatus: (): Promise<{
+      isHttpDefault: boolean
+      isHttpsDefault: boolean
+      isFullDefault: boolean
+      platform: string
+    }> => ipcRenderer.invoke('defaultBrowser:getStatus'),
+    setAsDefault: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('defaultBrowser:setAsDefault'),
+    remove: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('defaultBrowser:remove'),
+    openSystemSettings: (): Promise<void> =>
+      ipcRenderer.invoke('defaultBrowser:openSystemSettings')
   }
 }
 

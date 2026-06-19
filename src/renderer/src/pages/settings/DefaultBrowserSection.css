@@ -1,0 +1,113 @@
+.dfb-status-block {
+  margin-bottom: 16px;
+}
+
+.dfb-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.dfb-status-badge.is-default {
+  background: var(--success-bg, rgba(16, 185, 129, 0.12));
+  color: var(--success, #10b981);
+  border: 1px solid var(--success, #10b981);
+}
+
+.dfb-status-badge.not-default {
+  background: var(--warning-bg, rgba(245, 158, 11, 0.12));
+  color: var(--warning, #f59e0b);
+  border: 1px solid var(--warning, #f59e0b);
+}
+
+.dfb-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.dfb-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.dfb-btn {
+  padding: 9px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.dfb-btn:hover:not(:disabled) {
+  background: var(--hover-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.dfb-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dfb-btn.primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.dfb-btn.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: white;
+}
+
+.dfb-btn.secondary {
+  background: transparent;
+}
+
+.dfb-message {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dfb-message.dfb-success {
+  background: var(--success-bg, rgba(16, 185, 129, 0.12));
+  color: var(--success, #10b981);
+  border: 1px solid var(--success, #10b981);
+}
+
+.dfb-message.dfb-error {
+  background: var(--danger-bg, rgba(239, 68, 68, 0.12));
+  color: var(--danger, #ef4444);
+  border: 1px solid var(--danger, #ef4444);
+}
+
+.dfb-message.dfb-info {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  border: 1px solid var(--accent);
+}
+
+.dfb-info {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.6;
+}

@@ -13,24 +13,28 @@ export function useSettings(): {
 } {
   const [settings, setSettings] = useState<AuraSettings | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    void window.aura.settings.getAll().then((s) => {
-      if (cancelled) return
-      const settings = s as AuraSettings
-      setSettings(settings)
-      applyFontSize(settings.fontSize)
-    })
+  const fetchAll = useCallback(async () => {
+    const s = await window.aura.settings.getAll() as AuraSettings
+    setSettings(s)
+    applyFontSize(s.fontSize)
+  }, [])
 
-    const unsub = window.aura.settings.onChanged((data: { key: string; value: unknown }) => {
+  useEffect(() => {
+    fetchAll()
+
+    const unsubChange = window.aura.settings.onChanged((data: { key: string; value: unknown }) => {
       setSettings((prev) => (prev ? { ...prev, [data.key as keyof AuraSettings]: data.value as never } : prev))
       if (data.key === 'fontSize') {
         applyFontSize(data.value as string)
       }
     })
 
-    return () => { cancelled = true; unsub() }
-  }, [])
+    const unsubFullReset = window.aura.settings.onFullReset(() => {
+      fetchAll()
+    })
+
+    return () => { unsubChange(); unsubFullReset() }
+  }, [fetchAll])
 
   const set = useCallback(async <K extends keyof AuraSettings>(key: K, value: AuraSettings[K]) => {
     await window.aura.settings.set(key as string, value)
