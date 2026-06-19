@@ -141,5 +141,10 @@ export function registerShortcuts(win: BrowserWindow, tabs: TabManager): void {
       const active = tabs.getActiveId()
       if (active !== null) tabs.goForward(active)
     }
+
+    // Ctrl+, → open Settings
+    if (input.ctrl && key === ',') {
+      win.webContents.send('shortcut:openSettings')
+    }
   })
 }

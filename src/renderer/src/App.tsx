@@ -19,6 +19,7 @@ import BookmarksPage from './pages/BookmarksPage'
 import DownloadsPage from './pages/DownloadsPage'
 import ReadingListPage from './pages/ReadingListPage'
 import BoostsPage from './pages/BoostsPage'
+import SettingsPage from './pages/SettingsPage'
 import AssistantPanel from './ai/AssistantPanel'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useLocalStorage } from './hooks/useLocalStorage'
@@ -38,7 +39,7 @@ const CHROME_HEIGHT_BASE = 80                  // 36 (tabs) + 44 (toolbar)
 const BOOKMARKS_BAR_HEIGHT = 30                // .bookmarks-bar height
 const CHROME_HEIGHT_VERTICAL_COMPACT = 74      // 30 (compact top) + 44 (toolbar)
 
-type ChromePage = null | 'privacy' | 'history' | 'bookmarks' | 'downloads' | 'readingList' | 'boosts'
+type ChromePage = null | 'privacy' | 'history' | 'bookmarks' | 'downloads' | 'readingList' | 'boosts' | 'settings'
 
 export default function App(): React.ReactElement {
   const [tabs, setTabs] = useState<TabState[]>([])
@@ -152,6 +153,20 @@ export default function App(): React.ReactElement {
   }, [verticalTabs])
 
   useEffect(() => {
+    if (chromePage !== null) {
+      void window.aura.layout.hideView()
+      requestAnimationFrame(() => {
+        void window.aura.layout.hideView()
+      })
+    } else {
+      if (!ninjaModalOpen && !paletteOpen && !readerActive && !findBarOpen
+          && !tabSearchOpen && !assistantOpen) {
+        void window.aura.layout.showView()
+      }
+    }
+  }, [chromePage, ninjaModalOpen, paletteOpen, readerActive, findBarOpen, tabSearchOpen, assistantOpen])
+
+  useEffect(() => {
     const anyOverlay =
       ninjaModalOpen ||
       paletteOpen ||
@@ -184,8 +199,50 @@ export default function App(): React.ReactElement {
   }, [activeId])
 
   useEffect(() => {
-    if (activeTab && !activeTab.internal) setChromePage(null)
-  }, [activeTab])
+    if (activeId === null) return
+    const t = tabs.find((tab) => tab.id === activeId)
+    if (t && !t.internal) setChromePage(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId])
+
+  useEffect(() => {
+    if (!chromePage) return
+
+    const onMouseUp = (e: MouseEvent): void => {
+      if (e.button === 3) {
+        e.preventDefault()
+        setChromePage(null)
+      }
+    }
+    const onKeyDown = (e: KeyboardEvent): void => {
+      const target = e.target as HTMLElement
+      const isTyping =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      if (isTyping) return
+      if (e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault()
+        setChromePage(null)
+        return
+      }
+      if (e.key === 'Backspace') {
+        e.preventDefault()
+        setChromePage(null)
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setChromePage(null)
+      }
+    }
+    window.addEventListener('mouseup', onMouseUp)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('mouseup', onMouseUp)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [chromePage])
 
   const handleChangeGroup = useCallback(async (tabId: number, groupId: string | null) => {
     if (groupId === null) {
@@ -223,19 +280,19 @@ export default function App(): React.ReactElement {
   }, [])
 
   const handleSidebarAction = useCallback((action: SidebarAction) => {
-    if (action === 'privacy') return setChromePage('privacy')
-    if (action === 'history') return setChromePage('history')
-    if (action === 'bookmarks') return setChromePage('bookmarks')
-    if (action === 'downloads') return setChromePage('downloads')
-    if (action === 'readingList') return setChromePage('readingList')
-    if (action === 'boosts') return setChromePage('boosts')
+    if (action === 'privacy') return setChromePage((p) => p === 'privacy' ? null : 'privacy')
+    if (action === 'history') return setChromePage((p) => p === 'history' ? null : 'history')
+    if (action === 'bookmarks') return setChromePage((p) => p === 'bookmarks' ? null : 'bookmarks')
+    if (action === 'downloads') return setChromePage((p) => p === 'downloads' ? null : 'downloads')
+    if (action === 'readingList') return setChromePage((p) => p === 'readingList' ? null : 'readingList')
+    if (action === 'boosts') return setChromePage((p) => p === 'boosts' ? null : 'boosts')
+    if (action === 'settings') return setChromePage((p) => p === 'settings' ? null : 'settings')
     if (action === 'verticalTabs') {
       setVerticalTabs((v) => !v)
       return
     }
     const labels: Partial<Record<SidebarAction, string>> = {
       extensions: 'Extensions page arrives in Stage 10',
-      settings: 'Settings arrives in Stage 10',
       profile: 'Profile switcher arrives in Stage 10'
     }
     const label = labels[action]
@@ -286,6 +343,16 @@ export default function App(): React.ReactElement {
 
   useEffect(() => {
     return window.aura.shortcuts.onToggleAssistant(() => setAssistantOpen((v) => !v))
+  }, [])
+
+  useEffect(() => {
+    return window.aura.shortcuts.onOpenSettings(() => setChromePage('settings'))
+  }, [])
+
+  useEffect(() => {
+    return window.aura.contextMenu.onOpenInNinja((url: string) => {
+      window.aura.ninja.launchWithUrl(url)
+    })
   }, [])
 
   useEffect(() => {
@@ -350,12 +417,14 @@ export default function App(): React.ReactElement {
   }, [])
 
   const renderChromePage = (): React.ReactElement | null => {
-    if (chromePage === 'privacy') return <PrivacyDashboard />
-    if (chromePage === 'history') return <HistoryPage onNavigate={handleNavigate} />
-    if (chromePage === 'bookmarks') return <BookmarksPage onNavigate={handleNavigate} />
-    if (chromePage === 'downloads') return <DownloadsPage />
-    if (chromePage === 'readingList') return <ReadingListPage onNavigate={handleNavigate} />
-    if (chromePage === 'boosts') return <BoostsPage />
+    const onClose = (): void => setChromePage(null)
+    if (chromePage === 'privacy') return <PrivacyDashboard onClose={onClose} />
+    if (chromePage === 'history') return <HistoryPage onNavigate={handleNavigate} onClose={onClose} />
+    if (chromePage === 'bookmarks') return <BookmarksPage onNavigate={handleNavigate} onClose={onClose} />
+    if (chromePage === 'downloads') return <DownloadsPage onClose={onClose} />
+    if (chromePage === 'readingList') return <ReadingListPage onNavigate={handleNavigate} onClose={onClose} />
+    if (chromePage === 'boosts') return <BoostsPage onClose={onClose} />
+    if (chromePage === 'settings') return <SettingsPage onClose={onClose} />
     return null
   }
 
@@ -417,18 +486,15 @@ export default function App(): React.ReactElement {
             onNavigate={handleNavigate}
             onAssistant={() => setAssistantOpen((v) => !v)}
             focusSignal={focusSignal}
-            onOpenBookmarks={() => setChromePage('bookmarks')}
-            onOpenHistory={() => setChromePage('history')}
-            onOpenDownloads={() => setChromePage('downloads')}
-            onOpenPrivacy={() => setChromePage('privacy')}
+            onOpenBookmarks={() => setChromePage(chromePage === 'bookmarks' ? null : 'bookmarks')}
+            onOpenHistory={() => setChromePage(chromePage === 'history' ? null : 'history')}
+            onOpenDownloads={() => setChromePage(chromePage === 'downloads' ? null : 'downloads')}
+            onOpenPrivacy={() => setChromePage(chromePage === 'privacy' ? null : 'privacy')}
             onOpenExtensions={() => {
               setPanelMessage('Extensions page arrives in Stage 10')
               setTimeout(() => setPanelMessage(null), 2500)
             }}
-            onOpenSettings={() => {
-              setPanelMessage('Settings arrives in Stage 10')
-              setTimeout(() => setPanelMessage(null), 2500)
-            }}
+            onOpenSettings={() => setChromePage(chromePage === 'settings' ? null : 'settings')}
             onOpenProfile={() => {
               setPanelMessage('Profile switcher arrives in Stage 10')
               setTimeout(() => setPanelMessage(null), 2500)

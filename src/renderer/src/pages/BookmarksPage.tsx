@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { IconBookmark, IconClose, IconPlus } from '../components/Icons'
+import { ChromePageHeader } from '../components/ChromePageHeader'
 import type { Bookmark, BookmarkFolder } from '../types'
 
 interface Props {
   onNavigate: (url: string) => void
+  onClose: () => void
 }
 
-export default function BookmarksPage({ onNavigate }: Props): React.ReactElement {
+export default function BookmarksPage({ onNavigate, onClose }: Props): React.ReactElement {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
   const [folders, setFolders] = useState<BookmarkFolder[]>([])
   const [activeFolderId, setActiveFolderId] = useState<number | null>(null)
@@ -46,13 +48,7 @@ export default function BookmarksPage({ onNavigate }: Props): React.ReactElement
   return (
     <div className="data-page">
       <header className="data-header">
-        <div className="data-header-title">
-          <IconBookmark size={24} />
-          <div>
-            <h1>Bookmarks</h1>
-            <p>{bookmarks.length} saved</p>
-          </div>
-        </div>
+        <ChromePageHeader title="Bookmarks" onBack={onClose} />
         <div className="data-header-actions">
           <button className="data-btn" onClick={() => setAdding((v) => !v)}>
             <IconPlus size={13} /> Add bookmark

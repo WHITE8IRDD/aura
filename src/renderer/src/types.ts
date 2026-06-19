@@ -127,3 +127,41 @@ export interface DownloadRecord {
   startedAt: number
   completedAt: number | null
 }
+
+export interface AuraSettings {
+  startupBehavior: 'newtab' | 'restoreSession' | 'specificUrl'
+  startupUrl: string
+  openLinksInTabs: boolean
+  switchToNewTab: boolean
+  ctrlTabRecentOrder: boolean
+  askBeforeClosingMultipleTabs: boolean
+  tabsLayout: 'horizontal' | 'vertical'
+  showBookmarksBar: boolean
+  theme: 'light' | 'dark' | 'auto'
+  fontSize: 'small' | 'medium' | 'large'
+  downloadsFolder: string
+  alwaysAskWhereToSave: boolean
+  deleteDownloadsAfterPrivateClose: boolean
+  hardwareAcceleration: boolean
+  sleepingTabsEnabled: boolean
+  sleepingTabsMinutes: number
+  autoplayAllowed: boolean
+  smoothScrolling: boolean
+  ctrlWheelZoom: boolean
+  autoCheckUpdates: boolean
+  shieldsLevel: 'standard' | 'strict' | 'custom'
+  blockTrackers: boolean
+  blockAds: boolean
+  blockSocialTrackers: boolean
+  blockFingerprinters: boolean
+  httpsOnly: boolean
+  sendDoNotTrack: boolean
+  blockPhishing: boolean
+  rememberHistory: boolean
+  suggestHistory: boolean
+  suggestBookmarks: boolean
+  suggestOpenTabs: boolean
+  defaultSearchEngine: 'duckduckgo' | 'google' | 'brave' | 'startpage'
+  aiIncludePageContextDefault: boolean
+  aiRememberConversations: boolean
+}

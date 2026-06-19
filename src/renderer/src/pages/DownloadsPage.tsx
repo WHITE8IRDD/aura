@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { IconDownload, IconClose } from '../components/Icons'
+import { ChromePageHeader } from '../components/ChromePageHeader'
 import type { DownloadRecord } from '../types'
 
-export default function DownloadsPage(): React.ReactElement {
+interface Props {
+  onClose: () => void
+}
+
+export default function DownloadsPage({ onClose }: Props): React.ReactElement {
   const [downloads, setDownloads] = useState<DownloadRecord[]>([])
 
   const load = (): void => {
@@ -37,13 +42,7 @@ export default function DownloadsPage(): React.ReactElement {
   return (
     <div className="data-page">
       <header className="data-header">
-        <div className="data-header-title">
-          <IconDownload size={24} />
-          <div>
-            <h1>Downloads</h1>
-            <p>{downloads.length} total</p>
-          </div>
-        </div>
+        <ChromePageHeader title="Downloads" onBack={onClose} />
         <div className="data-header-actions">
           <button className="data-btn" onClick={handleClearCompleted}>
             Clear completed
@@ -97,7 +96,7 @@ function DownloadRow({
         <div className="data-row-title">{download.filename}</div>
         <div className="data-row-meta">
           <span className={`download-state state-${download.state}`}>{download.state}</span>
-          <span className="data-row-sep">·</span>
+          <span className="data-row-sep">&middot;</span>
           <span>
             {sizeMB} MB{download.totalBytes > 0 && ` / ${totalMB} MB`}
           </span>

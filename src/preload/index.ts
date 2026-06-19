@@ -127,6 +127,7 @@ const api = {
 
   ninja: {
     launch: (): Promise<void> => ipcRenderer.invoke('ninja:launch'),
+    launchWithUrl: (url: string): Promise<void> => ipcRenderer.invoke('ninja:launchWithUrl', url),
     isPrivate: (): Promise<boolean> => ipcRenderer.invoke('ninja:isPrivate')
   },
 
@@ -281,6 +282,11 @@ const api = {
       const l = (): void => cb()
       ipcRenderer.on('shortcut:toggleAssistant', l)
       return () => ipcRenderer.removeListener('shortcut:toggleAssistant', l)
+    },
+    onOpenSettings: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('shortcut:openSettings', l)
+      return () => ipcRenderer.removeListener('shortcut:openSettings', l)
     }
   },
 
@@ -367,6 +373,41 @@ const api = {
         cb(data)
       ipcRenderer.on('ai:stream:error', l)
       return () => ipcRenderer.removeListener('ai:stream:error', l)
+    }
+  },
+
+  settings: {
+    getAll: (): Promise<import('../renderer/src/types').AuraSettings> =>
+      ipcRenderer.invoke('settings:getAll'),
+    get: <K extends keyof import('../renderer/src/types').AuraSettings>(key: K):
+      Promise<import('../renderer/src/types').AuraSettings[K]> =>
+      ipcRenderer.invoke('settings:get', key),
+    set: <K extends keyof import('../renderer/src/types').AuraSettings>(key: K, value: import('../renderer/src/types').AuraSettings[K]):
+      Promise<void> => ipcRenderer.invoke('settings:set', key, value),
+    reset: (): Promise<void> => ipcRenderer.invoke('settings:reset'),
+    onChanged: (cb: (data: { key: string; value: unknown }) => void): (() => void) => {
+      const l = (_e: Electron.IpcRendererEvent, data: { key: string; value: unknown }) =>
+        cb(data)
+      ipcRenderer.on('settings:changed', l)
+      return () => ipcRenderer.removeListener('settings:changed', l)
+    }
+  },
+
+  browser: {
+    setDefault: (): Promise<boolean> => ipcRenderer.invoke('browser:setDefault'),
+    isDefault: (): Promise<boolean> => ipcRenderer.invoke('browser:isDefault')
+  },
+
+  app: {
+    openUserDataFolder: (): void => { void ipcRenderer.invoke('app:openUserDataFolder') },
+    getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion')
+  },
+
+  contextMenu: {
+    onOpenInNinja: (cb: (url: string) => void): (() => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, url: string): void => cb(url)
+      ipcRenderer.on('cm:openInNinja', handler)
+      return () => ipcRenderer.removeListener('cm:openInNinja', handler)
     }
   }
 }

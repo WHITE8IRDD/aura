@@ -1,9 +1,10 @@
-import { BrowserWindow, Menu, MenuItem, WebContentsView } from 'electron'
+import { BrowserWindow, WebContentsView } from 'electron'
 import { join } from 'path'
 import { isInternal, normalizeInput } from './url'
 import { recordVisit, updateTitle } from './history'
 import { getZoomForHost, setZoomForHost } from './zoom'
 import { getGroupForTab, removeTabFromAnyGroup } from './tab-groups'
+import { attachContextMenu } from './contextMenu'
 
 export interface TabState {
   id: number
@@ -51,8 +52,18 @@ const ZOOM_STEP = 0.1
 const ZOOM_MIN = 0.25
 const ZOOM_MAX = 5.0
 
-const SLEEP_AFTER_MS = 30 * 60 * 1000
 const SLEEP_CHECK_INTERVAL_MS = 60 * 1000
+
+function getSleepAfterMs(): number {
+  try {
+    const { getSetting } = require('./settings')
+    if (!getSetting('sleepingTabsEnabled')) return Infinity
+    const minutes = getSetting('sleepingTabsMinutes') as number
+    return Math.max(1, minutes) * 60 * 1000
+  } catch {
+    return 30 * 60 * 1000
+  }
+}
 
 function hostnameOf(url: string): string | null {
   try { return new URL(url).hostname } catch { return null }
@@ -408,13 +419,16 @@ export class TabManager {
   }
 
   private checkSleepingTabs(): void {
+    const sleepAfterMs = getSleepAfterMs()
+    if (!Number.isFinite(sleepAfterMs)) return
+
     for (const rec of this.records.values()) {
       if (!rec.view) continue
       if (rec.id === this.activeId) continue
       if (rec.pinned) continue
       if (rec.hasAudio) continue
-      if (rec.fullscreen) continue   // never sleep fullscreen tabs
-      if (this.idleMs(rec) > SLEEP_AFTER_MS) {
+      if (rec.fullscreen) continue
+      if (this.idleMs(rec) > sleepAfterMs) {
         if (rec.loadingTimeout) clearTimeout(rec.loadingTimeout)
         this.destroyView(rec)
         rec.loading = false
@@ -465,6 +479,7 @@ export class TabManager {
     }
 
     this.wireEvents(rec)
+    attachContextMenu(view.webContents, this.win, this)
     this.win.contentView.addChildView(view)
     view.webContents.loadURL(url)
   }
@@ -545,16 +560,6 @@ export class TabManager {
 
     wc.on('leave-html-full-screen', () => {
       this.exitFullscreenLayout()
-    })
-
-    wc.on('context-menu', (_e, params) => {
-      if (params.mediaType !== 'video') return
-      const menu = new Menu()
-      menu.append(new MenuItem({
-        label: 'Picture in Picture',
-        click: () => this.pictureInPicture(rec.id)
-      }))
-      menu.popup({ window: this.win })
     })
 
     wc.setWindowOpenHandler(({ url }) => {

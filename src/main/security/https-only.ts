@@ -1,12 +1,11 @@
 import { type Session } from 'electron'
+import { getSetting } from '../settings'
 
 const allowedInsecureHosts = new Set<string>()
+const registered = new WeakSet<Session>()
 
 const SKIP_UPGRADE_HOSTS = new Set<string>([
-  'youtube.com',
-  'www.youtube.com',
-  'google.com',
-  'www.google.com'
+  'youtube.com', 'www.youtube.com', 'google.com', 'www.google.com'
 ])
 
 function isLocalAddress(hostname: string): boolean {
@@ -22,16 +21,20 @@ function isLocalAddress(hostname: string): boolean {
 }
 
 export function setupHttpsOnly(targetSession: Session): void {
+  if (registered.has(targetSession)) return
+  registered.add(targetSession)
+
   targetSession.webRequest.onBeforeRequest(
     { urls: ['http://*/*'] },
     (details, callback) => {
+      if (!getSetting('httpsOnly')) {
+        return callback({ cancel: false })
+      }
       if (details.resourceType !== 'mainFrame') {
         return callback({ cancel: false })
       }
-
       try {
         const url = new URL(details.url)
-
         if (
           allowedInsecureHosts.has(url.host) ||
           isLocalAddress(url.hostname) ||
@@ -39,7 +42,6 @@ export function setupHttpsOnly(targetSession: Session): void {
         ) {
           return callback({ cancel: false })
         }
-
         url.protocol = 'https:'
         callback({ redirectURL: url.toString() })
       } catch {

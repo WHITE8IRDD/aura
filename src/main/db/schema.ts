@@ -3,7 +3,6 @@ import type Database from 'better-sqlite3'
 type Migration = (db: Database.Database) => void
 
 const MIGRATIONS: Migration[] = [
-  // v1 — initial
   (db) => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS history (
@@ -32,7 +31,6 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_downloads_started ON downloads(started_at DESC);
     `)
   },
-  // v2 — bookmark sort
   (db) => {
     db.exec(`
       ALTER TABLE bookmarks ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
@@ -43,7 +41,6 @@ const MIGRATIONS: Migration[] = [
     let i = 0
     for (const row of rows) update.run(i++, row.id)
   },
-  // v3 — reading list + boosts + sidebar panels
   (db) => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS reading_list (
@@ -67,27 +64,31 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_panels_sort ON sidebar_panels(sort_order);
     `)
   },
-  // v4 — AI conversations (Stage 9)
   (db) => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS ai_conversations (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        title       TEXT NOT NULL,
-        page_url    TEXT,
-        page_title  TEXT,
-        created_at  INTEGER NOT NULL,
-        updated_at  INTEGER NOT NULL
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        page_url TEXT, page_title TEXT,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_ai_conv_updated ON ai_conversations(updated_at DESC);
-
       CREATE TABLE IF NOT EXISTS ai_messages (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         conversation_id INTEGER NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
-        role            TEXT NOT NULL,
-        content         TEXT NOT NULL,
-        created_at      INTEGER NOT NULL
+        role TEXT NOT NULL, content TEXT NOT NULL,
+        created_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_ai_msg_conv ON ai_messages(conversation_id);
+    `)
+  },
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
     `)
   }
 ]

@@ -50,11 +50,17 @@ import {
 } from './tab-groups'
 import { aiManager } from './ai/manager'
 import { extractPageContext } from './ai/page-context'
+import { getAllSettings, getSetting, setSetting, resetSettings, getDefaults } from './settings'
+import { setAsDefaultBrowser, isDefaultBrowser } from './default-browser'
+import { registerSession, broadcastSettingChange, applyStartupFlags, applyHardwareAccelLater } from './settings-bridge'
 import {
   createConversation, addMessage, listConversations, getMessages,
   deleteConversation, renameConversation
 } from './ai/conversations'
 import type { AiMessage } from './ai/types'
+
+// STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
+applyStartupFlags()
 
 // ============================================================
 // STAGE 8.5 — PERFORMANCE HARDENING
@@ -110,11 +116,14 @@ let ninja: NinjaWindowManager | null = null
 const startupReady = app.whenReady().then(async () => {
   console.log('[Aura] Opening database…')
   getDb()
+  applyHardwareAccelLater()
+  console.log('[Aura/settings] Loaded settings')
   console.log('[Aura] Pre-initializing blocker engine…')
   await setupDefaultSessionBlocking()
   setupHttpsOnly(session.defaultSession)
   setupSessionFingerprintDefenses(session.defaultSession)
   setupPermissionPrompts(session.defaultSession)
+  registerSession(session.defaultSession)
   setupDownloads()
   await aiManager.init()
   console.log('[Aura/ai] Manager ready, active provider:', aiManager.getActive().label)
@@ -279,6 +288,10 @@ ipcMain.handle('permission:respond', (_e, id: number, granted: boolean, remember
 ipcMain.handle('favicons:fetch', (_e, url: string) => fetchFavicon(url))
 
 ipcMain.handle('ninja:launch', () => ninja?.launch())
+ipcMain.handle('ninja:launchWithUrl', (_e, url: string) => {
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return
+  return ninja?.launch(url)
+})
 ipcMain.handle('ninja:isPrivate', (e) => {
   const win = BrowserWindow.fromWebContents(e.sender)
   if (!win || !ninja) return false
@@ -454,6 +467,30 @@ Answer questions based on this content. If the answer isn't in the page, say so.
   }
 })
 
+// ====================================================================
+// STAGE 10A — Settings
+// ====================================================================
+
+ipcMain.handle('settings:getAll', () => getAllSettings())
+ipcMain.handle('settings:get', (_e, key: string) => getSetting(key as keyof ReturnType<typeof getAllSettings>))
+ipcMain.handle('settings:set', (_e, key: string, value: unknown) => {
+  setSetting(key as keyof ReturnType<typeof getAllSettings>, value)
+  try {
+    broadcastSettingChange(key)
+  } catch (err) {
+    console.warn('[Aura/settings] broadcastSettingChange failed for', key, err)
+  }
+})
+ipcMain.handle('settings:reset', () => resetSettings())
+
+ipcMain.handle('browser:setDefault', () => setAsDefaultBrowser())
+ipcMain.handle('browser:isDefault', () => isDefaultBrowser())
+
+ipcMain.handle('app:openUserDataFolder', () => {
+  shell.openPath(app.getPath('userData'))
+})
+ipcMain.handle('app:getVersion', () => app.getVersion())
+
 app.whenReady().then(() => { void createWindow() })
 
 app.on('window-all-closed', () => {
@@ -477,5 +514,6 @@ export async function setupNinjaSession(s: Electron.Session): Promise<void> {
   setupHttpsOnly(s)
   setupSessionFingerprintDefenses(s)
   setupPermissionPrompts(s)
-  attachDownloadHandler(s, true)  // STAGE 9.5: isPrivate=true — downloads don't get persisted
+  attachDownloadHandler(s, true)
+  registerSession(s)
 }

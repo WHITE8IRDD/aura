@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { IconHistory, IconClose, IconSearch } from '../components/Icons'
+import { ChromePageHeader } from '../components/ChromePageHeader'
 import type { HistoryEntry } from '../types'
 
 interface Props {
   onNavigate: (url: string) => void
+  onClose: () => void
 }
 
-export default function HistoryPage({ onNavigate }: Props): React.ReactElement {
+export default function HistoryPage({ onNavigate, onClose }: Props): React.ReactElement {
   const [entries, setEntries] = useState<HistoryEntry[]>([])
   const [query, setQuery] = useState('')
 
@@ -33,13 +35,7 @@ export default function HistoryPage({ onNavigate }: Props): React.ReactElement {
   return (
     <div className="data-page">
       <header className="data-header">
-        <div className="data-header-title">
-          <IconHistory size={24} />
-          <div>
-            <h1>History</h1>
-            <p>{entries.length} entries</p>
-          </div>
-        </div>
+        <ChromePageHeader title="History" onBack={onClose} />
         <div className="data-header-actions">
           <div className="data-search">
             <IconSearch size={14} />
@@ -90,11 +86,11 @@ function HistoryRow({
         <div className="data-row-title">{entry.title || entry.url}</div>
         <div className="data-row-meta">
           <span>{hostname}</span>
-          <span className="data-row-sep">·</span>
+          <span className="data-row-sep">&middot;</span>
           <span>{dateStr}</span>
           {entry.visitCount > 1 && (
             <>
-              <span className="data-row-sep">·</span>
+              <span className="data-row-sep">&middot;</span>
               <span>{entry.visitCount} visits</span>
             </>
           )}

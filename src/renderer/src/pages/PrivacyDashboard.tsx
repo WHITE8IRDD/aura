@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { IconShield } from '../components/Icons'
+import { ChromePageHeader } from '../components/ChromePageHeader'
+
+interface Props {
+  onClose: () => void
+}
 
 interface Stats {
   trackersBlocked: number
@@ -9,7 +14,7 @@ interface Stats {
   bandwidthSavedKb: number
 }
 
-export default function PrivacyDashboard(): React.ReactElement {
+export default function PrivacyDashboard({ onClose }: Props): React.ReactElement {
   const [stats, setStats] = useState<Stats>({
     trackersBlocked: 0,
     adsBlocked: 0,
@@ -40,10 +45,10 @@ export default function PrivacyDashboard(): React.ReactElement {
 
   return (
     <div className="privacy-dashboard">
+      <ChromePageHeader title="Privacy Shield" onBack={onClose} />
       <header className="pd-header">
         <IconShield size={28} />
         <div>
-          <h1>Privacy Shield</h1>
           <p>
             {total > 0
               ? `${total} requests blocked this session`

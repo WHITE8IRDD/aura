@@ -5,6 +5,8 @@ import BookmarkDialog from './BookmarkDialog'
 import ZoomIndicator from './ZoomIndicator'
 import UtilityCluster from './UtilityCluster'
 import ReaderButton from './ReaderButton'
+import SearchEnginePicker from './SearchEnginePicker'
+import { useSettings } from '../hooks/useSettings'
 import {
   IconBack, IconForward, IconReload, IconClose, IconLock, IconAlert,
   IconMic, IconSparkle, IconShield, IconBookmark
@@ -28,9 +30,9 @@ interface Props {
   onOpenNinja: () => void
   onToggleVerticalTabs: () => void
   bookmarkSignal: number
-  onToggleReader: () => void
-  readerActive: boolean
   onSaveToReadingList: () => void
+  onToggleReader?: () => void
+  readerActive?: boolean
 }
 
 function isSecure(url: string): boolean {
@@ -49,15 +51,38 @@ function extractHostname(url: string): string | null {
   try { return new URL(url).hostname } catch { return null }
 }
 
+function buildSearchUrl(engine: string, query: string): string {
+  const q = encodeURIComponent(query)
+  switch (engine) {
+    case 'duckduckgo': return `https://duckduckgo.com/?q=${q}`
+    case 'brave':      return `https://search.brave.com/search?q=${q}`
+    case 'startpage':  return `https://www.startpage.com/sp/search?query=${q}`
+    case 'google':
+    default:           return `https://www.google.com/search?q=${q}`
+  }
+}
+
+function engineDisplayName(engine: string): string {
+  switch (engine) {
+    case 'duckduckgo': return 'DuckDuckGo'
+    case 'brave':      return 'Brave Search'
+    case 'startpage':  return 'Startpage'
+    case 'google':
+    default:           return 'Google'
+  }
+}
+
 export default function Toolbar(props: Props): React.ReactElement {
   const {
     tab, onBack, onForward, onReload, onNavigate, onAssistant, focusSignal,
     onOpenBookmarks, onOpenHistory, onOpenDownloads, onOpenPrivacy,
     onOpenExtensions, onOpenSettings, onOpenProfile, onOpenNinja,
-    onToggleVerticalTabs, bookmarkSignal,
-    onToggleReader, readerActive,
-    onSaveToReadingList
+    onToggleVerticalTabs, bookmarkSignal, onSaveToReadingList,
+    onToggleReader, readerActive
   } = props
+
+  const { settings, set } = useSettings()
+  const currentEngine = settings?.defaultSearchEngine ?? 'google'
 
   const isLoading = tab?.loading ?? false
   const url = tab?.url ?? 'aura://newtab'
@@ -106,14 +131,12 @@ export default function Toolbar(props: Props): React.ReactElement {
       setBookmarkAnchor(rect)
       setBookmarkDialogOpen(true)
     }
-  }, [bookmarkSignal, isWebPage])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookmarkSignal])
 
   useEffect(() => {
-    if (bookmarkDialogOpen) {
-      void window.aura.layout.hideView()
-    } else {
-      void window.aura.layout.showView()
-    }
+    if (bookmarkDialogOpen) void window.aura.layout.hideView()
+    else void window.aura.layout.showView()
   }, [bookmarkDialogOpen])
 
   useEffect(() => {
@@ -122,10 +145,10 @@ export default function Toolbar(props: Props): React.ReactElement {
       return
     }
     const handle = setTimeout(() => {
-      void buildSuggestions(value).then(setSuggestions)
+      void buildSuggestions(value, currentEngine).then(setSuggestions)
     }, 80)
     return () => clearTimeout(handle)
-  }, [value, focused])
+  }, [value, focused, currentEngine])
 
   useEffect(() => { setSelectedIndex(0) }, [suggestions.length])
 
@@ -140,9 +163,16 @@ export default function Toolbar(props: Props): React.ReactElement {
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault()
     const chosen = suggestions[selectedIndex]
-    if (chosen) submitSuggestion(chosen)
-    else {
-      onNavigate(value.trim())
+    if (chosen) {
+      submitSuggestion(chosen)
+    } else {
+      const trimmed = value.trim()
+      if (!trimmed) return
+      if (looksLikeUrl(trimmed)) {
+        onNavigate(trimmed)
+      } else {
+        onNavigate(buildSearchUrl(currentEngine, trimmed))
+      }
       inputRef.current?.blur()
     }
   }
@@ -221,11 +251,20 @@ export default function Toolbar(props: Props): React.ReactElement {
               {secure ? <IconLock size={12} /> : <IconAlert size={12} />}
             </span>
 
+            {settings && (
+              <SearchEnginePicker
+                current={currentEngine}
+                onChange={(engine) => {
+                  void set('defaultSearchEngine', engine)
+                }}
+              />
+            )}
+
             <input
               ref={inputRef}
               type="text"
               value={value}
-              placeholder="Ask Aura or type a URL"
+              placeholder={`Search ${engineDisplayName(currentEngine)} or type a URL`}
               autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -238,24 +277,8 @@ export default function Toolbar(props: Props): React.ReactElement {
               aria-label="Address bar"
             />
 
-            {isWebPage && (
-              <ReaderButton active={readerActive} onClick={onToggleReader} />
-            )}
-
-            {isWebPage && (
-              <button
-                type="button"
-                className="ab-reading-list"
-                title="Save to reading list"
-                onClick={(e) => { e.stopPropagation(); onSaveToReadingList() }}
-                tabIndex={-1}
-              >
-                <svg width={13} height={13} viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                </svg>
-              </button>
+            {onToggleReader && (
+              <ReaderButton active={!!readerActive} onClick={onToggleReader} />
             )}
 
             {isWebPage && (
@@ -348,7 +371,7 @@ export default function Toolbar(props: Props): React.ReactElement {
   )
 }
 
-async function buildSuggestions(input: string): Promise<Suggestion[]> {
+async function buildSuggestions(input: string, engine: string): Promise<Suggestion[]> {
   const q = input.trim()
   const out: Suggestion[] = []
 
@@ -357,10 +380,23 @@ async function buildSuggestions(input: string): Promise<Suggestion[]> {
       const url = /^https?:\/\//i.test(q) ? q : `https://${q}`
       out.push({ type: 'url', label: `Go to ${q}`, hint: 'Enter', url })
     }
+
+    const engineName = engineDisplayName(engine)
+    const searchUrl = (() => {
+      const enc = encodeURIComponent(q)
+      switch (engine) {
+        case 'duckduckgo': return `https://duckduckgo.com/?q=${enc}`
+        case 'brave':      return `https://search.brave.com/search?q=${enc}`
+        case 'startpage':  return `https://www.startpage.com/sp/search?query=${enc}`
+        case 'google':
+        default:           return `https://www.google.com/search?q=${enc}`
+      }
+    })()
+
     out.push({
       type: 'search',
-      label: `Search the web for "${q}"`,
-      url: `https://duckduckgo.com/?q=${encodeURIComponent(q)}`
+      label: `Search ${engineName} for "${q}"`,
+      url: searchUrl
     })
   }
 
@@ -368,7 +404,12 @@ async function buildSuggestions(input: string): Promise<Suggestion[]> {
   for (const h of history) {
     let hn = h.url
     try { hn = new URL(h.url).hostname.replace(/^www\./, '') } catch {}
-    out.push({ type: 'history', label: h.title || h.url, hint: hn, url: h.url })
+    out.push({
+      type: 'history',
+      label: h.title || h.url,
+      hint: hn,
+      url: h.url
+    })
   }
   return out
 }

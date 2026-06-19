@@ -1,44 +1,22 @@
 import { app, type Session } from 'electron'
 
-/**
- * Anti-fingerprinting protections.
- *
- * Stage 5.9 update: UA normalization REMOVED.
- *
- * Why: Generic Chrome UA caused YouTube, Spotify Web, and several other
- * single-page apps to refuse to render — their feature detection thought
- * we were an outdated browser. The privacy gain from UA spoofing is
- * small (Aura is detectable by other means anyway), but the breakage
- * was large.
- *
- * What remains active:
- *   - Canvas noise injection (defeats canvas fingerprinting)
- *   - WebRTC IP leak protection (mDNS + UDP policy via Chromium flags)
- *
- * Stage 8 plan: re-introduce UA normalization as an opt-in toggle in
- * Settings under "Strict Privacy Mode".
- */
+const CHROME_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+  '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
 export function setupAntiFingerprintFlags(): void {
-  // Block WebRTC IP leak — uses mDNS hostnames instead of local IPs
   app.commandLine.appendSwitch('enable-features', 'WebRtcHideLocalIpsWithMdns')
-  // Disable non-proxied UDP which can reveal real IP behind a VPN
   app.commandLine.appendSwitch(
     'force-webrtc-ip-handling-policy',
     'default_public_interface_only'
   )
 }
 
-export function setupSessionFingerprintDefenses(_targetSession: Session): void {
-  // UA normalization disabled — see comment above.
-  // Chromium's default UA is used, which is what most sites expect.
+export function setupSessionFingerprintDefenses(targetSession: Session): void {
+  targetSession.setUserAgent(CHROME_UA)
+  console.log('[Aura/fingerprint] Set Chrome user-agent on session')
 }
 
-/**
- * Canvas noise script — injected into every web page via the tab preload.
- * Adds tiny imperceptible variation to canvas reads so two fingerprint
- * attempts return slightly different values.
- */
 export const CANVAS_NOISE_SCRIPT = `
 (function() {
   try {
@@ -51,8 +29,6 @@ export const CANVAS_NOISE_SCRIPT = `
       }
       return imageData;
     };
-  } catch (e) {
-    /* CSP may block — fail silently */
-  }
+  } catch (e) {}
 })();
 `

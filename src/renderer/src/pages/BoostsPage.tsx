@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import type { Boost } from '../types'
 import { IconClose, IconPlus } from '../components/Icons'
+import { ChromePageHeader } from '../components/ChromePageHeader'
 
-export default function BoostsPage(): React.ReactElement {
+interface Props {
+  onClose: () => void
+}
+
+export default function BoostsPage({ onClose }: Props): React.ReactElement {
   const [boosts, setBoosts] = useState<Boost[]>([])
   const [editing, setEditing] = useState<Boost | null>(null)
   const [creating, setCreating] = useState(false)
@@ -17,16 +22,7 @@ export default function BoostsPage(): React.ReactElement {
   return (
     <div className="data-page">
       <header className="data-header">
-        <div className="data-header-title">
-          <svg width={24} height={24} viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-          </svg>
-          <div>
-            <h1>Boosts</h1>
-            <p>{boosts.length} custom site styles</p>
-          </div>
-        </div>
+        <ChromePageHeader title="Boosts" onBack={onClose} />
         <div className="data-header-actions">
           <button className="data-btn primary" onClick={() => setCreating(true)}>
             <IconPlus size={13} /> New Boost

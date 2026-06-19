@@ -3165,3 +3165,342 @@ html[data-ninja="true"] .ninja-pill,
   to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
 
+/* ====================================================================
+   STAGE 10A — Settings Page
+   ==================================================================== */
+
+.sett-page {
+  height: 100%;
+  overflow-y: auto;
+  padding: 32px 40px 120px;
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sett-hero { display: flex; align-items: baseline; gap: 12px; }
+.sett-hero-title {
+  font-size: 28px; font-weight: 700;
+  background: var(--aura-gradient);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  line-height: 1;
+}
+.sett-hero-stage {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(166, 192, 241, 0.1); color: var(--aura-secondary);
+  padding: 3px 8px; border-radius: var(--radius-pill);
+}
+
+.sett-search-bar {
+  display: flex; align-items: center; gap: 10px;
+  height: 38px; padding: 0 14px;
+  background: var(--bg-elev); border: 1px solid var(--stroke);
+  border-radius: var(--radius-pill); color: var(--text-dim);
+  width: 100%; max-width: 480px;
+}
+.sett-search-bar input {
+  flex: 1; border: none; outline: none; background: transparent;
+  color: var(--text); font-family: inherit; font-size: 13px;
+  user-select: text; -webkit-user-select: text;
+}
+.sett-search-bar input::placeholder { color: var(--text-faint); }
+
+.sett-search-results {
+  background: var(--bg-elev-2); border: 1px solid var(--stroke-strong);
+  border-radius: var(--radius-md); padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+  max-width: 480px; box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+}
+.sett-search-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; background: transparent; border: none; border-radius: 6px;
+  color: var(--text); font-family: inherit; font-size: 12.5px;
+  cursor: pointer; text-align: left; transition: background 0.08s;
+}
+.sett-search-item:hover { background: var(--bg-elev-3); }
+.sett-search-section { font-size: 10px; font-weight: 600; color: var(--text-faint);
+  text-transform: uppercase; letter-spacing: 0.04em; min-width: 60px; }
+.sett-search-label { flex: 1; }
+
+.sett-layout { display: flex; gap: 36px; align-items: flex-start; }
+
+.sett-nav {
+  flex-shrink: 0; width: 200px;
+  display: flex; flex-direction: column; gap: 2px;
+  position: sticky; top: 0;
+}
+.sett-nav-item {
+  display: flex; align-items: center; width: 100%;
+  padding: 9px 12px; border-radius: 8px;
+  background: transparent; border: none; color: var(--text-dim);
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  cursor: pointer; text-align: left; transition: background 0.08s, color 0.08s;
+}
+.sett-nav-item:hover { background: var(--bg-elev); color: var(--text); }
+.sett-nav-item.active { background: var(--bg-elev-2); color: var(--text); font-weight: 600; }
+
+.sett-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 28px; }
+
+.sett-section { display: flex; flex-direction: column; gap: 16px; }
+.sett-section-title {
+  font-size: 18px; font-weight: 700; color: var(--text);
+  padding-bottom: 4px; border-bottom: 1px solid var(--stroke);
+}
+
+.sett-card {
+  background: var(--bg-elev); border: 1px solid var(--stroke);
+  border-radius: var(--radius-lg); padding: 20px 24px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.sett-card-title {
+  font-size: 13px; font-weight: 700; color: var(--text);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.sett-field { display: flex; flex-direction: column; gap: 6px; }
+.sett-field-label {
+  font-size: 12.5px; font-weight: 600; color: var(--text);
+}
+.sett-field-desc {
+  font-size: 11.5px; color: var(--text-faint); line-height: 1.4;
+}
+.sett-field-row {
+  display: flex; justify-content: space-between; align-items: center;
+}
+
+/* Toggle */
+.sett-toggle {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 8px 0; cursor: pointer;
+  border-top: 1px solid var(--stroke);
+  justify-content: space-between;
+}
+.sett-toggle:first-of-type { border-top: none; }
+.sett-toggle.disabled { opacity: 0.4; pointer-events: none; }
+.sett-toggle-body { flex: 1; min-width: 0; }
+.sett-toggle-label { font-size: 12.5px; font-weight: 500; color: var(--text); }
+.sett-toggle-desc { font-size: 11.5px; color: var(--text-faint); margin-top: 2px; line-height: 1.4; }
+.sett-toggle-switch {
+  flex-shrink: 0; position: relative;
+  width: 38px; height: 22px;
+  background: var(--bg-elev-3); border-radius: 999px;
+  transition: background 0.15s; cursor: pointer;
+  margin-top: 2px;
+}
+.sett-toggle-switch.on { background: var(--aura-gradient); }
+.sett-toggle-switch input {
+  position: absolute; opacity: 0; width: 0; height: 0;
+}
+.sett-toggle-knob {
+  position: absolute; top: 2px; left: 2px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--text); transition: transform 0.15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.sett-toggle-switch.on .sett-toggle-knob { transform: translateX(16px); }
+
+/* Radio */
+.sett-radio-group { display: flex; flex-direction: column; gap: 6px; }
+.sett-radio {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; border-radius: 8px;
+  cursor: pointer; transition: background 0.08s;
+  font-size: 12.5px; color: var(--text-dim);
+}
+.sett-radio:hover { background: var(--bg-elev-2); }
+.sett-radio.active { background: rgba(166, 192, 241, 0.06); color: var(--text); }
+.sett-radio-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--text-faint); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.12s;
+}
+.sett-radio.active .sett-radio-dot { border-color: var(--aura-secondary); }
+.sett-radio-fill {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--aura-gradient);
+}
+
+/* Select */
+.sett-select-wrap {
+  position: relative; width: 100%;
+}
+.sett-select-wrap select {
+  width: 100%; padding: 8px 12px;
+  background: var(--bg-elev-2); border: 1px solid var(--stroke);
+  border-radius: 8px; color: var(--text); font-family: inherit; font-size: 12.5px;
+  outline: none; cursor: pointer; appearance: auto;
+  user-select: text; -webkit-user-select: text;
+}
+.sett-select-wrap select:focus { border-color: rgba(166, 192, 241, 0.5); }
+
+/* Text input */
+.sett-text-input {
+  width: 100%; padding: 8px 12px;
+  background: var(--bg-elev-2); border: 1px solid var(--stroke);
+  border-radius: 8px; color: var(--text); font-family: inherit; font-size: 12.5px;
+  outline: none; user-select: text; -webkit-user-select: text;
+}
+.sett-text-input:focus { border-color: rgba(166, 192, 241, 0.5); }
+.sett-text-input-row { display: flex; gap: 8px; align-items: center; }
+.sett-text-input-row .sett-text-input { flex: 1; }
+.sett-password-row { display: flex; gap: 8px; align-items: center; }
+.sett-password-row .sett-text-input { flex: 1; }
+
+/* Slider */
+.sett-slider-value {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.sett-field input[type="range"] {
+  width: 100%; height: 4px;
+  background: var(--bg-elev-3); border-radius: 2px;
+  outline: none; appearance: none; cursor: pointer;
+  accent-color: var(--aura-secondary);
+}
+.sett-field input[type="range"]::-webkit-slider-thumb {
+  appearance: none; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--aura-gradient);
+  cursor: pointer; border: 2px solid var(--bg);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+/* Button */
+.sett-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 8px;
+  background: var(--bg-elev-2); border: 1px solid var(--stroke);
+  color: var(--text); font-family: inherit; font-size: 12px;
+  cursor: pointer; transition: background 0.12s, border-color 0.12s;
+  align-self: flex-start;
+}
+.sett-btn:hover { background: var(--bg-elev-3); border-color: var(--stroke-strong); }
+.sett-btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+.sett-btn.danger { color: var(--red); border-color: rgba(241,122,139,0.3); }
+.sett-btn.danger:hover { background: var(--red); color: white; border-color: var(--red); }
+.sett-btn-icon { display: flex; align-items: center; }
+
+/* Provider grid */
+.sett-provider-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+}
+.sett-provider-card {
+  padding: 14px; border-radius: var(--radius-md);
+  background: var(--bg-elev-2); border: 1px solid var(--stroke);
+  cursor: pointer; text-align: left; font-family: inherit;
+  transition: border-color 0.12s, background 0.12s;
+}
+.sett-provider-card:hover { border-color: var(--stroke-strong); background: var(--bg-elev-3); }
+.sett-provider-card.active { border-color: var(--aura-secondary); background: rgba(166,192,241,0.06); }
+.sett-provider-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.sett-provider-desc { font-size: 11.5px; color: var(--text-faint); line-height: 1.4; }
+
+.sett-test-result {
+  font-size: 12px; color: var(--aura-quaternary);
+  padding: 6px 0;
+}
+
+/* Footer */
+.sett-footer {
+  padding-top: 16px; border-top: 1px solid var(--stroke);
+  display: flex; justify-content: flex-end;
+}
+
+/* ── Search Engine Picker ── */
+/* ====================================================================
+   STAGE 10A-FIX 1.7 — Search Engine Picker with brand logos
+   ==================================================================== */
+
+.search-engine-picker-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.search-engine-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0;
+  transition: background 0.12s;
+}
+.search-engine-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.search-engine-btn svg {
+  display: block;
+  border-radius: 50%;
+}
+
+.search-engine-check {
+  color: var(--aura-secondary);
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ====================================================================
+   STAGE 10A-FIX 1.11 — Compact horizontal search engine switcher
+   ==================================================================== */
+
+.search-engine-popover-compact {
+  position: fixed;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: #1a1a23;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  animation: engine-pop-in 0.14s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes engine-pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+.search-engine-compact-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 0;
+  transition: background 0.12s, border-color 0.12s, transform 0.1s;
+}
+
+.search-engine-compact-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(1.08);
+}
+
+.search-engine-compact-btn.active {
+  border-color: var(--aura-secondary);
+  background: rgba(166, 192, 241, 0.1);
+}
+
+.search-engine-compact-btn svg {
+  display: block;
+  border-radius: 50%;
+}
+

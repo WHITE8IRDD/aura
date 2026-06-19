@@ -25,7 +25,7 @@ export class NinjaWindowManager {
     return this.managers.get(winId)
   }
 
-  async launch(): Promise<void> {
+  async launch(rawUrl?: string): Promise<void> {
     const id = this.nextId++
     const partition = `ninja-${Date.now()}-${id}`
     const privateSession = session.fromPartition(partition, { cache: false })
@@ -72,7 +72,8 @@ export class NinjaWindowManager {
     }
 
     win.webContents.once('did-finish-load', () => {
-      tabs.create('aura://newtab')
+      const targetUrl = rawUrl && /^https?:\/\//i.test(rawUrl) ? rawUrl : 'aura://newtab'
+      tabs.create(targetUrl)
     })
 
     win.on('closed', () => {

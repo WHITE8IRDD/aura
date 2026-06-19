@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import type { ReadingItem } from '../types'
 import { IconClose } from '../components/Icons'
+import { ChromePageHeader } from '../components/ChromePageHeader'
 
 interface Props {
   onNavigate: (url: string) => void
+  onClose: () => void
 }
 
-export default function ReadingListPage({ onNavigate }: Props): React.ReactElement {
+export default function ReadingListPage({ onNavigate, onClose }: Props): React.ReactElement {
   const [items, setItems] = useState<ReadingItem[]>([])
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all')
 
@@ -23,17 +25,7 @@ export default function ReadingListPage({ onNavigate }: Props): React.ReactEleme
   return (
     <div className="data-page">
       <header className="data-header">
-        <div className="data-header-title">
-          <svg width={24} height={24} viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-          </svg>
-          <div>
-            <h1>Reading List</h1>
-            <p>{items.length} {filter}</p>
-          </div>
-        </div>
+        <ChromePageHeader title="Reading List" onBack={onClose} />
         <div className="data-header-actions">
           <div className="folder-pills">
             {(['all', 'unread', 'read'] as const).map((f) => (
