@@ -98,11 +98,7 @@ export async function clearBrowsingData(options: ClearOptions): Promise<ClearRes
       }
       try {
         if (isAll) {
-          db.prepare('DELETE FROM ai_messages').run()
-          db.prepare('DELETE FROM ai_conversations').run()
-        } else {
-          db.prepare(`DELETE FROM ai_messages WHERE created_at >= ?`).run(cutoff)
-          db.prepare(`DELETE FROM ai_conversations WHERE created_at >= ?`).run(cutoff)
+
         }
       } catch {}
     } catch (err: any) {

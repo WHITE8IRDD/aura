@@ -120,11 +120,6 @@ export function registerShortcuts(win: BrowserWindow, tabs: TabManager): void {
       win.webContents.send('shortcut:readerMode')
     }
 
-    // STAGE 9 — Ctrl+J → toggle AI assistant panel
-    if (ctrl && !shift && key === 'j') {
-      win.webContents.send('shortcut:toggleAssistant')
-    }
-
     // Escape closes overlays (find-in-page, etc.)
     if (key === 'escape') {
       win.webContents.send('shortcut:escape')

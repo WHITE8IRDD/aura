@@ -1,10 +1,16 @@
-import React from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   IconHistory, IconDownload, IconExtension, IconSettings,
   IconUser, IconSidebar
 } from './Icons'
 import NinjaAvatar from './NinjaAvatar'
 import { MediaHub } from './MediaHub'
+
+interface TabState {
+  id: number
+  url: string
+  title: string
+}
 
 interface Props {
   onOpenHistory: () => void
@@ -16,14 +22,37 @@ interface Props {
   onOpenCommandPalette: () => void
   onToggleVerticalTabs: () => void
   verticalTabs: boolean
+  activeTab?: TabState | null
 }
 
 export default function UtilityCluster({
   onOpenHistory, onOpenDownloads, onOpenExtensions,
   onOpenSettings, onOpenProfile, onOpenNinja,
   onOpenCommandPalette, onToggleVerticalTabs,
-  verticalTabs
+  verticalTabs, activeTab
 }: Props): React.ReactElement {
+  const [pageTranslated, setPageTranslated] = useState(false)
+  const [translatedTabId, setTranslatedTabId] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (activeTab?.id !== translatedTabId) {
+      setPageTranslated(false)
+      setTranslatedTabId(null)
+    }
+  }, [activeTab?.id, translatedTabId])
+
+  const handleTranslatePage = useCallback(() => {
+    if (!activeTab || activeTab.url.startsWith('aura://')) return
+    if (pageTranslated && translatedTabId === activeTab.id) {
+      window.aura.tabs.sendMessage(activeTab.id, 'pageTranslator:revert')
+      setPageTranslated(false)
+      setTranslatedTabId(null)
+    } else {
+      window.aura.tabs.sendMessage(activeTab.id, 'pageTranslator:translate', 'en')
+      setPageTranslated(true)
+      setTranslatedTabId(activeTab.id)
+    }
+  }, [activeTab, pageTranslated, translatedTabId])
   return (
     <div className="utility-cluster">
       {/* Group A — Global tools */}
@@ -50,6 +79,21 @@ export default function UtilityCluster({
           <path d="M15 9h6" />
           <path d="M3 15h6" />
           <path d="M15 15h6" />
+        </svg>
+      </button>
+      <button className={`util-btn${pageTranslated ? ' translator-active' : ''}`}
+        title={pageTranslated ? 'Show original' : 'Translate page'}
+        onClick={handleTranslatePage}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 8l6 6" />
+          <path d="M4 14l6-6 2-2" />
+          <path d="M12 4l-4 8 2 2" />
+          <path d="M14 12l-2 2-2 2" />
+          <path d="M16 10l-2 2 2 2 2-2-2-2z" />
+          <path d="M18 12h-2" />
+          <path d="M19 8l-3 4" />
+          <path d="M17 16l3-4" />
         </svg>
       </button>
 

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage } from 'electron'
 import { join } from 'path'
 import { TabManager } from './tabs'
 import { registerInputContextMenuIPC } from './inputContextMenu'
@@ -56,8 +56,6 @@ import {
   createGroup, deleteGroup, renameGroup, setGroupColor, toggleCollapsed,
   addTabToGroup, removeTabFromAnyGroup, listGroups, snapshot as snapshotGroups
 } from './tab-groups'
-import { aiManager } from './ai/manager'
-import { extractPageContext } from './ai/page-context'
 import { getAllSettings, getSetting, setSetting, resetSettings, getDefaults } from './settings'
 import { initThemeManager, getResolvedTheme, handleThemeSettingChange } from './themeManager'
 import { setAsDefaultBrowser, isDefaultBrowser } from './default-browser'
@@ -69,11 +67,6 @@ import {
   maybeClearOnQuit
 } from './downloadsSettings'
 import { loadTabs, loadPinnedTabsOnly } from './sessions'
-import {
-  createConversation, addMessage, listConversations, getMessages,
-  deleteConversation, renameConversation
-} from './ai/conversations'
-import type { AiMessage } from './ai/types'
 import { registerAboutIPC } from './about'
 import { initSystemIntegration, applyStartOnLogin, applyProxyMode, applyBackgroundMode } from './systemIntegration'
 import { initPerformance, applyEnergySaverToAll } from './performance'
@@ -81,6 +74,9 @@ import { registerDefaultBrowserIPC } from './defaultBrowser'
 import { registerResetIPC } from './resetSettings'
 import { registerProfileDataIPC } from './profileData'
 import { registerTabContextMenuIPC } from './tabContextMenuNative'
+import { registerTranslatorIPC } from './translator'
+import { registerImageSaverIPC } from './imageSaver'
+import { writeFile } from 'fs/promises'
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
 applyStartupFlags()
@@ -154,8 +150,6 @@ const startupReady = app.whenReady().then(async () => {
   setupDownloads()
   registerDownloadsSettingsIPC()
   startRetentionScheduler()
-  await aiManager.init()
-  console.log('[Aura/ai] Manager ready, active provider:', aiManager.getActive().label)
   setupMediaWatcher()
   registerMediaControllerIPC()
   registerMediaHubMenuIPC()
@@ -306,6 +300,16 @@ ipcMain.handle('tabs:zoomOut', (e, id: number) => getTabsForEvent(e)?.zoomOut(id
 ipcMain.handle('tabs:zoomReset', (e, id: number) => getTabsForEvent(e)?.zoomReset(id))
 ipcMain.handle('tabs:print', (e, id: number) => getTabsForEvent(e)?.print(id))
 ipcMain.handle('tabs:pip', (e, id: number) => getTabsForEvent(e)?.pictureInPicture(id))
+ipcMain.handle('tabs:sendMessage', (e, tabId: number, channel: string, ...args: unknown[]) => {
+  const tm = getTabsForEvent(e)
+  if (!tm) return
+  const wcId = tm.getWebContentsId(tabId)
+  if (wcId === null) return
+  const { webContents } = require('electron')
+  const wc = webContents.fromId(wcId)
+  if (wc) wc.send(channel, ...args)
+})
+
 ipcMain.handle('tabs:reloadAll', (e) => {
   const tm = getTabsForEvent(e); if (!tm) return
   for (const [, rec] of (tm as unknown as { records: Map<number, { view: { webContents: { reload: () => void } } | null }> }).records) {
@@ -451,108 +455,6 @@ ipcMain.handle('groups:list', () => listGroups())
 ipcMain.handle('groups:snapshot', () => snapshotGroups())
 
 // ====================================================================
-// STAGE 9 — AI Assistant
-// ====================================================================
-
-ipcMain.handle('ai:getConfig', () => aiManager.getConfig())
-ipcMain.handle('ai:setProvider', (_e, config) => aiManager.setProvider(config))
-ipcMain.handle('ai:listModels', () => aiManager.listModels())
-ipcMain.handle('ai:isReady', () => aiManager.getActive().isReady())
-
-ipcMain.handle('ai:createConversation', (_e, title: string, pageUrl: string | null, pageTitle: string | null) =>
-  createConversation(title, pageUrl, pageTitle))
-ipcMain.handle('ai:listConversations', () => listConversations())
-ipcMain.handle('ai:getMessages', (_e, id: number) => getMessages(id))
-ipcMain.handle('ai:deleteConversation', (_e, id: number) => deleteConversation(id))
-ipcMain.handle('ai:renameConversation', (_e, id: number, title: string) =>
-  renameConversation(id, title))
-
-ipcMain.handle('ai:stream', async (e, payload: {
-  streamId: string
-  conversationId: number | null
-  userMessage: string
-  includePageContext: boolean
-  tabId?: number
-}) => {
-  const sender = e.sender
-  const { streamId, conversationId, userMessage, includePageContext, tabId } = payload
-
-  const history: AiMessage[] = []
-
-  if (includePageContext && tabId !== undefined) {
-    const tm = getTabsForEvent(e)
-    const wcId = tm?.getWebContentsId(tabId)
-    if (wcId !== null && wcId !== undefined) {
-      const { webContents } = require('electron')
-      const wc = webContents.fromId(wcId)
-      if (wc) {
-        const ctx = await extractPageContext(wc)
-        if (ctx && ctx.text) {
-          history.push({
-            role: 'system',
-            content: `You are an AI assistant inside the Aura web browser. The user is currently viewing this page:
-
-URL: ${ctx.url}
-TITLE: ${ctx.title}
-
-PAGE CONTENT:
-${ctx.text}
-
-Answer questions based on this content. If the answer isn't in the page, say so.`
-          })
-        }
-      }
-    }
-  }
-
-  if (conversationId !== null) {
-    const prevMessages = getMessages(conversationId)
-    for (const m of prevMessages) {
-      if (m.role !== 'system') {
-        history.push({ role: m.role, content: m.content })
-      }
-    }
-  }
-
-  history.push({ role: 'user', content: userMessage })
-
-  let convId = conversationId
-  if (convId === null) {
-    const conv = createConversation(
-      userMessage.slice(0, 60),
-      null,
-      null
-    )
-    convId = conv.id
-  }
-  addMessage(convId, 'user', userMessage)
-
-  const provider = aiManager.getActive()
-  let assembled = ''
-
-  try {
-    for await (const chunk of provider.complete({ messages: history })) {
-      assembled += chunk
-      if (!sender.isDestroyed()) {
-        sender.send('ai:stream:chunk', { streamId, chunk })
-      }
-    }
-    if (assembled.trim()) {
-      addMessage(convId, 'assistant', assembled)
-    }
-    if (!sender.isDestroyed()) {
-      sender.send('ai:stream:done', { streamId, conversationId: convId })
-    }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err)
-    console.warn('[Aura/ai] Stream error:', message)
-    if (!sender.isDestroyed()) {
-      sender.send('ai:stream:error', { streamId, error: message })
-    }
-  }
-})
-
-// ====================================================================
 // STAGE 10A — Settings
 // ====================================================================
 
@@ -602,6 +504,29 @@ registerProfileDataIPC()
 registerTabContextMenuIPC()
 registerClearBrowsingDataIPC()
 registerAutofillIPC()
+registerTranslatorIPC()
+registerImageSaverIPC()
+
+ipcMain.on('videoDl:request', async (_e, { url, filename }: { url: string; filename: string }) => {
+  if (!url || url.startsWith('blob:') || url.startsWith('data:')) return
+  const win = BrowserWindow.getFocusedWindow()
+  try {
+    const buf = await fetch(url).then((r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      return r.arrayBuffer()
+    }).then((ab) => Buffer.from(ab))
+    const result = await dialog.showSaveDialog(win!, {
+      defaultPath: `${filename}.mp4`,
+      filters: [{ name: 'Video', extensions: ['mp4', 'webm', 'mov', 'avi', 'mkv'] }]
+    })
+    if (result.canceled || !result.filePath) return
+    await writeFile(result.filePath, buf)
+    if (win) win.webContents.send('videoDl:complete', { success: true, path: result.filePath })
+  } catch (err) {
+    console.error('[videoDl]', err)
+    if (win) win.webContents.send('videoDl:complete', { success: false, error: (err as Error).message })
+  }
+})
 
 ipcMain.on('autofill:formSubmitted', (e, captured) => {
   const win = BrowserWindow.fromWebContents(e.sender)

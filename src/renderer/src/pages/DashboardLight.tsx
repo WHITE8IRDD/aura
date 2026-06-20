@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react'
-import GlassyOrb from '../components/GlassyOrb'
 import { IconSparkle, IconMic, IconPlus, IconMore } from '../components/Icons'
 import WidgetGrid from '../widgets/WidgetGrid'
 import { showNativeInputMenu } from '../lib/buildInputMenu'
@@ -19,10 +18,7 @@ export default function DashboardLight({
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const { settings } = useSettings()
   const s = settings as Record<string, unknown> | null
-  const greetingName = (s?.profileName as string || '').trim() || 'there'
   const ntpLayout = (s?.ntpLayout as string) ?? 'default'
-  const showGreeting = (s?.ntpShowGreeting as boolean) ?? true
-  const showMascot = (s?.ntpShowMascot as boolean) ?? true
   const searchPosition = (s?.ntpSearchBarPosition as string) ?? 'center'
 
   useEffect(() => {
@@ -65,13 +61,7 @@ export default function DashboardLight({
       <button className="layout-toggle-floating" onClick={onSwitchLayout}>Switch layout</button>
       <div className="dash-light-inner">
         <header className="dash-light-hero">
-          {showMascot && ntpLayout !== 'minimal' && (
-            <div className="dash-light-orb"><GlassyOrb size={68} /></div>
-          )}
           <div className="dash-light-greeting-block">
-            {showGreeting && (
-              <div className="dash-light-greet">Hi <span className="ntp-greeting-name">{greetingName}</span>,</div>
-            )}
             <h1 className="dash-light-title">What&apos;s on your mind?</h1>
           </div>
         </header>

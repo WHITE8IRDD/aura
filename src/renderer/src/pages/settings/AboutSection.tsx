@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import GlassyOrb from '../../components/GlassyOrb'
 import './AboutSection.css'
 
 interface AboutInfo {
@@ -52,9 +51,6 @@ export function AboutSection(): React.ReactElement {
       <h2 className="sett-section-title">About Aura</h2>
 
       <div className="about-hero">
-        <div className="about-hero-orb">
-          <GlassyOrb size={80} />
-        </div>
         <div className="about-hero-meta">
           <h1 className="about-app-name">{info.appName}</h1>
           <div className="about-app-version">Version {info.appVersion}</div>

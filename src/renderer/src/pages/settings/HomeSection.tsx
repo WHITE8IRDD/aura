@@ -1,6 +1,6 @@
 import React from 'react'
 import { useSettings } from '../../hooks/useSettings'
-import { Toggle, RadioGroup } from './SettingsControls'
+import { RadioGroup } from './SettingsControls'
 
 export function HomeSection(): React.ReactElement {
   const { settings } = useSettings()
@@ -9,7 +9,6 @@ export function HomeSection(): React.ReactElement {
 
   const set = (key: string, value: unknown) => window.aura.settings.set(key, value)
   const isLayoutOff = s.ntpLayout === 'off'
-  const isLayoutMinimal = s.ntpLayout === 'minimal'
 
   return (
     <div className="sett-section">
@@ -24,26 +23,10 @@ export function HomeSection(): React.ReactElement {
           value={s.ntpLayout as string}
           onChange={(v) => set('ntpLayout', v)}
           options={[
-            { value: 'default', label: 'Default (mascot + search)' },
+            { value: 'default', label: 'Default' },
             { value: 'minimal', label: 'Minimal (search only)' },
             { value: 'off', label: 'Blank page' }
           ]}
-        />
-
-        <Toggle
-          label="Show greeting"
-          description='"Happy to see you, there" message above the search bar'
-          checked={s.ntpShowGreeting as boolean}
-          disabled={isLayoutOff}
-          onChange={(v) => set('ntpShowGreeting', v)}
-        />
-
-        <Toggle
-          label="Show mascot"
-          description="The glowing Aura orb above the search bar"
-          checked={s.ntpShowMascot as boolean}
-          disabled={isLayoutOff || isLayoutMinimal}
-          onChange={(v) => set('ntpShowMascot', v)}
         />
 
         <RadioGroup

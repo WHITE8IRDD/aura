@@ -95,7 +95,17 @@ export function attachContextMenu(
     const hasImage = params.hasImageContents && !!params.srcURL
     const hasSelection = !!(params.selectionText && params.selectionText.trim())
 
-    if (!hasLink && !hasImage && !hasSelection) return
+    if (!hasLink && !hasImage && !hasSelection) {
+      const menu = new Menu()
+      menu.append(new MenuItem({
+        label: 'Save all images on this page\u2026',
+        click: () => {
+          win.webContents.send('imageSaver:openBatch')
+        }
+      }))
+      menu.popup({ window: win })
+      return
+    }
 
     const template: Electron.MenuItemConstructorOptions[] = []
 
@@ -147,6 +157,17 @@ export function attachContextMenu(
         { label: 'Copy Image Link', click: () => clipboard.writeText(srcURL) },
         { type: 'separator' },
         {
+          label: 'Save with options\u2026',
+          click: () => {
+            win.webContents.send('imageSaver:open', {
+              srcURL,
+              x: params.x,
+              y: params.y
+            })
+          }
+        },
+        { type: 'separator' },
+        {
           label: 'Reverse Image Search',
           click: () => {
             const searchURL = `https://duckduckgo.com/?q=${encodeURIComponent(srcURL)}&iax=images&ia=images`
@@ -173,6 +194,17 @@ export function attachContextMenu(
       template.push({
         label: `Search ${engineName} for "${truncated}"`,
         click: () => { tabs.create(searchUrl(selText)) }
+      })
+
+      template.push({
+        label: `Translate "${truncated}"`,
+        click: () => {
+          win.webContents.send('translator:requestSelection', {
+            text: selText,
+            x: params.x,
+            y: params.y
+          })
+        }
       })
 
       if (selIsUrl) {

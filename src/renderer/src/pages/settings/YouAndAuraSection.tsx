@@ -129,7 +129,6 @@ export const YouAndAuraSection: React.FC = () => {
             )}
           </div>
           <div className="yua-profile-info">
-            <span className="yua-preview-greeting">Happy to see you,</span>
             <span className="yua-preview-name">{displayName}</span>
           </div>
         </div>

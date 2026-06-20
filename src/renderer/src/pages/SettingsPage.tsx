@@ -5,7 +5,6 @@ import { AppearanceSection } from './settings/AppearanceSection'
 import { HomeSection } from './settings/HomeSection'
 import { SearchSection } from './settings/SearchSection'
 import { PrivacySection } from './settings/PrivacySection'
-import { AiSection } from './settings/AiSection'
 import { LanguagesSection } from './settings/LanguagesSection'
 import { DownloadsSection } from './settings/DownloadsSection'
 import { AccessibilitySection } from './settings/AccessibilitySection'
@@ -113,11 +112,6 @@ const SECTION_ICONS: Record<string, JSX.Element> = {
       <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
     </svg>
   ),
-  ai: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2L9.5 7.5l-6 .9 4.4 4.2-1 6 5.1-2.7 5.1 2.7-1-6 4.4-4.2-6-.9L12 2z"/>
-    </svg>
-  ),
   languages: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10"/>
@@ -146,7 +140,6 @@ const SECTIONS: Section[] = [
   { id: 'accessibility', label: 'Accessibility' },
   { id: 'performance', label: 'Performance' },
   { id: 'languages', label: 'Languages' },
-  { id: 'ai', label: 'AI Assistant' },
   { id: 'system', label: 'System' },
   { id: 'defaultBrowser', label: 'Default browser' },
   { id: 'about', label: 'About' }
@@ -237,7 +230,6 @@ export default function SettingsPage({ onClose }: Props): React.ReactElement {
           {activeSection === 'accessibility' && <AccessibilitySection />}
           {activeSection === 'performance' && <PerformanceSection />}
           {activeSection === 'languages' && <LanguagesSection />}
-          {activeSection === 'ai' && <AiSection />}
           {activeSection === 'system' && <SystemSection />}
           {activeSection === 'defaultBrowser' && <DefaultBrowserSection />}
           {activeSection === 'about' && <AboutSection />}

@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { setupAutofillCapture, setupAutofillSuggestions } from './autofillFormWatcher'
+import './pageTranslator'
+import './videoDownloadDetector'
 
 const zoomApi = {
   zoom: (dir: 'in' | 'out') => ipcRenderer.send('tab:wheelZoom', dir)

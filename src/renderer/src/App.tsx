@@ -23,7 +23,8 @@ import DownloadsPage from './pages/DownloadsPage'
 import ReadingListPage from './pages/ReadingListPage'
 import BoostsPage from './pages/BoostsPage'
 import SettingsPage from './pages/SettingsPage'
-import AssistantPanel from './ai/AssistantPanel'
+import TranslatorPopover from './components/TranslatorPopover'
+import ImageSaverPopover from './components/ImageSaverPopover'
 import { AutofillSavePrompt } from './components/AutofillSavePrompt'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useLocalStorage } from './hooks/useLocalStorage'
@@ -73,7 +74,6 @@ export default function App(): React.ReactElement {
   const [bookmarkSignal, setBookmarkSignal] = useState(0)
   const [findBarOpen, setFindBarOpen] = useState(false)
   const [tabSearchOpen, setTabSearchOpen] = useState(false)
-  const [assistantOpen, setAssistantOpen] = useState(false)
   const [readerActive, setReaderActive] = useState(false)
   const [bookmarksBarVisible, setBookmarksBarVisible] = useLocalStorage<boolean>(
     'aura:bookmarksBarVisible',
@@ -185,11 +185,11 @@ export default function App(): React.ReactElement {
       })
     } else {
       if (!ninjaModalOpen && !paletteOpen && !readerActive && !findBarOpen
-          && !tabSearchOpen && !assistantOpen) {
+          && !tabSearchOpen) {
         void window.aura.layout.showView()
       }
     }
-  }, [chromePage, ninjaModalOpen, paletteOpen, readerActive, findBarOpen, tabSearchOpen, assistantOpen])
+  }, [chromePage, ninjaModalOpen, paletteOpen, readerActive, findBarOpen, tabSearchOpen])
 
   useEffect(() => {
     const anyOverlay =
@@ -198,11 +198,10 @@ export default function App(): React.ReactElement {
       chromePage !== null ||
       readerActive ||
       findBarOpen ||
-      tabSearchOpen ||
-      assistantOpen
+      tabSearchOpen
     if (anyOverlay) void window.aura.layout.hideView()
     else void window.aura.layout.showView()
-  }, [ninjaModalOpen, paletteOpen, chromePage, readerActive, findBarOpen, tabSearchOpen, assistantOpen])
+  }, [ninjaModalOpen, paletteOpen, chromePage, readerActive, findBarOpen, tabSearchOpen])
 
   useEffect(() => {
     if (isResizing) void window.aura.layout.hideView()
@@ -212,12 +211,11 @@ export default function App(): React.ReactElement {
       chromePage === null &&
       !readerActive &&
       !findBarOpen &&
-      !tabSearchOpen &&
-      !assistantOpen
+      !tabSearchOpen
     ) {
       void window.aura.layout.showView()
     }
-  }, [isResizing, ninjaModalOpen, paletteOpen, chromePage, readerActive, findBarOpen, tabSearchOpen, assistantOpen])
+  }, [isResizing, ninjaModalOpen, paletteOpen, chromePage, readerActive, findBarOpen, tabSearchOpen])
 
   useEffect(() => {
     setReaderActive(false)
@@ -375,10 +373,6 @@ export default function App(): React.ReactElement {
   }, [])
 
   useEffect(() => {
-    return window.aura.shortcuts.onToggleAssistant(() => setAssistantOpen((v) => !v))
-  }, [])
-
-  useEffect(() => {
     return window.aura.shortcuts.onOpenSettings(() => setChromePage('settings'))
   }, [])
 
@@ -519,7 +513,6 @@ export default function App(): React.ReactElement {
             onForward={() => activeId !== null && window.aura.tabs.goForward(activeId)}
             onReload={() => activeId !== null && window.aura.tabs.reload(activeId)}
             onNavigate={handleNavigate}
-            onAssistant={() => setAssistantOpen((v) => !v)}
             focusSignal={focusSignal}
             onOpenHistory={() => setChromePage(chromePage === 'history' ? null : 'history')}
             onOpenDownloads={() => setChromePage(chromePage === 'downloads' ? null : 'downloads')}
@@ -627,13 +620,10 @@ export default function App(): React.ReactElement {
         onClose_={(id) => window.aura.tabs.close(id)}
       />
 
-      <AssistantPanel
-        open={assistantOpen}
-        activeTab={activeTab}
-        onClose={() => setAssistantOpen(false)}
-      />
-
       <AutofillSavePrompt />
+
+      <TranslatorPopover onClose={() => {}} />
+      <ImageSaverPopover onClose={() => {}} />
 
       {isResizing && (
         <div

@@ -63,6 +63,8 @@ const api = {
     zoomReset: (id: number): Promise<void> => ipcRenderer.invoke('tabs:zoomReset', id),
     print: (id: number): Promise<void> => ipcRenderer.invoke('tabs:print', id),
     pip: (id: number): Promise<boolean> => ipcRenderer.invoke('tabs:pip', id),
+    sendMessage: (tabId: number, channel: string, ...args: unknown[]): Promise<void> =>
+      ipcRenderer.invoke('tabs:sendMessage', tabId, channel, ...args),
     readerExtract: (id: number): Promise<{ url: string; title: string; html: string } | null> =>
       ipcRenderer.invoke('tabs:readerExtract', id),
     screenshot: (id: number, action: 'save' | 'copy'): Promise<string | null> =>
@@ -307,11 +309,6 @@ const api = {
       ipcRenderer.on('fullscreen:exit', l)
       return () => ipcRenderer.removeListener('fullscreen:exit', l)
     },
-    onToggleAssistant: (cb: () => void): (() => void) => {
-      const l = (): void => cb()
-      ipcRenderer.on('shortcut:toggleAssistant', l)
-      return () => ipcRenderer.removeListener('shortcut:toggleAssistant', l)
-    },
     onOpenSettings: (cb: () => void): (() => void) => {
       const l = (): void => cb()
       ipcRenderer.on('shortcut:openSettings', l)
@@ -355,53 +352,6 @@ const api = {
       const l = () => cb()
       ipcRenderer.on('boosts:update', l)
       return () => ipcRenderer.removeListener('boosts:update', l)
-    }
-  },
-
-  ai: {
-    getConfig: () => ipcRenderer.invoke('ai:getConfig'),
-    setProvider: (config: {
-      id: 'mock' | 'openai' | 'anthropic' | 'ollama'
-      apiKey?: string
-      baseUrl?: string
-      defaultModel?: string
-    }) => ipcRenderer.invoke('ai:setProvider', config),
-    listModels: () => ipcRenderer.invoke('ai:listModels'),
-    isReady: () => ipcRenderer.invoke('ai:isReady'),
-
-    createConversation: (title: string, pageUrl: string | null, pageTitle: string | null) =>
-      ipcRenderer.invoke('ai:createConversation', title, pageUrl, pageTitle),
-    listConversations: () => ipcRenderer.invoke('ai:listConversations'),
-    getMessages: (id: number) => ipcRenderer.invoke('ai:getMessages', id),
-    deleteConversation: (id: number) => ipcRenderer.invoke('ai:deleteConversation', id),
-    renameConversation: (id: number, title: string) =>
-      ipcRenderer.invoke('ai:renameConversation', id, title),
-
-    stream: (payload: {
-      streamId: string
-      conversationId: number | null
-      userMessage: string
-      includePageContext: boolean
-      tabId?: number
-    }) => ipcRenderer.invoke('ai:stream', payload),
-
-    onStreamChunk: (cb: (data: { streamId: string; chunk: string }) => void) => {
-      const l = (_e: Electron.IpcRendererEvent, data: { streamId: string; chunk: string }) =>
-        cb(data)
-      ipcRenderer.on('ai:stream:chunk', l)
-      return () => ipcRenderer.removeListener('ai:stream:chunk', l)
-    },
-    onStreamDone: (cb: (data: { streamId: string; conversationId: number }) => void) => {
-      const l = (_e: Electron.IpcRendererEvent, data: { streamId: string; conversationId: number }) =>
-        cb(data)
-      ipcRenderer.on('ai:stream:done', l)
-      return () => ipcRenderer.removeListener('ai:stream:done', l)
-    },
-    onStreamError: (cb: (data: { streamId: string; error: string }) => void) => {
-      const l = (_e: Electron.IpcRendererEvent, data: { streamId: string; error: string }) =>
-        cb(data)
-      ipcRenderer.on('ai:stream:error', l)
-      return () => ipcRenderer.removeListener('ai:stream:error', l)
     }
   },
 
@@ -496,6 +446,37 @@ const api = {
     openDataFolder: () => { void ipcRenderer.invoke('about:openDataFolder') },
     openLogsFolder: () => { void ipcRenderer.invoke('about:openLogsFolder') },
     copySystemInfo: () => { void ipcRenderer.invoke('about:copySystemInfo') }
+  },
+
+  translator: {
+    translate: (text: string, targetLang?: string): Promise<{ translatedText: string; detectedLang?: string; engine: string; error?: string }> =>
+      ipcRenderer.invoke('translator:translate', text, targetLang),
+    onSelectionRequest: (cb: (data: { text: string; x: number; y: number }) => void): (() => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: { text: string; x: number; y: number }) => cb(data)
+      ipcRenderer.on('translator:requestSelection', handler)
+      return () => ipcRenderer.removeListener('translator:requestSelection', handler)
+    }
+  },
+
+  imageSaver: {
+    saveWithFormat: (url: string, format: 'png' | 'jpg', quality: number): Promise<{ success: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('imageSaver:saveWithFormat', url, format, quality),
+    batchSavePage: (format: 'png' | 'jpg', quality: number): Promise<{ success: boolean; count: number; folder?: string }> =>
+      ipcRenderer.invoke('imageSaver:batchSavePage', format, quality),
+    copyToClipboard: async (url: string): Promise<boolean> => {
+      const result = await ipcRenderer.invoke('imageSaver:saveWithFormat', url, 'png', 100)
+      return result.success
+    },
+    onOpen: (cb: (data: { srcURL: string; x: number; y: number }) => void): (() => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: { srcURL: string; x: number; y: number }) => cb(data)
+      ipcRenderer.on('imageSaver:open', handler)
+      return () => ipcRenderer.removeListener('imageSaver:open', handler)
+    },
+    onOpenBatch: (cb: () => void): (() => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('imageSaver:openBatch', handler)
+      return () => ipcRenderer.removeListener('imageSaver:openBatch', handler)
+    }
   },
 
   performance: {

@@ -6,30 +6,6 @@ declare global {
   }
 }
 
-export interface AiConversation {
-  id: number
-  title: string
-  pageUrl: string | null
-  pageTitle: string | null
-  createdAt: number
-  updatedAt: number
-}
-
-export interface AiConversationMessage {
-  id: number
-  conversationId: number
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  createdAt: number
-}
-
-export interface AiProviderConfig {
-  id: 'mock' | 'openai' | 'anthropic' | 'ollama'
-  hasKey: boolean
-  defaultModel?: string
-  baseUrl?: string
-}
-
 export interface TabState {
   id: number
   url: string
@@ -174,15 +150,11 @@ export interface AuraSettings {
   suggestBookmarks: boolean
   suggestOpenTabs: boolean
   defaultSearchEngine: 'duckduckgo' | 'google' | 'brave' | 'startpage'
-  aiIncludePageContextDefault: boolean
-  aiRememberConversations: boolean
   forceDarkOnWebsites: boolean
   spellcheckEnabled: boolean
   spellcheckLanguages: string[]
   preferredLanguages: string[]
   ntpLayout: 'default' | 'minimal' | 'off'
-  ntpShowGreeting: boolean
-  ntpShowMascot: boolean
   ntpSearchBarPosition: 'center' | 'top'
   searchPickerVisible: boolean
   searchSuggestionsEnabled: boolean
@@ -198,4 +170,7 @@ export interface AuraSettings {
   a11yLargerCursor: boolean
   profileName: string
   profileAvatar: string
+  translatorEngine: 'libretranslate' | 'google'
+  translatorTargetLang: string
+  translatorLibreEndpoint: string
 }

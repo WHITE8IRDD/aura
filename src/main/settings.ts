@@ -47,15 +47,11 @@ export interface AuraSettings {
   suggestBookmarks: boolean
   suggestOpenTabs: boolean
   defaultSearchEngine: 'duckduckgo' | 'google' | 'brave' | 'startpage'
-  aiIncludePageContextDefault: boolean
-  aiRememberConversations: boolean
   forceDarkOnWebsites: boolean
   spellcheckEnabled: boolean
   spellcheckLanguages: string[]
   preferredLanguages: string[]
   ntpLayout: 'default' | 'minimal' | 'off'
-  ntpShowGreeting: boolean
-  ntpShowMascot: boolean
   ntpSearchBarPosition: 'center' | 'top'
   searchPickerVisible: boolean
   searchSuggestionsEnabled: boolean
@@ -71,6 +67,9 @@ export interface AuraSettings {
   a11yLargerCursor: boolean
   profileName: string
   profileAvatar: string
+  translatorEngine: 'libretranslate' | 'google'
+  translatorTargetLang: string
+  translatorLibreEndpoint: string
 }
 
 const DEFAULTS: AuraSettings = {
@@ -119,15 +118,11 @@ const DEFAULTS: AuraSettings = {
   suggestBookmarks: true,
   suggestOpenTabs: true,
   defaultSearchEngine: 'google',
-  aiIncludePageContextDefault: true,
-  aiRememberConversations: true,
   forceDarkOnWebsites: false,
   spellcheckEnabled: true,
   spellcheckLanguages: ['en-US'],
   preferredLanguages: ['en-US', 'en'],
   ntpLayout: 'default',
-  ntpShowGreeting: true,
-  ntpShowMascot: true,
   ntpSearchBarPosition: 'center',
   searchPickerVisible: true,
   searchSuggestionsEnabled: true,
@@ -142,7 +137,10 @@ const DEFAULTS: AuraSettings = {
   a11yAlwaysShowFocus: false,
   a11yLargerCursor: false,
   profileName: '',
-  profileAvatar: ''
+  profileAvatar: '',
+  translatorEngine: 'libretranslate',
+  translatorTargetLang: 'en',
+  translatorLibreEndpoint: 'https://translate.argosopentech.com/translate'
 }
 
 let cache: Record<string, unknown> = {}

@@ -11,7 +11,7 @@ import { showToolbarMenu } from '../lib/showToolbarMenu'
 import { useSettings } from '../hooks/useSettings'
 import {
   IconBack, IconForward, IconReload, IconClose, IconLock, IconAlert,
-  IconSearch, IconMic, IconSparkle, IconShield, IconBookmark, IconHome
+  IconSearch, IconMic, IconShield, IconBookmark, IconHome
 } from './Icons'
 
 interface ToolbarMenuHandlers {
@@ -28,7 +28,6 @@ interface Props {
   onForward: () => void
   onReload: () => void
   onNavigate: (value: string) => void
-  onAssistant: () => void
   focusSignal: number
   onOpenHistory: () => void
   onOpenDownloads: () => void
@@ -88,7 +87,7 @@ export default function Toolbar(props: Props): React.ReactElement {
 
 
   const {
-    tab, onBack, onForward, onReload, onNavigate, onAssistant, focusSignal,
+    tab, onBack, onForward, onReload, onNavigate, focusSignal,
     onOpenHistory, onOpenDownloads,
     onOpenExtensions, onOpenSettings, onOpenProfile, onOpenNinja,
     onOpenCommandPalette,
@@ -392,6 +391,7 @@ export default function Toolbar(props: Props): React.ReactElement {
           onOpenCommandPalette={onOpenCommandPalette}
           onToggleVerticalTabs={onToggleVerticalTabs}
           verticalTabs={verticalTabs}
+          activeTab={tab}
         />
 
         <div className="toolbar-group-separator" />
@@ -419,12 +419,6 @@ export default function Toolbar(props: Props): React.ReactElement {
               <rect x="13" y="3" width="8" height="18" rx="1"/>
             </svg>
           )}
-        </button>
-        <button className="assistant-btn"
-          onClick={(e) => { e.currentTarget.blur(); onAssistant() }}
-          title="Open Aura assistant">
-          <IconSparkle size={13} />
-          <span>Assistant</span>
         </button>
       </div>
 

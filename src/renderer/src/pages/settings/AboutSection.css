@@ -30,19 +30,6 @@
   pointer-events: none;
 }
 
-.about-hero-orb {
-  width: 80px;
-  height: 80px;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 1;
-}
-
-.about-hero-orb > * {
-  width: 100% !important;
-  height: 100% !important;
-}
-
 .about-hero-meta {
   flex: 1;
   position: relative;

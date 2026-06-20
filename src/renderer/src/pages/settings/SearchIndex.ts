@@ -37,13 +37,6 @@ export const SEARCH_INDEX: SearchEntry[] = [
   { section: 'privacy', label: 'Suggest bookmarks', keywords: ['suggest', 'bookmarks', 'autocomplete'] },
   { section: 'privacy', label: 'Suggest open tabs', keywords: ['suggest', 'tab', 'open tabs', 'autocomplete'] },
 
-  { section: 'ai', label: 'AI provider', keywords: ['ai', 'provider', 'model', 'openai', 'anthropic', 'claude', 'ollama', 'mock'] },
-  { section: 'ai', label: 'API key', keywords: ['api', 'key', 'token', 'auth', 'credential'] },
-  { section: 'ai', label: 'AI model', keywords: ['model', 'gpt', 'claude', 'llama', 'mistral'] },
-  { section: 'ai', label: 'Test connection', keywords: ['test', 'connection', 'ping', 'check', 'verify'] },
-  { section: 'ai', label: 'Page context', keywords: ['page', 'context', 'ai', 'content', 'summarize'] },
-  { section: 'ai', label: 'Conversation memory', keywords: ['conversation', 'memory', 'history', 'ai', 'chat', 'remember'] },
-
   { section: 'autofill', label: 'Autofill', keywords: ['autofill', 'form', 'save', 'fill', 'profile'] },
   { section: 'autofill', label: 'Saved passwords', keywords: ['password', 'passwords', 'vault', 'credentials'] }
 ]

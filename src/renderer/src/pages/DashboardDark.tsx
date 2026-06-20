@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react'
-import GlassyOrb from '../components/GlassyOrb'
 import { showNativeInputMenu } from '../lib/buildInputMenu'
 import { useSettings } from '../hooks/useSettings'
 
@@ -16,10 +15,7 @@ export default function DashboardDark({
   const inputRef = useRef<HTMLInputElement>(null)
   const { settings } = useSettings()
   const s = settings as Record<string, unknown> | null
-  const greetingName = (s?.profileName as string || '').trim() || 'there'
   const ntpLayout = (s?.ntpLayout as string) ?? 'default'
-  const showGreeting = (s?.ntpShowGreeting as boolean) ?? true
-  const showMascot = (s?.ntpShowMascot as boolean) ?? true
   const searchPosition = (s?.ntpSearchBarPosition as string) ?? 'center'
 
   useEffect(() => {
@@ -67,15 +63,6 @@ export default function DashboardDark({
         Switch layout
       </button>
       <div className="aurora-center">
-        {showMascot && ntpLayout !== 'minimal' && (
-          <div className="aurora-orb-wrap">
-            <GlassyOrb size={140} />
-          </div>
-        )}
-        {showGreeting && (
-          <div className="aurora-greeting">Happy to see you, <span className="ntp-greeting-name">{greetingName}</span></div>
-        )}
-        <h1 className="aurora-question">How can I help you?</h1>
         <form className="aurora-searchbar" onSubmit={handleSubmit}>
           <div className="aurora-cursor-bar" />
           <input ref={inputRef} type="text" value={query}

@@ -131,6 +131,14 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_autofill_updated
         ON autofill_profiles(updated_at DESC);
     `)
+  },
+  (db) => {
+    db.exec(`
+      DROP TABLE IF EXISTS ai_messages;
+      DROP TABLE IF EXISTS ai_conversations;
+      DELETE FROM settings WHERE key LIKE 'ai%';
+      DELETE FROM settings WHERE key IN ('ntpShowGreeting', 'ntpShowMascot', 'ntpMascotStyle');
+    `)
   }
 ]
 
