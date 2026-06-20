@@ -13,16 +13,10 @@ export default function DashboardDark({
   onSwitchLayout
 }: Props): React.ReactElement {
   const [query, setQuery] = useState('')
-  const [userName] = useState<string>(() => {
-    try {
-      return localStorage.getItem('aura:userName') || 'there'
-    } catch {
-      return 'there'
-    }
-  })
   const inputRef = useRef<HTMLInputElement>(null)
   const { settings } = useSettings()
   const s = settings as Record<string, unknown> | null
+  const greetingName = (s?.profileName as string || '').trim() || 'there'
   const ntpLayout = (s?.ntpLayout as string) ?? 'default'
   const showGreeting = (s?.ntpShowGreeting as boolean) ?? true
   const showMascot = (s?.ntpShowMascot as boolean) ?? true
@@ -79,7 +73,7 @@ export default function DashboardDark({
           </div>
         )}
         {showGreeting && (
-          <div className="aurora-greeting">Happy to see you, {userName}</div>
+          <div className="aurora-greeting">Happy to see you, <span className="ntp-greeting-name">{greetingName}</span></div>
         )}
         <h1 className="aurora-question">How can I help you?</h1>
         <form className="aurora-searchbar" onSubmit={handleSubmit}>

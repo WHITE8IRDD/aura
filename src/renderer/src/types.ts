@@ -196,4 +196,6 @@ export interface AuraSettings {
   a11yCaretBrowsing: boolean
   a11yAlwaysShowFocus: boolean
   a11yLargerCursor: boolean
+  profileName: string
+  profileAvatar: string
 }

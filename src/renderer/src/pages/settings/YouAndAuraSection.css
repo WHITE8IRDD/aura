@@ -1,0 +1,231 @@
+.yua-profile-preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  margin-bottom: 18px;
+  background: linear-gradient(
+    135deg,
+    var(--bg-secondary) 0%,
+    var(--accent-soft) 100%
+  );
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+}
+
+.yua-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 2px solid var(--accent);
+  overflow: hidden;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.yua-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.yua-avatar-emoji {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.yua-profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.yua-preview-greeting {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.yua-preview-name {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.yua-input {
+  padding: 9px 14px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s ease;
+  width: 100%;
+  max-width: 360px;
+}
+
+.yua-input:focus {
+  border-color: var(--accent);
+}
+
+.yua-avatar-svg {
+  width: 56px;
+  height: 56px;
+}
+
+.yua-avatar-svg svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.yua-avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+  margin: 8px 0 14px;
+  max-width: 480px;
+}
+
+.yua-avatar-btn {
+  aspect-ratio: 1;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.yua-avatar-btn:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.yua-avatar-btn.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.yua-avatar-svg-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yua-avatar-svg-wrapper svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+@media (max-width: 720px) {
+  .yua-avatar-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.yua-avatar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.yua-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.yua-btn:hover:not(:disabled) {
+  background: var(--hover-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.yua-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.yua-btn.secondary {
+  background: transparent;
+}
+
+.yua-stub-card {
+  opacity: 0.75;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-default);
+}
+
+.yua-stub-card .setting-card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.yua-stub-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.yua-stub-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-tertiary);
+}
+
+.yua-message {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+  box-shadow: var(--shadow-lg);
+  z-index: 9999;
+  max-width: 600px;
+  text-align: center;
+}
+
+.yua-message.yua-success {
+  background: var(--success, #10b981);
+}
+
+.yua-message.yua-error {
+  background: var(--danger, #ef4444);
+}
+
+.yua-message.yua-info {
+  background: var(--accent, #6366f1);
+}

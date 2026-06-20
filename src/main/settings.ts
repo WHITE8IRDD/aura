@@ -69,6 +69,8 @@ export interface AuraSettings {
   a11yCaretBrowsing: boolean
   a11yAlwaysShowFocus: boolean
   a11yLargerCursor: boolean
+  profileName: string
+  profileAvatar: string
 }
 
 const DEFAULTS: AuraSettings = {
@@ -138,7 +140,9 @@ const DEFAULTS: AuraSettings = {
   a11yReduceMotion: false,
   a11yCaretBrowsing: false,
   a11yAlwaysShowFocus: false,
-  a11yLargerCursor: false
+  a11yLargerCursor: false,
+  profileName: '',
+  profileAvatar: ''
 }
 
 let cache: Record<string, unknown> = {}

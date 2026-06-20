@@ -74,6 +74,7 @@ import { initSystemIntegration, applyStartOnLogin, applyProxyMode, applyBackgrou
 import { initPerformance, applyEnergySaverToAll } from './performance'
 import { registerDefaultBrowserIPC } from './defaultBrowser'
 import { registerResetIPC } from './resetSettings'
+import { registerProfileDataIPC } from './profileData'
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
 applyStartupFlags()
@@ -585,6 +586,7 @@ ipcMain.handle('app:relaunch', () => {
 registerAboutIPC()
 registerDefaultBrowserIPC()
 registerResetIPC()
+registerProfileDataIPC()
 
 app.whenReady().then(() => { void createWindow() })
 

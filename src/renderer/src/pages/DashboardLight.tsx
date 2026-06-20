@@ -17,12 +17,9 @@ export default function DashboardLight({
   const [prompt, setPrompt] = useState('')
   const [editing, setEditing] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const [userName] = useState<string>(() => {
-    try { return localStorage.getItem('aura:userName') || 'there' }
-    catch { return 'there' }
-  })
   const { settings } = useSettings()
   const s = settings as Record<string, unknown> | null
+  const greetingName = (s?.profileName as string || '').trim() || 'there'
   const ntpLayout = (s?.ntpLayout as string) ?? 'default'
   const showGreeting = (s?.ntpShowGreeting as boolean) ?? true
   const showMascot = (s?.ntpShowMascot as boolean) ?? true
@@ -73,7 +70,7 @@ export default function DashboardLight({
           )}
           <div className="dash-light-greeting-block">
             {showGreeting && (
-              <div className="dash-light-greet">Hi {userName},</div>
+              <div className="dash-light-greet">Hi <span className="ntp-greeting-name">{greetingName}</span>,</div>
             )}
             <h1 className="dash-light-title">What&apos;s on your mind?</h1>
           </div>

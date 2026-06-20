@@ -516,6 +516,22 @@ const api = {
       ipcRenderer.invoke('defaultBrowser:remove'),
     openSystemSettings: (): Promise<void> =>
       ipcRenderer.invoke('defaultBrowser:openSystemSettings')
+  },
+
+  profile: {
+    exportData: (): Promise<{
+      success: boolean
+      path?: string
+      error?: string
+    }> => ipcRenderer.invoke('profile:exportData'),
+
+    importData: (): Promise<{
+      success: boolean
+      bookmarksImported?: number
+      historyImported?: number
+      settingsImported?: number
+      error?: string
+    }> => ipcRenderer.invoke('profile:importData')
   }
 }
 

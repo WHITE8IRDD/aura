@@ -13,6 +13,7 @@ import { SystemSection } from './settings/SystemSection'
 import { PerformanceSection } from './settings/PerformanceSection'
 import { DefaultBrowserSection } from './settings/DefaultBrowserSection'
 import { AboutSection } from './settings/AboutSection'
+import { YouAndAuraSection } from './settings/YouAndAuraSection'
 import { Button } from './settings/SettingsControls'
 import { useSettings } from '../hooks/useSettings'
 import { ChromePageHeader } from '../components/ChromePageHeader'
@@ -28,6 +29,14 @@ interface Section {
 }
 
 const SECTION_ICONS: Record<string, JSX.Element> = {
+  youAndAura: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+         strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+      <circle cx="12" cy="7" r="4"/>
+    </svg>
+  ),
   general: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3"/>
@@ -116,6 +125,7 @@ const SECTION_ICONS: Record<string, JSX.Element> = {
 }
 
 const SECTIONS: Section[] = [
+  { id: 'youAndAura', label: 'You and Aura' },
   { id: 'general', label: 'General' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'home', label: 'Home' },
@@ -132,7 +142,7 @@ const SECTIONS: Section[] = [
 ]
 
 export default function SettingsPage({ onClose }: Props): React.ReactElement {
-  const [activeSection, setActiveSection] = useState('general')
+  const [activeSection, setActiveSection] = useState('youAndAura')
   const [search, setSearch] = useState('')
 
   const { reset } = useSettings()
@@ -205,6 +215,7 @@ export default function SettingsPage({ onClose }: Props): React.ReactElement {
         </nav>
 
         <div className="sett-content">
+          {activeSection === 'youAndAura' && <YouAndAuraSection />}
           {activeSection === 'general' && <GeneralSection />}
           {activeSection === 'appearance' && <AppearanceSection />}
           {activeSection === 'home' && <HomeSection />}
