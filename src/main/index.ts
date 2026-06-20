@@ -75,6 +75,7 @@ import { initPerformance, applyEnergySaverToAll } from './performance'
 import { registerDefaultBrowserIPC } from './defaultBrowser'
 import { registerResetIPC } from './resetSettings'
 import { registerProfileDataIPC } from './profileData'
+import { registerTabContextMenuIPC } from './tabContextMenuNative'
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
 applyStartupFlags()
@@ -587,6 +588,7 @@ registerAboutIPC()
 registerDefaultBrowserIPC()
 registerResetIPC()
 registerProfileDataIPC()
+registerTabContextMenuIPC()
 
 app.whenReady().then(() => { void createWindow() })
 

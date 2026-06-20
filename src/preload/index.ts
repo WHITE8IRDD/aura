@@ -518,6 +518,19 @@ const api = {
       ipcRenderer.invoke('defaultBrowser:openSystemSettings')
   },
 
+  tabContextMenu: {
+    show: (ctx: {
+      tabId: number
+      muted: boolean
+      pinned: boolean
+      inGroup: boolean
+      isActive: boolean
+      canCloseOthers: boolean
+    }): Promise<{
+      type: string
+    } | null> => ipcRenderer.invoke('tabCtx:show', ctx)
+  },
+
   profile: {
     exportData: (): Promise<{
       success: boolean

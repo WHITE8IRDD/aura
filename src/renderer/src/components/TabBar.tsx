@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import type { TabState, TabGroup } from '../types'
 import { IconClose, IconPlus } from './Icons'
-import TabContextMenu, { type ContextMenuItem } from './TabContextMenu'
 
 interface Props {
   tabs: TabState[]
@@ -14,91 +13,79 @@ interface Props {
   onChangeGroup?: (tabId: number, groupId: string | null) => void
 }
 
-interface ContextMenuState {
-  x: number
-  y: number
-  items: ContextMenuItem[]
-}
-
 import NinjaAvatar from './NinjaAvatar'
 
 export default function TabBar({
   tabs, activeId, onSelect, onClose, onNew, isPrivate, vertical, onChangeGroup
 }: Props): React.ReactElement {
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
 
-  const handleContextMenu = (e: React.MouseEvent, tab: TabState): void => {
+  const handleContextMenu = async (e: React.MouseEvent, tab: TabState): Promise<void> => {
     e.preventDefault()
     e.stopPropagation()
 
-    const items: ContextMenuItem[] = [
-      { label: 'New Tab Below', onClick: onNew },
-      { separator: true },
-      { label: 'Reload Tab', onClick: () => window.aura.tabs.reload(tab.id) },
-      {
-        label: tab.muted ? 'Unmute Tab' : 'Mute Tab',
-        onClick: () => window.aura.tabs.mute(tab.id)
-      },
-      {
-        label: tab.pinned ? 'Unpin Tab' : 'Pin Tab',
-        onClick: () => {
-          if (tab.pinned) window.aura.tabs.unpin(tab.id)
-          else window.aura.tabs.pin(tab.id)
-        }
-      },
-      {
-        label: 'Unload Tab',
-        onClick: () => window.aura.tabs.unload(tab.id),
-        disabled: tab.id === activeId
-      },
-      { label: 'Duplicate Tab', onClick: () => window.aura.tabs.duplicate(tab.id) },
-      { separator: true },
-      {
-        label: 'Bookmark Tab\u2026',
-        onClick: () => window.aura.bookmarks.add(tab.url, tab.title).catch(() => {})
-      },
-      {
-        label: 'Add to New Group\u2026',
-        onClick: async () => {
-          const name = prompt('Group name:')?.trim()
-          if (!name) return
-          const color = '#A6C0F1'
-          const group = await window.aura.groups.create(name, color)
-          await window.aura.groups.addTab(group.id, tab.id)
-        }
-      },
-      {
-        label: 'Remove from Group',
-        onClick: () => {
-          if (onChangeGroup) onChangeGroup(tab.id, null)
-          else void window.aura.groups.removeTab(tab.id)
-        },
-        disabled: !tab.groupId
-      },
-      { separator: true },
-      {
-        label: tab.pinned ? 'Unpin and Close' : 'Close Tab',
-        onClick: () => {
-          if (tab.pinned) window.aura.tabs.unpin(tab.id)
-          onClose(tab.id)
-        },
-        danger: true
-      },
-      {
-        label: 'Close Other Tabs',
-        onClick: () => window.aura.tabs.closeOthers(tab.id),
-        disabled: tabs.length < 2
-      },
-      {
-        label: 'Close Tabs to the Right',
-        onClick: () => window.aura.tabs.closeToRight(tab.id)
-      },
-      { label: 'Close Duplicate Tabs', onClick: () => window.aura.tabs.closeDuplicates() },
-      { separator: true },
-      { label: 'Reopen Closed Tab', onClick: () => window.aura.tabs.reopenClosed() }
-    ]
+    const action = await window.aura.tabContextMenu.show({
+      tabId: tab.id,
+      muted: !!tab.muted,
+      pinned: !!tab.pinned,
+      inGroup: tab.groupId != null,
+      isActive: tab.id === activeId,
+      canCloseOthers: tabs.length >= 2
+    })
 
-    setContextMenu({ x: e.clientX, y: e.clientY, items })
+    if (!action) return
+
+    switch (action.type) {
+      case 'new-tab':
+        window.aura.tabs.create('aura://newtab')
+        break
+      case 'reload':
+        window.aura.tabs.reload(tab.id)
+        break
+      case 'mute-toggle':
+        window.aura.tabs.mute(tab.id)
+        break
+      case 'pin-toggle':
+        if (tab.pinned) window.aura.tabs.unpin(tab.id)
+        else window.aura.tabs.pin(tab.id)
+        break
+      case 'unload':
+        window.aura.tabs.unload(tab.id)
+        break
+      case 'duplicate':
+        window.aura.tabs.duplicate(tab.id)
+        break
+      case 'bookmark':
+        window.aura.bookmarks.add(tab.url, tab.title).catch(() => {})
+        break
+      case 'add-to-new-group': {
+        const name = prompt('Group name:')?.trim()
+        if (!name) break
+        const color = '#A6C0F1'
+        const group = await window.aura.groups.create(name, color)
+        await window.aura.groups.addTab(group.id, tab.id)
+        break
+      }
+      case 'remove-from-group':
+        if (onChangeGroup) onChangeGroup(tab.id, null)
+        else void window.aura.groups.removeTab(tab.id)
+        break
+      case 'close':
+        if (tab.pinned) window.aura.tabs.unpin(tab.id)
+        onClose(tab.id)
+        break
+      case 'close-others':
+        window.aura.tabs.closeOthers(tab.id)
+        break
+      case 'close-right':
+        window.aura.tabs.closeToRight(tab.id)
+        break
+      case 'close-duplicates':
+        window.aura.tabs.closeDuplicates()
+        break
+      case 'reopen-closed':
+        window.aura.tabs.reopenClosed()
+        break
+    }
   }
 
   return (
@@ -129,15 +116,6 @@ export default function TabBar({
           <IconPlus size={14} />
         </button>
       </div>
-
-      {contextMenu && (
-        <TabContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          items={contextMenu.items}
-          onClose={() => setContextMenu(null)}
-        />
-      )}
     </div>
   )
 }
