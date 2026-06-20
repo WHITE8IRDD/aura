@@ -108,6 +108,29 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_tab_sessions_pinned
         ON tab_sessions(pinned, tab_order);
     `)
+  },
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS autofill_profiles (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        label           TEXT NOT NULL DEFAULT 'Profile',
+        full_name_enc   TEXT,
+        given_name_enc  TEXT,
+        family_name_enc TEXT,
+        email_enc       TEXT,
+        phone_enc       TEXT,
+        organization_enc TEXT,
+        street_enc      TEXT,
+        city_enc        TEXT,
+        region_enc      TEXT,
+        postal_code_enc TEXT,
+        country_enc     TEXT,
+        created_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at      INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+      CREATE INDEX IF NOT EXISTS idx_autofill_updated
+        ON autofill_profiles(updated_at DESC);
+    `)
   }
 ]
 

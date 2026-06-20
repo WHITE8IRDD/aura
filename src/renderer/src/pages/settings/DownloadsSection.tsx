@@ -11,7 +11,7 @@ export function DownloadsSection(): React.ReactElement {
 
   useEffect(() => {
     window.aura.downloads.getCurrentFolder().then(setCurrentFolder).catch(() => {})
-  }, [s.downloadPath])
+  }, [])
 
   if (!settings) return <div className="sett-card">Loading…</div>
 

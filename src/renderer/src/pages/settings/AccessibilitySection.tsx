@@ -1,8 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useSettings } from '../../hooks/useSettings'
 import { Toggle, Select } from './SettingsControls'
 
-const ZOOM_LEVELS = [50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200]
+const ZOOM_PRESETS = [50, 75, 100, 125, 150, 200]
 const FONT_SIZES = [
   { value: 0, label: 'No minimum' },
   { value: 10, label: '10 px (Tiny)' },
@@ -14,11 +14,25 @@ const FONT_SIZES = [
 
 export function AccessibilitySection(): React.ReactElement {
   const { settings } = useSettings()
+  const [customZoom, setCustomZoom] = useState('100')
+
   if (!settings) return <div className="sett-card">Loading\u2026</div>
 
   const s = settings as Record<string, unknown>
   const set = (key: string, value: unknown): void => {
     window.aura.settings.set(key, value)
+  }
+
+  const currentZoom = Number(s.a11yDefaultZoom ?? 100)
+
+  const handleCustomZoom = () => {
+    const v = Math.round(Math.max(25, Math.min(500, Number(customZoom) || 100)))
+    set('a11yDefaultZoom', v)
+    setCustomZoom(String(v))
+  }
+
+  const handleCustomKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleCustomZoom()
   }
 
   return (
@@ -28,16 +42,35 @@ export function AccessibilitySection(): React.ReactElement {
       <div className="sett-card">
         <h3 className="sett-card-title">Vision</h3>
 
-        <Select
-          label="Default page zoom"
-          description="The starting zoom level for every webpage. Individual sites you've zoomed in/out manually keep their custom level."
-          value={String(s.a11yDefaultZoom ?? 100)}
-          onChange={(v) => set('a11yDefaultZoom', Number(v))}
-          options={ZOOM_LEVELS.map((z) => ({
-            value: String(z),
-            label: `${z}%${z === 100 ? ' (Default)' : ''}`
-          }))}
-        />
+        <div className="sett-field">
+          <div className="sett-field-label">Default page zoom</div>
+          <div className="sett-field-desc">The starting zoom level for every webpage. Individual sites you've zoomed in/out manually keep their custom level.</div>
+          <div className="zoom-presets">
+            {ZOOM_PRESETS.map((z) => (
+              <button
+                key={z}
+                className={`zoom-preset-btn${currentZoom === z ? ' active' : ''}`}
+                onClick={() => { set('a11yDefaultZoom', z); setCustomZoom(String(z)) }}
+              >
+                {z}%
+              </button>
+            ))}
+          </div>
+          <div className="zoom-custom-row">
+            <span className="zoom-custom-label">Custom</span>
+            <input
+              type="number"
+              className="zoom-custom-input"
+              min={25}
+              max={500}
+              value={customZoom}
+              onChange={(e) => setCustomZoom(e.target.value)}
+              onBlur={handleCustomZoom}
+              onKeyDown={handleCustomKeyDown}
+            />
+            <span className="zoom-custom-unit">%</span>
+          </div>
+        </div>
 
         <Select
           label="Minimum font size"

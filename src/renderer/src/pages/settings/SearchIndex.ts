@@ -42,5 +42,8 @@ export const SEARCH_INDEX: SearchEntry[] = [
   { section: 'ai', label: 'AI model', keywords: ['model', 'gpt', 'claude', 'llama', 'mistral'] },
   { section: 'ai', label: 'Test connection', keywords: ['test', 'connection', 'ping', 'check', 'verify'] },
   { section: 'ai', label: 'Page context', keywords: ['page', 'context', 'ai', 'content', 'summarize'] },
-  { section: 'ai', label: 'Conversation memory', keywords: ['conversation', 'memory', 'history', 'ai', 'chat', 'remember'] }
+  { section: 'ai', label: 'Conversation memory', keywords: ['conversation', 'memory', 'history', 'ai', 'chat', 'remember'] },
+
+  { section: 'autofill', label: 'Autofill', keywords: ['autofill', 'form', 'save', 'fill', 'profile'] },
+  { section: 'autofill', label: 'Saved passwords', keywords: ['password', 'passwords', 'vault', 'credentials'] }
 ]

@@ -1,10 +1,12 @@
-import React from 'react'
+import React, { useState } from 'react'
 import type { AuraSettings } from '../../types'
 import { Toggle, RadioGroup, Button } from './SettingsControls'
 import { useSettings } from '../../hooks/useSettings'
+import { ClearBrowsingDataDialog } from '../../components/ClearBrowsingDataDialog'
 
 export function PrivacySection(): React.ReactElement {
   const { settings, set, loaded } = useSettings()
+  const [clearOpen, setClearOpen] = useState(false)
   if (!loaded || !settings) return <div className="sett-card">Loading…</div>
 
   const shieldsOptions = [
@@ -16,6 +18,18 @@ export function PrivacySection(): React.ReactElement {
   return (
     <div className="sett-section" id="sett-privacy">
       <h2 className="sett-section-title">Privacy & Security</h2>
+
+      <div className="sett-card">
+        <h3 className="sett-card-title">YOUR DATA</h3>
+        <div className="sett-field">
+          <div className="sett-field-label">Clear browsing data</div>
+          <div className="sett-field-desc">Delete your history, cookies, cache, and more</div>
+          <button className="sett-btn" style={{ marginTop: 8, background: 'var(--accent)', color: 'white', borderColor: 'var(--accent)' }}
+            onClick={() => setClearOpen(true)}>
+            Clear data\u2026
+          </button>
+        </div>
+      </div>
 
       <div className="sett-card">
         <h3 className="sett-card-title">Shields</h3>
@@ -71,6 +85,8 @@ export function PrivacySection(): React.ReactElement {
             alert(ok ? 'Aura is your default browser' : 'Aura is not the default browser')
           }} />
       </div>
+
+      <ClearBrowsingDataDialog open={clearOpen} onClose={() => setClearOpen(false)} />
     </div>
   )
 }

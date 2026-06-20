@@ -4,6 +4,7 @@ import {
   IconUser, IconSidebar
 } from './Icons'
 import NinjaAvatar from './NinjaAvatar'
+import { MediaHub } from './MediaHub'
 
 interface Props {
   onOpenHistory: () => void
@@ -32,6 +33,7 @@ export default function UtilityCluster({
       <button className="util-btn" title="Downloads" onClick={onOpenDownloads}>
         <IconDownload size={15} />
       </button>
+      <MediaHub />
       <button className="util-btn ninja-util" title="Ninja Mode" onClick={onOpenNinja}>
         <NinjaAvatar size={18} />
       </button>

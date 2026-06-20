@@ -18,7 +18,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/preload/index.ts'),
-          tab: resolve(__dirname, 'src/preload/tab.ts')
+          tab: resolve(__dirname, 'src/preload/tab.ts'),
+          mediaHubPopover: resolve(__dirname, 'src/preload/mediaHubPopover.ts')
         }
       }
     }
@@ -28,7 +29,8 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'src/renderer/index.html')
+          index: resolve(__dirname, 'src/renderer/index.html'),
+          mediaHubPopover: resolve(__dirname, 'src/renderer/mediaHubPopover.html')
         }
       }
     },

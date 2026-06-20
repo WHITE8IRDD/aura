@@ -2,6 +2,8 @@ import { app, BrowserWindow, ipcMain, session, shell } from 'electron'
 import { join } from 'path'
 import { TabManager } from './tabs'
 import { registerInputContextMenuIPC } from './inputContextMenu'
+import { registerMediaHubMenuIPC } from './mediaHubMenu'
+import { registerMediaHubWindowIPC } from './mediaHubWindow'
 import { registerToolbarContextMenuIPC } from './toolbarContextMenu'
 import { registerWindowControls, wireMaximizeEvents } from './window-controls'
 import { registerShortcuts } from './shortcuts'
@@ -28,6 +30,9 @@ import { setupAntiFingerprintFlags, setupSessionFingerprintDefenses } from './se
 import { setupPermissionPrompts, respondToPermission } from './security/permissions'
 import { isPhishingDomain } from './blocker/phishing'
 import { fetchFavicon } from './favicons'
+import { setupMediaWatcher, registerMediaControllerIPC } from './mediaController'
+import { registerClearBrowsingDataIPC } from './clearBrowsingData'
+import { registerAutofillIPC, maybePromptSave } from './autofill'
 import { applyZoomToAllTabs } from './accessibility'
 import { getDb, closeDb } from './db'
 import {
@@ -151,6 +156,10 @@ const startupReady = app.whenReady().then(async () => {
   startRetentionScheduler()
   await aiManager.init()
   console.log('[Aura/ai] Manager ready, active provider:', aiManager.getActive().label)
+  setupMediaWatcher()
+  registerMediaControllerIPC()
+  registerMediaHubMenuIPC()
+  registerMediaHubWindowIPC()
   console.log('[Aura] Ready')
 })
 
@@ -237,6 +246,7 @@ async function createWindow(): Promise<void> {
         tabs.create('aura://newtab')
       }
     }
+
   })
 
   mainWindow.on('closed', () => {
@@ -281,6 +291,7 @@ ipcMain.handle('tabs:closeOthers', (e, id: number) => getTabsForEvent(e)?.closeO
 ipcMain.handle('tabs:closeToRight', (e, id: number) => getTabsForEvent(e)?.closeToRight(id))
 ipcMain.handle('tabs:closeDuplicates', (e) => getTabsForEvent(e)?.closeDuplicates())
 ipcMain.handle('tabs:reopenClosed', (e) => getTabsForEvent(e)?.reopenLastClosed())
+ipcMain.handle('tabs:hasClosedTabs', (e) => getTabsForEvent(e)?.hasClosedTabs() ?? false)
 
 ipcMain.handle('tabs:find', (e, id: number, query: string, forward: boolean) =>
   getTabsForEvent(e)?.findInPage(id, query, forward))
@@ -589,6 +600,13 @@ registerDefaultBrowserIPC()
 registerResetIPC()
 registerProfileDataIPC()
 registerTabContextMenuIPC()
+registerClearBrowsingDataIPC()
+registerAutofillIPC()
+
+ipcMain.on('autofill:formSubmitted', (e, captured) => {
+  const win = BrowserWindow.fromWebContents(e.sender)
+  if (win) maybePromptSave(win, captured)
+})
 
 app.whenReady().then(() => { void createWindow() })
 

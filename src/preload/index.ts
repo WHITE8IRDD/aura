@@ -50,6 +50,7 @@ const api = {
     closeToRight: (id: number): Promise<void> => ipcRenderer.invoke('tabs:closeToRight', id),
     closeDuplicates: (): Promise<void> => ipcRenderer.invoke('tabs:closeDuplicates'),
     reopenClosed: (): Promise<number | null> => ipcRenderer.invoke('tabs:reopenClosed'),
+    hasClosedTabs: (): Promise<boolean> => ipcRenderer.invoke('tabs:hasClosedTabs'),
     find: (id: number, query: string, forward: boolean): Promise<void> =>
       ipcRenderer.invoke('tabs:find', id, query, forward),
     findNext: (id: number, forward: boolean): Promise<void> =>
@@ -526,6 +527,7 @@ const api = {
       inGroup: boolean
       isActive: boolean
       canCloseOthers: boolean
+      canReopenClosed: boolean
     }): Promise<{
       type: string
     } | null> => ipcRenderer.invoke('tabCtx:show', ctx)
@@ -545,6 +547,94 @@ const api = {
       settingsImported?: number
       error?: string
     }> => ipcRenderer.invoke('profile:importData')
+  },
+
+  media: {
+    getActiveTabs: (): Promise<Array<{
+      id: number; title: string; url: string; favicon?: string
+      audible: boolean; muted: boolean; playing: boolean
+    }>> => ipcRenderer.invoke('media:getActiveTabs'),
+
+    dispatch: (tabId: number, action: 'play' | 'pause' | 'previoustrack' | 'nexttrack'): Promise<{ success: boolean; method: string }> =>
+      ipcRenderer.invoke('media:dispatch', tabId, action),
+
+    setMuted: (tabId: number, muted: boolean): Promise<{ success: boolean; reason?: string }> =>
+      ipcRenderer.invoke('media:setMuted', tabId, muted),
+
+    focusTab: (tabId: number): Promise<{ success: boolean; reason?: string }> =>
+      ipcRenderer.invoke('media:focusTab', tabId),
+
+    openPopoverWindow: (buttonRect: {
+      x: number; y: number; width: number; height: number
+    }) => ipcRenderer.invoke('mediaHubWindow:open', buttonRect),
+
+    showNativeMenu: (): Promise<{
+      type: string; wcId?: number; muted?: boolean
+    } | null> => ipcRenderer.invoke('mediaHub:show'),
+
+    onStateChanged: (cb: () => void): (() => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('media:stateChanged', handler)
+      return () => ipcRenderer.removeListener('media:stateChanged', handler)
+    }
+  },
+
+  clearData: {
+    preview: (timeRange: 'hour' | 'day' | 'week' | 'fourWeeks' | 'all'): Promise<{
+      historyCount: number
+      downloadsCount: number
+      cookiesSiteCount: number
+      cacheSizeBytes: number
+      siteSettingsCount: number
+    }> => ipcRenderer.invoke('clearData:preview', timeRange),
+
+    execute: (options: {
+      timeRange: 'hour' | 'day' | 'week' | 'fourWeeks' | 'all'
+      browsingHistory: boolean
+      downloadHistory: boolean
+      cookies: boolean
+      cache: boolean
+      passwords: boolean
+      autofillData: boolean
+      siteSettings: boolean
+      hostedAppData: boolean
+    }): Promise<{
+      success: boolean
+      cleared: Record<string, number>
+      errors: string[]
+    }> => ipcRenderer.invoke('clearData:execute', options)
+  },
+
+  autofill: {
+    isAvailable: (): Promise<boolean> => ipcRenderer.invoke('autofill:isAvailable'),
+
+    list: (): Promise<Array<{
+      id: number; label: string; fullName: string; givenName: string
+      familyName: string; email: string; phone: string
+      organization: string; street: string; city: string
+      region: string; postalCode: string; country: string
+      createdAt: number; updatedAt: number
+    }>> => ipcRenderer.invoke('autofill:list'),
+
+    add: (input: any): Promise<{ id: number; success: boolean }> =>
+      ipcRenderer.invoke('autofill:add', input),
+
+    update: (id: number, input: any): Promise<boolean> =>
+      ipcRenderer.invoke('autofill:update', id, input),
+
+    delete: (id: number): Promise<boolean> =>
+      ipcRenderer.invoke('autofill:delete', id),
+
+    deleteAll: (): Promise<number> => ipcRenderer.invoke('autofill:deleteAll'),
+
+    acceptSave: (input: any): Promise<{ id: number; success: boolean }> =>
+      ipcRenderer.invoke('autofill:promptSaveAccept', input),
+
+    onPromptSave: (cb: (data: any) => void): (() => void) => {
+      const handler = (_e: any, data: any) => cb(data)
+      ipcRenderer.on('autofill:promptSave', handler)
+      return () => ipcRenderer.removeListener('autofill:promptSave', handler)
+    }
   }
 }
 

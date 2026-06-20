@@ -7,6 +7,7 @@ export interface TabMenuContext {
   inGroup: boolean
   isActive: boolean
   canCloseOthers: boolean
+  canReopenClosed: boolean
 }
 
 export type TabMenuAction =
@@ -100,6 +101,7 @@ export function showTabContextMenu(
       { type: 'separator' },
       {
         label: 'Reopen Closed Tab',
+        enabled: ctx.canReopenClosed,
         click: () => respond({ type: 'reopen-closed' })
       }
     ]

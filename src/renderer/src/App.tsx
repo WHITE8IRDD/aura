@@ -24,6 +24,7 @@ import ReadingListPage from './pages/ReadingListPage'
 import BoostsPage from './pages/BoostsPage'
 import SettingsPage from './pages/SettingsPage'
 import AssistantPanel from './ai/AssistantPanel'
+import { AutofillSavePrompt } from './components/AutofillSavePrompt'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useResize } from './hooks/useResize'
@@ -631,6 +632,8 @@ export default function App(): React.ReactElement {
         activeTab={activeTab}
         onClose={() => setAssistantOpen(false)}
       />
+
+      <AutofillSavePrompt />
 
       {isResizing && (
         <div

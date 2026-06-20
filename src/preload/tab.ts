@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { setupAutofillCapture, setupAutofillSuggestions } from './autofillFormWatcher'
 
 const zoomApi = {
   zoom: (dir: 'in' | 'out') => ipcRenderer.send('tab:wheelZoom', dir)
@@ -12,3 +13,6 @@ window.addEventListener('wheel', (e) => {
   e.stopPropagation()
   zoomApi.zoom(e.deltaY < 0 ? 'in' : 'out')
 }, { passive: false, capture: true })
+
+setupAutofillCapture()
+setupAutofillSuggestions()

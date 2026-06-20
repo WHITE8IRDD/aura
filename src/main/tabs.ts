@@ -79,6 +79,23 @@ function clampZoom(factor: number): number {
 }
 
 export class TabManager {
+  private static instances = new Map<number, TabManager>()
+
+  static getAll(): TabManager[] {
+    return [...TabManager.instances.values()]
+  }
+
+  static getByWinId(winId: number): TabManager | undefined {
+    return TabManager.instances.get(winId)
+  }
+
+  static findTab(tabId: number): TabManager | null {
+    for (const mgr of TabManager.instances.values()) {
+      if (mgr.records.has(tabId)) return mgr
+    }
+    return null
+  }
+
   records = new Map<number, TabRecord>()
   private order: number[] = []
   private activeId: number | null = null
@@ -100,10 +117,12 @@ export class TabManager {
   ) {
     this.chromeHeight = chromeHeight
     this._isPrivate = isPrivate
+    TabManager.instances.set(win.id, this)
     win.on('resize', () => this.layout())
     win.on('enter-full-screen', () => this.layout())
     win.on('leave-full-screen', () => this.layout())
     win.on('closed', () => {
+      TabManager.instances.delete(win.id)
       if (this.sleepTimer) clearInterval(this.sleepTimer)
       if (this.saveTimeout) { clearTimeout(this.saveTimeout); this.saveTimeout = null }
       if (!this.isPrivate) this.flushSession()
@@ -119,8 +138,29 @@ export class TabManager {
 
   get isPrivate(): boolean { return this._isPrivate }
 
+  getWindow(): BrowserWindow { return this.win }
   getActiveId(): number | null { return this.activeId }
   setSidebarWidth(w: number): void { this.sidebarWidth = Math.max(0, w); this.layout() }
+
+  getMediaTabs(): Array<{
+    id: number; title: string; url: string; favicon: string | null
+    hasAudio: boolean; muted: boolean
+  }> {
+    const result: Array<{
+      id: number; title: string; url: string; favicon: string | null
+      hasAudio: boolean; muted: boolean
+    }> = []
+    for (const id of this.order) {
+      const rec = this.records.get(id)
+      if (!rec) continue
+      if (!rec.hasAudio && !rec.muted) continue
+      result.push({
+        id: rec.id, title: rec.title, url: rec.url,
+        favicon: rec.favicon, hasAudio: rec.hasAudio, muted: rec.muted
+      })
+    }
+    return result
+  }
   setChromeHeight(h: number): void { this.chromeHeight = h; this.layout() }
   isFullscreen(): boolean { return this.fullscreenTabId !== null }
 
@@ -193,6 +233,10 @@ export class TabManager {
     const last = this.closedStack.shift()
     if (!last) return null
     return this.create(last.url)
+  }
+
+  hasClosedTabs(): boolean {
+    return this.closedStack.length > 0
   }
 
   activate(id: number): void {
@@ -269,23 +313,33 @@ export class TabManager {
     rec.loading = false; this.emit()
   }
   closeOthers(keepId: number): void {
-    [...this.records.keys()].filter((id) => id !== keepId).forEach((id) => this.close(id))
+    const toClose = [...this.records.keys()]
+      .filter((id) => id !== keepId && !this.records.get(id)?.pinned)
+    for (const id of toClose) this.close(id)
   }
   closeToRight(keepId: number): void {
     const idx = this.order.indexOf(keepId)
     if (idx === -1) return
-    this.order.slice(idx + 1).forEach((id) => this.close(id))
+    const toClose = this.order.slice(idx + 1).filter((id) => !this.records.get(id)?.pinned)
+    for (const id of toClose) this.close(id)
   }
   closeDuplicates(): void {
-    const seen = new Map<string, number>()
+    const ids = [...this.order]
+    const seen = new Set<string>()
     const toClose: number[] = []
-    for (const id of this.order) {
-      const rec = this.records.get(id)
-      if (!rec || rec.pinned) continue
-      if (seen.has(rec.url)) toClose.push(id)
-      else seen.set(rec.url, id)
+    for (const id of ids) {
+      const tab = this.records.get(id)
+      if (!tab) continue
+      if (tab.pinned) continue
+      if (!tab.url) continue
+      if (tab.url === 'aura://newtab') continue
+      if (seen.has(tab.url)) {
+        toClose.push(tab.id)
+      } else {
+        seen.add(tab.url)
+      }
     }
-    toClose.forEach((id) => this.close(id))
+    for (const id of toClose) this.close(id)
   }
 
   reorder(fromId: number, toIndex: number): void {
@@ -558,8 +612,8 @@ export class TabManager {
       this.emit()
     })
 
-    wc.on('audio-state-changed', (event) => {
-      rec.hasAudio = event.audible
+    wc.on('audio-state-changed', (event, audible) => {
+      rec.hasAudio = audible ?? event?.audible ?? false
       this.emit()
     })
 

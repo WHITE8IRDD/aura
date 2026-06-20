@@ -23,13 +23,16 @@ export default function TabBar({
     e.preventDefault()
     e.stopPropagation()
 
+    const canReopenClosed = await window.aura.tabs.hasClosedTabs()
+
     const action = await window.aura.tabContextMenu.show({
       tabId: tab.id,
       muted: !!tab.muted,
       pinned: !!tab.pinned,
       inGroup: tab.groupId != null,
       isActive: tab.id === activeId,
-      canCloseOthers: tabs.length >= 2
+      canCloseOthers: tabs.length >= 2,
+      canReopenClosed
     })
 
     if (!action) return

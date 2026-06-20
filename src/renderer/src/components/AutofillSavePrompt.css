@@ -1,0 +1,76 @@
+.autofill-save-banner {
+  position: fixed;
+  top: 76px;
+  right: 24px;
+  width: 380px;
+  padding: 14px 16px;
+  background: var(--bg-elevated);
+  backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  z-index: 9500;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.autofill-banner-content {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  color: var(--accent);
+}
+
+.autofill-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.autofill-banner-text strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.autofill-banner-text span {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.autofill-banner-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.autofill-banner-actions button {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.autofill-banner-actions button:hover {
+  background: var(--hover-bg);
+}
+
+.autofill-banner-actions button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.autofill-banner-actions button.primary:hover {
+  background: var(--accent-hover);
+}

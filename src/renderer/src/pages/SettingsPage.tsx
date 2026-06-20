@@ -14,6 +14,7 @@ import { PerformanceSection } from './settings/PerformanceSection'
 import { DefaultBrowserSection } from './settings/DefaultBrowserSection'
 import { AboutSection } from './settings/AboutSection'
 import { YouAndAuraSection } from './settings/YouAndAuraSection'
+import { AutofillSection } from './settings/AutofillSection'
 import { Button } from './settings/SettingsControls'
 import { useSettings } from '../hooks/useSettings'
 import { ChromePageHeader } from '../components/ChromePageHeader'
@@ -35,6 +36,15 @@ const SECTION_ICONS: Record<string, JSX.Element> = {
          strokeLinejoin="round">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
       <circle cx="12" cy="7" r="4"/>
+    </svg>
+  ),
+  autofill: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+         strokeLinejoin="round">
+      <rect x="2" y="4" width="20" height="16" rx="2"/>
+      <line x1="2" y1="10" x2="22" y2="10"/>
+      <line x1="6" y1="15" x2="10" y2="15"/>
     </svg>
   ),
   general: (
@@ -130,14 +140,15 @@ const SECTIONS: Section[] = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'home', label: 'Home' },
   { id: 'search', label: 'Search' },
-  { id: 'downloads', label: 'Downloads' },
   { id: 'privacy', label: 'Privacy & Security' },
+  { id: 'autofill', label: 'Autofill' },
+  { id: 'downloads', label: 'Downloads' },
   { id: 'accessibility', label: 'Accessibility' },
-  { id: 'system', label: 'System' },
   { id: 'performance', label: 'Performance' },
-  { id: 'defaultBrowser', label: 'Default browser' },
-  { id: 'ai', label: 'AI Assistant' },
   { id: 'languages', label: 'Languages' },
+  { id: 'ai', label: 'AI Assistant' },
+  { id: 'system', label: 'System' },
+  { id: 'defaultBrowser', label: 'Default browser' },
   { id: 'about', label: 'About' }
 ]
 
@@ -220,14 +231,15 @@ export default function SettingsPage({ onClose }: Props): React.ReactElement {
           {activeSection === 'appearance' && <AppearanceSection />}
           {activeSection === 'home' && <HomeSection />}
           {activeSection === 'search' && <SearchSection />}
-          {activeSection === 'downloads' && <DownloadsSection />}
           {activeSection === 'privacy' && <PrivacySection />}
+          {activeSection === 'autofill' && <AutofillSection />}
+          {activeSection === 'downloads' && <DownloadsSection />}
           {activeSection === 'accessibility' && <AccessibilitySection />}
-          {activeSection === 'system' && <SystemSection />}
           {activeSection === 'performance' && <PerformanceSection />}
-          {activeSection === 'defaultBrowser' && <DefaultBrowserSection />}
-          {activeSection === 'ai' && <AiSection />}
           {activeSection === 'languages' && <LanguagesSection />}
+          {activeSection === 'ai' && <AiSection />}
+          {activeSection === 'system' && <SystemSection />}
+          {activeSection === 'defaultBrowser' && <DefaultBrowserSection />}
           {activeSection === 'about' && <AboutSection />}
 
           <div className="sett-footer">
