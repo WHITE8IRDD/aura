@@ -19,7 +19,9 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/preload/index.ts'),
           tab: resolve(__dirname, 'src/preload/tab.ts'),
-          mediaHubPopover: resolve(__dirname, 'src/preload/mediaHubPopover.ts')
+          mediaHubPopover: resolve(__dirname, 'src/preload/mediaHubPopover.ts'),
+          translatorPopover: resolve(__dirname, 'src/preload/translatorPopover.ts'),
+          imageSaverPopover: resolve(__dirname, 'src/preload/imageSaverPopover.ts')
         }
       }
     }
@@ -30,7 +32,9 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/renderer/index.html'),
-          mediaHubPopover: resolve(__dirname, 'src/renderer/mediaHubPopover.html')
+          mediaHubPopover: resolve(__dirname, 'src/renderer/mediaHubPopover.html'),
+          translatorPopover: resolve(__dirname, 'src/renderer/translatorPopover.html'),
+          imageSaverPopover: resolve(__dirname, 'src/renderer/imageSaverPopover.html')
         }
       }
     },

@@ -79,7 +79,9 @@ export function attachContextMenu(
   win: BrowserWindow,
   tabs: TabManager
 ): void {
-  wc.on('context-menu', (_event, params) => {
+  wc.on('context-menu', (event, params) => {
+    event.preventDefault()
+
     // PiP for video elements takes priority
     if (params.mediaType === 'video') {
       const menu = new Menu()
@@ -100,7 +102,12 @@ export function attachContextMenu(
       menu.append(new MenuItem({
         label: 'Save all images on this page\u2026',
         click: () => {
-          win.webContents.send('imageSaver:openBatch')
+          win.webContents.send('imageSaver:requestOpenFloating', {
+            srcURL: '',
+            pageRectX: params.x,
+            pageRectY: params.y,
+            sourceWcId: wc.id
+          })
         }
       }))
       menu.popup({ window: win })
@@ -129,6 +136,25 @@ export function attachContextMenu(
         { type: 'separator' },
         { label: `Search ${engineName} for "${truncatedText}"`, click: () => tabs.create(searchUrl(linkText)) }
       )
+
+      // If user also selected text, show Translate for the selection
+      const linkSelText = params.selectionText?.trim()
+      if (linkSelText) {
+        const linkSelTrunc = truncate(linkSelText, 30)
+        template.push(
+          { type: 'separator' },
+          {
+            label: `Translate "${linkSelTrunc}"`,
+            click: () => {
+              win.webContents.send('translator:requestOpenFloating', {
+                text: linkSelText,
+                pageRectX: params.x,
+                pageRectY: params.y
+              })
+            }
+          }
+        )
+      }
     }
 
     if (hasImage) {
@@ -157,15 +183,16 @@ export function attachContextMenu(
         { label: 'Copy Image Link', click: () => clipboard.writeText(srcURL) },
         { type: 'separator' },
         {
-          label: 'Save with options\u2026',
-          click: () => {
-            win.webContents.send('imageSaver:open', {
-              srcURL,
-              x: params.x,
-              y: params.y
-            })
-          }
-        },
+           label: 'Save with options\u2026',
+           click: () => {
+              win.webContents.send('imageSaver:requestOpenFloating', {
+                 srcURL,
+                 pageRectX: params.x,
+                 pageRectY: params.y,
+                 sourceWcId: wc.id
+               })
+             }
+           },
         { type: 'separator' },
         {
           label: 'Reverse Image Search',
@@ -199,10 +226,10 @@ export function attachContextMenu(
       template.push({
         label: `Translate "${truncated}"`,
         click: () => {
-          win.webContents.send('translator:requestSelection', {
+          win.webContents.send('translator:requestOpenFloating', {
             text: selText,
-            x: params.x,
-            y: params.y
+            pageRectX: params.x,
+            pageRectY: params.y
           })
         }
       })

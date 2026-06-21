@@ -23,8 +23,7 @@ import DownloadsPage from './pages/DownloadsPage'
 import ReadingListPage from './pages/ReadingListPage'
 import BoostsPage from './pages/BoostsPage'
 import SettingsPage from './pages/SettingsPage'
-import TranslatorPopover from './components/TranslatorPopover'
-import ImageSaverPopover from './components/ImageSaverPopover'
+
 import { AutofillSavePrompt } from './components/AutofillSavePrompt'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useLocalStorage } from './hooks/useLocalStorage'
@@ -383,6 +382,51 @@ export default function App(): React.ReactElement {
   }, [])
 
   useEffect(() => {
+    const unsub = window.aura.translator.onRequestOpenFloating((data) => {
+      const toolbar = document.querySelector('.chrome-top-row, [class*="chrome-top-row"]')
+      const bookmarksBar = document.querySelector('.bookmarks-bar, [class*="bookmarks-bar"]')
+      const sidebar = document.querySelector('.sidebar, [class*="sidebar"]')
+
+      const chromeOffsetTop = (toolbar?.getBoundingClientRect().bottom || 80) +
+        (bookmarksBar?.getBoundingClientRect().height || 0)
+      const chromeOffsetLeft = sidebar?.getBoundingClientRect().width || 0
+
+      window.aura.translator.openFloating({
+        text: data.text,
+        pageRectX: data.pageRectX,
+        pageRectY: data.pageRectY,
+        chromeOffsetTop,
+        chromeOffsetLeft
+      })
+    })
+    return unsub
+  }, [])
+
+  useEffect(() => {
+    const unsub = window.aura.imageSaver.onRequestOpenFloating((data) => {
+      const toolbar = document.querySelector('.chrome-top-row, [class*="chrome-top-row"]')
+      const bookmarksBar = document.querySelector('.bookmarks-bar, [class*="bookmarks-bar"]')
+      const sidebar = document.querySelector('.sidebar, [class*="sidebar"]')
+
+      const chromeOffsetTop = (toolbar?.getBoundingClientRect().bottom || 80) +
+        (bookmarksBar?.getBoundingClientRect().height || 0)
+      const chromeOffsetLeft = sidebar?.getBoundingClientRect().width || 0
+      const batchMode = !data.srcURL
+
+      window.aura.imageSaver.openFloating({
+        srcURL: data.srcURL || '',
+        batchMode,
+        sourceWcId: data.sourceWcId,
+        pageRectX: data.pageRectX,
+        pageRectY: data.pageRectY,
+        chromeOffsetTop,
+        chromeOffsetLeft
+      })
+    })
+    return unsub
+  }, [])
+
+  useEffect(() => {
     return window.aura.shortcuts.onScreenshot(async () => {
       if (activeId === null || !activeTab || activeTab.internal) return
       const result = await window.aura.tabs.screenshot(activeId, 'save')
@@ -621,9 +665,6 @@ export default function App(): React.ReactElement {
       />
 
       <AutofillSavePrompt />
-
-      <TranslatorPopover onClose={() => {}} />
-      <ImageSaverPopover onClose={() => {}} />
 
       {isResizing && (
         <div

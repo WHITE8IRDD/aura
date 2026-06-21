@@ -452,30 +452,75 @@ const api = {
     translate: (text: string, targetLang?: string): Promise<{ translatedText: string; detectedLang?: string; engine: string; error?: string }> =>
       ipcRenderer.invoke('translator:translate', text, targetLang),
     onSelectionRequest: (cb: (data: { text: string; x: number; y: number }) => void): (() => void) => {
-      const handler = (_e: Electron.IpcRendererEvent, data: { text: string; x: number; y: number }) => cb(data)
+      const handler = (_e: Electron.IpcRendererEvent, data: { text: string; x: number; y: number }) => {
+        cb(data)
+      }
       ipcRenderer.on('translator:requestSelection', handler)
       return () => ipcRenderer.removeListener('translator:requestSelection', handler)
+    },
+    openFloating: (anchor: {
+      text: string
+      pageRectX: number
+      pageRectY: number
+      chromeOffsetTop: number
+      chromeOffsetLeft: number
+    }) => ipcRenderer.send('translatorWindow:open', anchor),
+    onRequestOpenFloating: (cb: (data: {
+      text: string
+      pageRectX: number
+      pageRectY: number
+    }) => void): (() => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: { text: string; pageRectX: number; pageRectY: number }) => {
+        cb(data)
+      }
+      ipcRenderer.on('translator:requestOpenFloating', handler)
+      return () => ipcRenderer.removeListener('translator:requestOpenFloating', handler)
     }
   },
 
   imageSaver: {
-    saveWithFormat: (url: string, format: 'png' | 'jpg', quality: number): Promise<{ success: boolean; path?: string; error?: string }> =>
-      ipcRenderer.invoke('imageSaver:saveWithFormat', url, format, quality),
+    saveWithFormat: (url: string, format: 'png' | 'jpg', quality: number, sourceWcId?: number): Promise<{ success: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('imageSaver:saveWithFormat', url, format, quality, sourceWcId),
     batchSavePage: (format: 'png' | 'jpg', quality: number): Promise<{ success: boolean; count: number; folder?: string }> =>
       ipcRenderer.invoke('imageSaver:batchSavePage', format, quality),
-    copyToClipboard: async (url: string): Promise<boolean> => {
-      const result = await ipcRenderer.invoke('imageSaver:saveWithFormat', url, 'png', 100)
+    copyToClipboard: async (url: string, sourceWcId?: number): Promise<boolean> => {
+      const result = await ipcRenderer.invoke('imageSaver:saveWithFormat', url, 'png', 100, sourceWcId)
       return result.success
     },
     onOpen: (cb: (data: { srcURL: string; x: number; y: number }) => void): (() => void) => {
-      const handler = (_e: Electron.IpcRendererEvent, data: { srcURL: string; x: number; y: number }) => cb(data)
+      const handler = (_e: Electron.IpcRendererEvent, data: { srcURL: string; x: number; y: number }) => {
+        cb(data)
+      }
       ipcRenderer.on('imageSaver:open', handler)
       return () => ipcRenderer.removeListener('imageSaver:open', handler)
     },
     onOpenBatch: (cb: () => void): (() => void) => {
-      const handler = () => cb()
+      const handler = () => {
+        cb()
+      }
       ipcRenderer.on('imageSaver:openBatch', handler)
       return () => ipcRenderer.removeListener('imageSaver:openBatch', handler)
+    },
+    openFloating: (anchor: {
+      srcURL: string
+      batchMode: boolean
+      sourceWcId?: number
+      pageRectX: number
+      pageRectY: number
+      chromeOffsetTop: number
+      chromeOffsetLeft: number
+    }) => ipcRenderer.send('imageSaverWindow:open', anchor),
+    onRequestOpenFloating: (cb: (data: {
+      srcURL: string
+      pageRectX: number
+      pageRectY: number
+      sourceWcId?: number
+    }) => void): (() => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: { srcURL: string; pageRectX: number; pageRectY: number; sourceWcId?: number }) => {
+        cb(data)
+      }
+      ipcRenderer.on('imageSaver:requestOpenFloating', handler)
+      return () => ipcRenderer.removeListener('imageSaver:requestOpenFloating', handler)
     }
   },
 

@@ -76,6 +76,8 @@ import { registerProfileDataIPC } from './profileData'
 import { registerTabContextMenuIPC } from './tabContextMenuNative'
 import { registerTranslatorIPC } from './translator'
 import { registerImageSaverIPC } from './imageSaver'
+import { registerTranslatorWindowIPC } from './translatorWindow'
+import { registerImageSaverWindowIPC } from './imageSaverWindow'
 import { writeFile } from 'fs/promises'
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
@@ -506,6 +508,8 @@ registerClearBrowsingDataIPC()
 registerAutofillIPC()
 registerTranslatorIPC()
 registerImageSaverIPC()
+registerTranslatorWindowIPC()
+registerImageSaverWindowIPC()
 
 ipcMain.on('videoDl:request', async (_e, { url, filename }: { url: string; filename: string }) => {
   if (!url || url.startsWith('blob:') || url.startsWith('data:')) return
