@@ -3,6 +3,7 @@ import { IconSparkle, IconMic, IconPlus, IconMore } from '../components/Icons'
 import WidgetGrid from '../widgets/WidgetGrid'
 import { showNativeInputMenu } from '../lib/buildInputMenu'
 import { useSettings } from '../hooks/useSettings'
+import auraWordmark from '../assets/brand/aura-wordmark-colored.png'
 
 interface Props {
   onNavigate: (url: string) => void
@@ -60,6 +61,9 @@ export default function DashboardLight({
       <div className="dash-light-bg-glow" />
       <button className="layout-toggle-floating" onClick={onSwitchLayout}>Switch layout</button>
       <div className="dash-light-inner">
+        <div className="ntp-hero">
+          <img src={auraWordmark} alt="Aura" className="ntp-hero-wordmark-img" draggable={false} />
+        </div>
         <header className="dash-light-hero">
           <div className="dash-light-greeting-block">
             <h1 className="dash-light-title">What&apos;s on your mind?</h1>

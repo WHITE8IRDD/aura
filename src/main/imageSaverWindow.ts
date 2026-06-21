@@ -51,6 +51,7 @@ export function openImageSaverPopover(parent: BrowserWindow, anchor: ImageSaverA
     parent,
     hasShadow: true,
     backgroundColor: '#00000000',
+    icon: join(__dirname, '../../resources/icons/icon-256.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/imageSaverPopover.js'),
       contextIsolation: true,

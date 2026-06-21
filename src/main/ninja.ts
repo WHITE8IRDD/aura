@@ -43,6 +43,7 @@ export class NinjaWindowManager {
       trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 14 } : undefined,
       frame: process.platform === 'darwin',
       ...(process.platform === 'win32' && { thickFrame: true }),
+      icon: join(__dirname, '../../resources/icons/icon-256.png'),
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
         sandbox: true,

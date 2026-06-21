@@ -49,6 +49,7 @@ export function openTranslatorPopover(parent: BrowserWindow, anchor: TranslatorA
     parent,
     hasShadow: true,
     backgroundColor: '#00000000',
+    icon: join(__dirname, '../../resources/icons/icon-256.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/translatorPopover.js'),
       contextIsolation: true,

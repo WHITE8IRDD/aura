@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import type { TabState, TabGroup } from '../types'
 import { IconClose, IconPlus } from './Icons'
+import auraFavicon from '../assets/brand/aura-mark-colored.png'
 
 interface Props {
   tabs: TabState[]
@@ -178,6 +179,8 @@ function Tab({
       ) : tab.favicon ? (
         <img className="tab-favicon" src={tab.favicon} alt=""
           onError={(e) => { e.currentTarget.style.display = 'none' }} />
+      ) : tab.internal ? (
+        <img className="tab-favicon" src={auraFavicon} alt="" />
       ) : (
         <span className="tab-favicon-placeholder" aria-hidden="true" />
       )}

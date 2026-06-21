@@ -11,8 +11,9 @@ import { showToolbarMenu } from '../lib/showToolbarMenu'
 import { useSettings } from '../hooks/useSettings'
 import {
   IconBack, IconForward, IconReload, IconClose, IconLock, IconAlert,
-  IconSearch, IconMic, IconShield, IconBookmark, IconHome
+  IconSearch, IconMic, IconShield, IconBookmark
 } from './Icons'
+import auraBrandMark from '../assets/brand/aura-mark-colored.png'
 
 interface ToolbarMenuHandlers {
   bookmarksBarVisible: boolean
@@ -114,11 +115,6 @@ export default function Toolbar(props: Props): React.ReactElement {
   const [bookmarkAnchor, setBookmarkAnchor] = useState<DOMRect | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const bookmarkBtnRef = useRef<HTMLButtonElement>(null)
-
-  const handleHome = useCallback(() => {
-    const homeUrl = settings?.startupUrl || 'aura://newtab'
-    onNavigate(homeUrl)
-  }, [onNavigate, settings])
 
   useEffect(() => {
     if (!focused) setValue(url === 'aura://newtab' ? '' : url)
@@ -262,13 +258,16 @@ export default function Toolbar(props: Props): React.ReactElement {
           title={isLoading ? 'Stop' : 'Reload (Ctrl+R)'}>
           {isLoading ? <IconClose size={15} /> : <IconReload size={15} />}
         </button>
-        <button className="nav-btn toolbar-nav-btn"
-          onClick={(e) => { e.currentTarget.blur(); handleHome() }}
-          title="Home (Alt+Home)">
-          <IconHome size={16} />
-        </button>
         <div className="nav-divider" />
       </div>
+
+      <button
+        className="toolbar-brand-btn"
+        title="Aura — Home"
+        onClick={(e) => { e.currentTarget.blur(); onNavigate('aura://newtab') }}
+      >
+        <img src={auraBrandMark} alt="Aura" className="toolbar-brand-mark" />
+      </button>
 
       <div className="addressbar-wrap">
         <div className="addressbar-stack">

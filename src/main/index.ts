@@ -131,6 +131,12 @@ app.setName('Aura')
 const CHROME_HEIGHT = 84
 const SIDEBAR_WIDTH_DEFAULT = 52
 
+function resolveIcon(name: string): string {
+  const devPath = join(__dirname, '../../resources/icons', name)
+  if (require('fs').existsSync(devPath)) return devPath
+  return join(app.isPackaged ? process.resourcesPath : __dirname, 'icons', name)
+}
+
 let mainWindow: BrowserWindow | null = null
 let tabs: TabManager | null = null
 let ninja: NinjaWindowManager | null = null
@@ -175,6 +181,7 @@ async function createWindow(): Promise<void> {
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 14 } : undefined,
     frame: process.platform === 'darwin',
     ...(process.platform === 'win32' && { thickFrame: true }),
+    icon: resolveIcon('icon-256.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,
@@ -195,8 +202,10 @@ async function createWindow(): Promise<void> {
 
   ninja = new NinjaWindowManager(CHROME_HEIGHT, SIDEBAR_WIDTH_DEFAULT)
 
-  iconPath = join(__dirname, '../../resources/icon.png')
+  iconPath = resolveIcon('icon-32.png')
   initSystemIntegration(mainWindow, iconPath)
+
+  mainWindow.setIcon(nativeImage.createFromPath(resolveIcon('icon-256.png')))
   initPerformance()
 
   registerWindowControls(() => BrowserWindow.getFocusedWindow() ?? mainWindow)

@@ -687,6 +687,29 @@ button:focus-visible {
   width: 100%;
 }
 
+.ntp-hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 48px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.ntp-hero-wordmark-img {
+  height: 140px !important;
+  width: auto !important;
+  max-width: 90vw;
+  object-fit: contain;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.18));
+}
+
+@media (max-width: 720px) {
+  .ntp-hero-wordmark-img { height: 96px !important; }
+  .ntp-hero { margin-bottom: 32px; }
+}
+
 .aurora-searchbar {
   position: relative;
   display: flex;
@@ -3228,5 +3251,36 @@ html[data-ninja="true"] .ninja-pill,
 .util-btn.translator-active {
   color: var(--aura-secondary);
   background: rgba(166,192,241,0.1);
+}
+
+/* ====================================================================
+   Toolbar brand mark
+   ==================================================================== */
+.toolbar-brand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0 4px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.toolbar-brand-btn:hover {
+  background: var(--hover-bg);
+}
+
+.toolbar-brand-mark {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  -webkit-user-drag: none;
+  pointer-events: none;
 }
 

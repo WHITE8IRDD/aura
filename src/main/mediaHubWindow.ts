@@ -51,6 +51,7 @@ export function openMediaHubPopover(
     parent,
     hasShadow: true,
     backgroundColor: '#00000000',
+    icon: join(__dirname, '../../resources/icons/icon-256.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/mediaHubPopover.js'),
       contextIsolation: true,
