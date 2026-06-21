@@ -1,6 +1,6 @@
 {
   "name": "aura",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Aura — the fastest and most secure consumer browser, with AI built in.",
   "author": "Aura",
   "main": "out/main/index.js",
@@ -29,7 +29,9 @@
     "productName": "Aura",
     "win": {
       "icon": "resources/icons/icon-256.png",
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "nsis": {
       "installerIcon": "resources/icons/icon.ico",

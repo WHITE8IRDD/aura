@@ -575,6 +575,11 @@ const api = {
     }> => ipcRenderer.invoke('profile:importData')
   },
 
+  perfHud: {
+    toggle: (anchor?: { x: number; y: number; width: number; height: number }) =>
+      ipcRenderer.send('perf-hud:toggle', anchor),
+  },
+
   media: {
     getActiveTabs: (): Promise<Array<{
       id: number; title: string; url: string; favicon?: string

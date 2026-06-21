@@ -141,4 +141,9 @@ export const IconHome = (p: IconProps): React.ReactElement => (
     <polyline points="9 22 9 12 15 12 15 22" />
   </I>
 )
+export const IconActivity = (p: IconProps): React.ReactElement => (
+  <I {...p}>
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  </I>
+)
 

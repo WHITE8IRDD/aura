@@ -21,7 +21,8 @@ export default defineConfig({
           tab: resolve(__dirname, 'src/preload/tab.ts'),
           mediaHubPopover: resolve(__dirname, 'src/preload/mediaHubPopover.ts'),
           translatorPopover: resolve(__dirname, 'src/preload/translatorPopover.ts'),
-          imageSaverPopover: resolve(__dirname, 'src/preload/imageSaverPopover.ts')
+          imageSaverPopover: resolve(__dirname, 'src/preload/imageSaverPopover.ts'),
+          perfHud: resolve(__dirname, 'src/preload/perfHud.ts')
         }
       }
     }
@@ -34,7 +35,8 @@ export default defineConfig({
           index: resolve(__dirname, 'src/renderer/index.html'),
           mediaHubPopover: resolve(__dirname, 'src/renderer/mediaHubPopover.html'),
           translatorPopover: resolve(__dirname, 'src/renderer/translatorPopover.html'),
-          imageSaverPopover: resolve(__dirname, 'src/renderer/imageSaverPopover.html')
+          imageSaverPopover: resolve(__dirname, 'src/renderer/imageSaverPopover.html'),
+          'perf-hud': resolve(__dirname, 'src/renderer/perf-hud/index.html')
         }
       }
     },

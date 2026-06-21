@@ -11,7 +11,7 @@ import { showToolbarMenu } from '../lib/showToolbarMenu'
 import { useSettings } from '../hooks/useSettings'
 import {
   IconBack, IconForward, IconReload, IconClose, IconLock, IconAlert,
-  IconSearch, IconMic, IconShield, IconBookmark
+  IconSearch, IconMic, IconShield, IconBookmark, IconActivity
 } from './Icons'
 import auraBrandMark from '../assets/brand/aura-mark-colored.png'
 
@@ -267,6 +267,22 @@ export default function Toolbar(props: Props): React.ReactElement {
         onClick={(e) => { e.currentTarget.blur(); onNavigate('aura://newtab') }}
       >
         <img src={auraBrandMark} alt="Aura" className="toolbar-brand-mark" />
+      </button>
+
+      <button
+        className="toolbar-perf-btn"
+        title="Performance HUD (Ctrl+Shift+P)"
+        onClick={(e) => {
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+          window.aura.perfHud.toggle({
+            x: Math.round(rect.left),
+            y: Math.round(rect.top),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          })
+        }}
+      >
+        <IconActivity size={16} />
       </button>
 
       <div className="addressbar-wrap">

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage, globalShortcut } from 'electron'
 import { join } from 'path'
 import { TabManager } from './tabs'
 import { registerInputContextMenuIPC } from './inputContextMenu'
@@ -78,6 +78,7 @@ import { registerTranslatorIPC } from './translator'
 import { registerImageSaverIPC } from './imageSaver'
 import { registerTranslatorWindowIPC } from './translatorWindow'
 import { registerImageSaverWindowIPC } from './imageSaverWindow'
+import { registerPerfHudWindowIPC, togglePerfHud } from './perfHudWindow'
 import { writeFile } from 'fs/promises'
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
@@ -211,6 +212,12 @@ async function createWindow(): Promise<void> {
   registerWindowControls(() => BrowserWindow.getFocusedWindow() ?? mainWindow)
   wireMaximizeEvents(mainWindow)
   registerShortcuts(mainWindow, tabs)
+
+  globalShortcut.register('CommandOrControl+Shift+P', () => {
+    const focused = BrowserWindow.getFocusedWindow()
+    const parent = focused ?? mainWindow
+    if (parent) togglePerfHud(parent)
+  })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -519,6 +526,7 @@ registerTranslatorIPC()
 registerImageSaverIPC()
 registerTranslatorWindowIPC()
 registerImageSaverWindowIPC()
+registerPerfHudWindowIPC()
 
 ipcMain.on('videoDl:request', async (_e, { url, filename }: { url: string; filename: string }) => {
   if (!url || url.startsWith('blob:') || url.startsWith('data:')) return
@@ -561,6 +569,10 @@ app.on('before-quit', () => {
     }
   }
   maybeClearOnQuit()
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
 })
 
 app.on('window-all-closed', () => {

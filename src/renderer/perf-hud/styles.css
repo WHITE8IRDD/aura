@@ -1,0 +1,386 @@
+/* ════════════════════════════════════════════════════════════════
+   PERFORMANCE HUD — Native macOS/iOS-inspired design
+   ════════════════════════════════════════════════════════════════ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Surface */
+  --surface:           rgba(28, 28, 32, 0.78);
+  --surface-elev:      rgba(255, 255, 255, 0.04);
+  --hairline:          rgba(255, 255, 255, 0.08);
+
+  /* Text */
+  --text:              rgba(255, 255, 255, 0.96);
+  --text-secondary:    rgba(255, 255, 255, 0.62);
+  --text-tertiary:     rgba(255, 255, 255, 0.42);
+
+  /* Semantic — Apple-style system colors */
+  --ok:                #30d158;     /* systemGreen */
+  --warn:              #ff9f0a;     /* systemOrange */
+  --danger:            #ff453a;     /* systemRed */
+  --accent:            #0a84ff;     /* systemBlue */
+  --accent-soft:       rgba(10, 132, 255, 0.16);
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  font-family: -apple-system, 'SF Pro Display', 'Inter',
+    BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  overflow: hidden;
+  letter-spacing: -0.01em;
+}
+
+/* ── SHELL ────────────────────────────────────────────────────── */
+.hud-shell {
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  backdrop-filter: blur(40px) saturate(1.8);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.48),
+    0 2px 8px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  position: relative;
+}
+
+.hud-shell::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 120px;
+  background: radial-gradient(ellipse 80% 100% at 50% 0%,
+    rgba(255, 255, 255, 0.05), transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── DRAG HANDLE ──────────────────────────────────────────────── */
+.hud-drag {
+  height: 14px;
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+}
+
+/* ── HERO METRIC ──────────────────────────────────────────────── */
+.hud-hero {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 4px 20px 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.hud-hero-left { flex: 1; min-width: 0; }
+
+.hud-hero-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+}
+
+.hud-hero-value {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum', 'cv11';
+}
+
+.hud-hero-unit {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  margin-left: 2px;
+}
+
+.hud-hero-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+}
+
+.hud-hero-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.hud-hero-status.tone-ok      { color: var(--ok); }
+.hud-hero-status.tone-warn    { color: var(--warn); }
+.hud-hero-status.tone-danger  { color: var(--danger); }
+.hud-hero-status.tone-neutral { color: var(--text-secondary); }
+
+.hud-hero-spark {
+  width: 130px;
+  flex-shrink: 0;
+}
+
+/* ── TAB SWITCHER ─────────────────────────────────────────────── */
+.hud-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 16px 14px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 9px;
+  position: relative;
+  z-index: 1;
+}
+
+.hud-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+  font-family: inherit;
+  letter-spacing: -0.01em;
+}
+
+.hud-tab:hover {
+  color: var(--text);
+}
+
+.hud-tab.active {
+  background: rgba(255, 255, 255, 0.10);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+/* ── LIST CONTENT ─────────────────────────────────────────────── */
+.hud-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.hud-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 4px;
+  border-bottom: 0.5px solid var(--hairline);
+}
+
+.hud-row:last-child { border-bottom: none; }
+
+.hud-row-label {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.hud-row-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.hud-row-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.hud-row-sub {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── PROCESS LIST ─────────────────────────────────────────────── */
+.hud-proc-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.hud-proc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px;
+  border-radius: 8px;
+  transition: background 0.12s ease;
+}
+
+.hud-proc-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.hud-proc-icon {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.hud-proc-favicon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  border-radius: 3px;
+}
+
+.hud-proc-glyph {
+  font-size: 13px;
+  line-height: 1;
+}
+.hud-proc-glyph.tone-accent { color: var(--accent); }
+.hud-proc-glyph.tone-warn   { color: var(--warn); }
+.hud-proc-glyph.tone-muted  { color: var(--text-tertiary); }
+
+.hud-proc-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hud-proc-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.hud-proc-meta {
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.hud-proc-cpu {
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  min-width: 44px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.hud-proc-cpu.tone-ok     { color: var(--text-secondary); }
+.hud-proc-cpu.tone-warn   { color: var(--warn); }
+.hud-proc-cpu.tone-danger { color: var(--danger); }
+
+/* ── SCROLLBARS ───────────────────────────────────────────────── */
+.hud-list::-webkit-scrollbar,
+.hud-proc-list::-webkit-scrollbar { width: 4px; }
+.hud-list::-webkit-scrollbar-track,
+.hud-proc-list::-webkit-scrollbar-track { background: transparent; }
+.hud-list::-webkit-scrollbar-thumb,
+.hud-proc-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+
+/* ── FOOTER ───────────────────────────────────────────────────── */
+.hud-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px 14px;
+  border-top: 0.5px solid var(--hairline);
+  position: relative;
+  z-index: 1;
+}
+
+.hud-footer-time {
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+}
+
+.hud-footer-close {
+  background: var(--accent);
+  border: none;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: -0.01em;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.hud-footer-close:hover {
+  background: #0070e0;
+}
+
+.hud-footer-close:active {
+  transform: scale(0.96);
+}
+
+/* ── LOADING STATE ────────────────────────────────────────────── */
+.hud-loading {
+  flex: 1;
+  display: grid;
+  place-items: center;
+}
+
+.hud-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.85s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }

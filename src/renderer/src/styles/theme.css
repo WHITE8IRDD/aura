@@ -3284,3 +3284,27 @@ html[data-ninja="true"] .ninja-pill,
   pointer-events: none;
 }
 
+.toolbar-perf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0 2px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+.toolbar-perf-btn:hover {
+  background: var(--bg-elev);
+  color: var(--text);
+}
+.toolbar-perf-btn:active {
+  transform: scale(0.94);
+}
+
