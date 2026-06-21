@@ -26,6 +26,7 @@ export interface TabState {
   groupId: string | null
   hasAudio: boolean
   fullscreen: boolean
+  workspaceId: string
 }
 
 export interface TabRecord {
@@ -43,6 +44,7 @@ export interface TabRecord {
   loadingTimeout: NodeJS.Timeout | null
   hasAudio: boolean
   fullscreen: boolean
+  workspaceId: string
 }
 
 interface ClosedTab { url: string; title: string; closedAt: number }
@@ -140,6 +142,28 @@ export class TabManager {
 
   getWindow(): BrowserWindow { return this.win }
   getActiveId(): number | null { return this.activeId }
+
+  /**
+   * Returns the full tab manager state for the `tabs:getState` IPC channel.
+   * Shape matches what the renderer's `tabs.onUpdate` consumer expects.
+   */
+  getState(): { tabs: TabState[]; activeId: number | null } {
+    return this.snapshot()
+  }
+
+  getChromeHeight(): number { return this.chromeHeight }
+  getSidebarWidth(): number { return this.sidebarWidth }
+  getTab(id: number): TabRecord | undefined { return this.records.get(id) }
+
+  /** Optional callback for custom layout override (e.g. split view) */
+  customLayout: ((activeId: number) => boolean) | null = null
+
+  /** Callback invoked after a tab is activated */
+  onAfterActivate: ((id: number) => void) | null = null
+
+  /** Callback invoked before a tab is closed */
+  onBeforeClose: ((id: number) => void) | null = null
+
   setSidebarWidth(w: number): void { this.sidebarWidth = Math.max(0, w); this.layout() }
 
   getMediaTabs(): Array<{
@@ -192,7 +216,8 @@ export class TabManager {
       lastActiveAt: Date.now(),
       loadingTimeout: null,
       hasAudio: false,
-      fullscreen: false
+      fullscreen: false,
+      workspaceId: '00000000-0000-0000-0000-000000000001'
     }
     this.records.set(id, rec)
     if (afterId !== undefined) {
@@ -203,13 +228,15 @@ export class TabManager {
       this.order.push(id)
     }
     this.normalizeOrder()
-    if (!isInternal(url)) this.attachView(rec, url)
+    this.attachView(rec, url)
     this.activate(id)
     return id
   }
 
   close(id: number): void {
     const rec = this.records.get(id); if (!rec) return
+    // STAGE 10C.4: notify split manager before closing
+    if (this.onBeforeClose) this.onBeforeClose(id)
     if (!this.isPrivate && rec.view && rec.url.startsWith('http')) {
       this.closedStack.unshift({ url: rec.url, title: rec.title, closedAt: Date.now() })
       if (this.closedStack.length > CLOSED_STACK_LIMIT) this.closedStack.length = CLOSED_STACK_LIMIT
@@ -252,11 +279,14 @@ export class TabManager {
     for (const r of this.records.values()) {
       if (!r.view) continue
       if (r.id === id) {
-        this.win.contentView.addChildView(r.view)
-        if (!this.viewHidden) r.view.setVisible(true)
+        if (!isInternal(r.url)) {
+          this.win.contentView.addChildView(r.view)
+          if (!this.viewHidden) r.view.setVisible(true)
+        }
       } else r.view.setVisible(false)
     }
     this.layout(); this.emit()
+    if (this.onAfterActivate) this.onAfterActivate(id)
   }
 
   navigate(id: number, rawUrl: string): void {
@@ -264,16 +294,22 @@ export class TabManager {
     const url = normalizeInput(rawUrl)
     rec.lastActiveAt = Date.now()
     if (isInternal(url)) {
-      if (rec.view) this.destroyView(rec)
       rec.url = url
-      rec.title = 'New Tab'
+      rec.title = url === 'aura://newtab' ? 'New Tab' : url
       rec.favicon = null
       rec.loading = false
+      if (rec.view) {
+        try { this.win.contentView.removeChildView(rec.view) } catch {}
+        rec.view.setVisible(false)
+      }
       this.activate(id)
       return
     }
-    if (!rec.view) this.attachView(rec, url)
-    else rec.view.webContents.loadURL(url)
+    rec.url = url
+    rec.title = url
+    rec.favicon = null
+    this.win.contentView.addChildView(rec.view)
+    rec.view.webContents.loadURL(url)
     if (this.activeId === id) this.activate(id)
   }
 
@@ -546,8 +582,10 @@ export class TabManager {
 
     this.wireEvents(rec)
     attachContextMenu(view.webContents, this.win, this)
-    this.win.contentView.addChildView(view)
-    view.webContents.loadURL(url)
+    if (!isInternal(url)) {
+      this.win.contentView.addChildView(view)
+      view.webContents.loadURL(url)
+    }
   }
 
   private destroyView(rec: TabRecord): void {
@@ -634,18 +672,21 @@ export class TabManager {
     })
   }
 
-  private layout(): void {
+  layout(): void {
     if (this.activeId === null) return
     const rec = this.records.get(this.activeId)
     if (!rec?.view) return
 
-    // STAGE 8.8: if fullscreen, view fills the entire window
+    // STAGE 8.8: if fullscreen, view fills the entire window (takes priority over split)
     if (this.fullscreenTabId === this.activeId) {
       const { width, height } = this.win.getContentBounds()
       if (width === 0 || height === 0) return
       rec.view.setBounds({ x: 0, y: 0, width, height })
       return
     }
+
+    // STAGE 10C.4: allow custom layout override (e.g. split view)
+    if (this.customLayout && this.customLayout(this.activeId)) return
 
     const { width, height } = this.win.getContentBounds()
     if (width === 0 || height === 0) return
@@ -664,16 +705,17 @@ export class TabManager {
       return {
         id: r.id, url: r.url, title: r.title || 'New Tab',
         favicon: r.favicon, loading: r.loading,
-        internal: r.view === null,
+        internal: isInternal(r.url),
         canGoBack: wc ? wc.canGoBack() : false,
         canGoForward: wc ? wc.canGoForward() : false,
         pinned: r.pinned, muted: r.muted,
         zoomFactor: r.zoomFactor, findMatches: r.findMatches,
-        sleeping: r.view === null && !isInternal(r.url),
+        sleeping: false,
         lastActiveAt: r.lastActiveAt,
         groupId: group?.id ?? null,
         hasAudio: r.hasAudio,
-        fullscreen: r.fullscreen
+        fullscreen: r.fullscreen,
+        workspaceId: r.workspaceId
       } satisfies TabState
     })
     return { tabs, activeId: this.activeId }
@@ -701,13 +743,13 @@ export class TabManager {
       .map((id, idx) => {
         const r = this.records.get(id)
         if (!r) return null
-        return { url: r.url, title: r.title, pinned: r.pinned, active: id === this.activeId, order: idx }
+        return { url: r.url, title: r.title, pinned: r.pinned, active: id === this.activeId, order: idx, workspaceId: r.workspaceId }
       })
       .filter((t): t is NonNullable<typeof t> => t !== null)
     saveTabs(persistable)
   }
 
-  private emit(): void {
+  emit(): void {
     if (this.win.isDestroyed()) return
     if (this.emitTimer) return
     this.emitTimer = setTimeout(() => {

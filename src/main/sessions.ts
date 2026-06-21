@@ -7,7 +7,7 @@ export interface SavedTab {
   groupId: number | null
 }
 
-export function saveTabs(tabs: { url: string; title: string; pinned: boolean; active: boolean; order: number }[], windowId: number = 0): void {
+export function saveTabs(tabs: { url: string; title: string; pinned: boolean; active: boolean; order: number; workspaceId?: string }[], windowId: number = 0): void {
   const db = getDb()
   const persistable = tabs.filter(t => {
     if (!t.url) return false
@@ -18,11 +18,11 @@ export function saveTabs(tabs: { url: string; title: string; pinned: boolean; ac
   const tx = db.transaction(() => {
     db.prepare('DELETE FROM tab_sessions WHERE window_id = ?').run(windowId)
     const insert = db.prepare(`
-      INSERT INTO tab_sessions (window_id, tab_order, url, title, pinned, group_id, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, unixepoch())
+      INSERT INTO tab_sessions (window_id, tab_order, url, title, pinned, group_id, workspace_id, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, unixepoch())
     `)
     persistable.forEach((tab, index) => {
-      insert.run(windowId, index, tab.url, tab.title ?? null, tab.pinned ? 1 : 0, null)
+      insert.run(windowId, index, tab.url, tab.title ?? null, tab.pinned ? 1 : 0, null, tab.workspaceId ?? null)
     })
   })
   tx()

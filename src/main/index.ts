@@ -79,7 +79,9 @@ import { registerImageSaverIPC } from './imageSaver'
 import { registerTranslatorWindowIPC } from './translatorWindow'
 import { registerImageSaverWindowIPC } from './imageSaverWindow'
 import { registerPerfHudWindowIPC, togglePerfHud } from './perfHudWindow'
+import { SplitManager } from './splitManager'
 import { writeFile } from 'fs/promises'
+
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
 applyStartupFlags()
@@ -129,6 +131,24 @@ process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true'
 
 app.setName('Aura')
 
+// ─── Single-instance lock ─────────────────────────────────────
+// Prevents zombie processes from holding ports/cache directories.
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  console.log('[Aura] Another instance is already running. Exiting.')
+  app.quit()
+  process.exit(0)
+} else {
+  app.on('second-instance', () => {
+    const wins = BrowserWindow.getAllWindows()
+    if (wins.length > 0) {
+      const w = wins[0]
+      if (w.isMinimized()) w.restore()
+      w.focus()
+    }
+  })
+}
+
 const CHROME_HEIGHT = 84
 const SIDEBAR_WIDTH_DEFAULT = 52
 
@@ -140,6 +160,7 @@ function resolveIcon(name: string): string {
 
 let mainWindow: BrowserWindow | null = null
 let tabs: TabManager | null = null
+let splitManager: SplitManager | null = null
 let ninja: NinjaWindowManager | null = null
 let iconPath = ''
 
@@ -201,6 +222,23 @@ async function createWindow(): Promise<void> {
   tabs = new TabManager(mainWindow, CHROME_HEIGHT, false)
   tabs.setSidebarWidth(SIDEBAR_WIDTH_DEFAULT)
 
+  // STAGE 10C.4 — Split View
+  splitManager = new SplitManager(mainWindow)
+  tabs.customLayout = (activeId) => {
+    if (!splitManager) return false
+    if (!splitManager.isSplit(activeId)) return false
+    splitManager.layoutForTab(tabs!, activeId)
+    return true
+  }
+  tabs.onAfterActivate = (id) => {
+    if (!splitManager) return
+    splitManager.showForTab(id)
+  }
+  tabs.onBeforeClose = (id) => {
+    if (!splitManager) return
+    splitManager.closeSplitForTabAndEmit(tabs!, id)
+  }
+
   ninja = new NinjaWindowManager(CHROME_HEIGHT, SIDEBAR_WIDTH_DEFAULT)
 
   iconPath = resolveIcon('icon-32.png')
@@ -217,6 +255,23 @@ async function createWindow(): Promise<void> {
     const focused = BrowserWindow.getFocusedWindow()
     const parent = focused ?? mainWindow
     if (parent) togglePerfHud(parent)
+  })
+
+  // STAGE 10C.4 — Split View toggle shortcut
+  globalShortcut.register('CommandOrControl+\\', () => {
+    const focused = BrowserWindow.getFocusedWindow()
+    if (!focused || !tabs || !splitManager) return
+    const activeId = tabs.getActiveId()
+    if (activeId === null) return
+    if (splitManager.isSplit(activeId)) {
+      splitManager.closeSplitForTabAndEmit(tabs, activeId)
+    } else {
+      const state = tabs.getState()
+      const other = state.tabs.find((t) => t.id !== activeId)
+      if (other) {
+        splitManager.openSplit(tabs, activeId, other.url)
+      }
+    }
   })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
@@ -262,6 +317,7 @@ async function createWindow(): Promise<void> {
   })
 
   mainWindow.on('closed', () => {
+    if (splitManager) { splitManager.cleanup(); splitManager = null }
     mainWindow = null
     tabs = null
   })
@@ -282,16 +338,42 @@ function getTabsForEvent(e: Electron.IpcMainInvokeEvent): TabManager | null {
 registerInputContextMenuIPC()
 registerToolbarContextMenuIPC()
 
+function getSplitManager(e: Electron.IpcMainInvokeEvent): SplitManager | null {
+  const win = BrowserWindow.fromWebContents(e.sender)
+  if (!win || win !== mainWindow) return null
+  return splitManager
+}
+
 // ---- Tab IPC ----
 ipcMain.handle('tabs:create', (e, url?: string) => getTabsForEvent(e)?.create(url))
 ipcMain.handle('tabs:close', (e, id: number) => getTabsForEvent(e)?.close(id))
-ipcMain.handle('tabs:activate', (e, id: number) => getTabsForEvent(e)?.activate(id))
+ipcMain.handle('tabs:activate', (e, id: number) => {
+  const tm = getTabsForEvent(e)
+  if (!tm) return
+  // STAGE 10C.4: hide split views for the previously active tab
+  const sm = getSplitManager(e)
+  const prevId = tm.getActiveId()
+  if (prevId !== null && sm) sm.hideForTab(prevId)
+  tm.activate(id)
+})
 ipcMain.handle('tabs:navigate', (e, id: number, url: string) =>
   getTabsForEvent(e)?.navigate(id, url))
 ipcMain.handle('tabs:goBack', (e, id: number) => getTabsForEvent(e)?.goBack(id))
 ipcMain.handle('tabs:goForward', (e, id: number) => getTabsForEvent(e)?.goForward(id))
 ipcMain.handle('tabs:reload', (e, id: number) => getTabsForEvent(e)?.reload(id))
-ipcMain.handle('tabs:getState', (e) => getTabsForEvent(e)?.getState())
+ipcMain.handle('tabs:getState', (e) => {
+  try {
+    const mgr = getTabsForEvent(e)
+    if (!mgr) {
+      console.warn('[tabs:getState] no TabManager for event sender')
+      return { tabs: [], activeId: null }
+    }
+    return mgr.getState()
+  } catch (err) {
+    console.error('[tabs:getState] threw', err)
+    return { tabs: [], activeId: null }
+  }
+})
 ipcMain.handle('tabs:reorder', (e, fromId: number, toIndex: number) =>
   getTabsForEvent(e)?.reorder(fromId, toIndex))
 ipcMain.handle('tabs:pin', (e, id: number) => getTabsForEvent(e)?.pin(id))
@@ -366,6 +448,82 @@ ipcMain.on('tab:wheelZoom', (e, direction: 'in' | 'out') => {
       return
     }
   }
+})
+
+// STAGE 10C.4 — Split View IPC
+ipcMain.handle('split:open', (e, tabId: number, url: string) => {
+  const tm = getTabsForEvent(e)
+  const sm = getSplitManager(e)
+  if (!tm || !sm) return
+  sm.openSplit(tm, tabId, url)
+})
+ipcMain.handle('split:close', (e, tabId: number) => {
+  const tm = getTabsForEvent(e)
+  const sm = getSplitManager(e)
+  if (!tm || !sm) return
+  sm.closeSplitForTabAndEmit(tm, tabId)
+})
+ipcMain.handle('split:isSplit', (e, tabId: number) => {
+  const sm = getSplitManager(e)
+  return sm?.isSplit(tabId) ?? false
+})
+ipcMain.handle('split:getState', (e, tabId: number) => {
+  const sm = getSplitManager(e)
+  const state = sm?.getSplit(tabId)
+  if (!state) return null
+  return {
+    tabId: state.tabId,
+    splitUrl: state.splitUrl,
+    focusedPane: state.focusedPane,
+    ratio: state.ratio
+  }
+})
+ipcMain.handle('split:setFocusedPane', (e, tabId: number, pane: 'primary' | 'split') => {
+  const sm = getSplitManager(e)
+  sm?.setFocusedPane(tabId, pane)
+})
+ipcMain.handle('split:toggleFocusedPane', (e, tabId: number) => {
+  const sm = getSplitManager(e)
+  sm?.toggleFocusedPane(tabId)
+})
+ipcMain.handle('split:navigateFocused', (e, tabId: number, url: string) => {
+  const tm = getTabsForEvent(e)
+  const sm = getSplitManager(e)
+  if (!tm || !sm) return
+  sm.navigateFocusedPane(tm, tabId, url)
+})
+ipcMain.handle('split:navigateNonFocused', (e, tabId: number, url: string) => {
+  const tm = getTabsForEvent(e)
+  const sm = getSplitManager(e)
+  if (!tm || !sm) return
+  sm.navigateNonFocusedPane(tm, tabId, url)
+})
+ipcMain.handle('split:navigateSplitPane', (e, tabId: number, url: string) => {
+  const sm = getSplitManager(e)
+  sm?.navigateSplitPane(tabId, url)
+})
+ipcMain.handle('split:setRatio', (e, tabId: number, ratio: number) => {
+  const sm = getSplitManager(e)
+  sm?.setRatio(tabId, ratio)
+})
+ipcMain.handle('split:getAll', (e) => {
+  const sm = getSplitManager(e)
+  if (!sm) return []
+  const tm = getTabsForEvent(e)
+  if (!tm) return []
+  const result: Array<{ tabId: number; splitUrl: string; focusedPane: 'primary' | 'split'; ratio: number }> = []
+  for (const id of (tm as unknown as { order: number[] }).order) {
+    const state = sm.getSplit(id)
+    if (state) {
+      result.push({
+        tabId: state.tabId,
+        splitUrl: state.splitUrl,
+        focusedPane: state.focusedPane,
+        ratio: state.ratio
+      })
+    }
+  }
+  return result
 })
 
 ipcMain.handle('layout:setSidebarWidth', (e, width: number) =>

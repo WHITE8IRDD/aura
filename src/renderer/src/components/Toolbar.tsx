@@ -86,7 +86,6 @@ function engineDisplayName(engine: string): string {
 
 export default function Toolbar(props: Props): React.ReactElement {
 
-
   const {
     tab, onBack, onForward, onReload, onNavigate, focusSignal,
     onOpenHistory, onOpenDownloads,

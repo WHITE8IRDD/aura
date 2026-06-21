@@ -25,6 +25,7 @@ export default function TabBar({
     e.stopPropagation()
 
     const canReopenClosed = await window.aura.tabs.hasClosedTabs()
+    const isSplit = await window.aura.split.isSplit(tab.id)
 
     const action = await window.aura.tabContextMenu.show({
       tabId: tab.id,
@@ -33,7 +34,8 @@ export default function TabBar({
       inGroup: tab.groupId != null,
       isActive: tab.id === activeId,
       canCloseOthers: tabs.length >= 2,
-      canReopenClosed
+      canReopenClosed,
+      isSplit
     })
 
     if (!action) return
@@ -89,6 +91,12 @@ export default function TabBar({
       case 'reopen-closed':
         window.aura.tabs.reopenClosed()
         break
+      case 'open-in-split':
+        window.aura.split.open(tab.id, tab.url || 'aura://newtab')
+        break
+      case 'close-split':
+        window.aura.split.close(tab.id)
+        break
     }
   }
 
@@ -136,6 +144,18 @@ interface TabProps {
 function Tab({
   tab, isActive, vertical, onSelect, onClose, onContextMenu
 }: TabProps): React.ReactElement {
+  const [hasSplit, setHasSplit] = useState(false)
+
+  useEffect(() => {
+    window.aura.split.isSplit(tab.id).then(setHasSplit)
+  }, [tab.id])
+
+  useEffect(() => {
+    return window.aura.split.onSplitChanged(() => {
+      window.aura.split.isSplit(tab.id).then(setHasSplit)
+    })
+  }, [tab.id])
+
   const handleMouseDown = (e: React.MouseEvent): void => {
     if (e.button === 0) {
       onSelect(tab.id)
@@ -184,6 +204,8 @@ function Tab({
       ) : (
         <span className="tab-favicon-placeholder" aria-hidden="true" />
       )}
+
+      {hasSplit && <span className="tab-split-badge" title="Split view active">||</span>}
 
       {tab.muted && <span className="tab-muted-indicator" title="Muted">🔇</span>}
 

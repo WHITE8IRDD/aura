@@ -8,6 +8,7 @@ export interface TabMenuContext {
   isActive: boolean
   canCloseOthers: boolean
   canReopenClosed: boolean
+  isSplit: boolean
 }
 
 export type TabMenuAction =
@@ -25,6 +26,8 @@ export type TabMenuAction =
   | { type: 'close-right' }
   | { type: 'close-duplicates' }
   | { type: 'reopen-closed' }
+  | { type: 'open-in-split' }
+  | { type: 'close-split' }
   | null
 
 export function showTabContextMenu(
@@ -67,6 +70,11 @@ export function showTabContextMenu(
         click: () => respond({ type: 'duplicate' })
       },
       { type: 'separator' },
+      {
+        label: ctx.isSplit ? 'Close Split View' : 'Open in Split View',
+        accelerator: 'CmdOrCtrl+\\',
+        click: () => respond(ctx.isSplit ? { type: 'close-split' } : { type: 'open-in-split' })
+      },
       {
         label: 'Bookmark Tab\u2026',
         click: () => respond({ type: 'bookmark' })

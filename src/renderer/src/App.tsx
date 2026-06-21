@@ -24,6 +24,7 @@ import ReadingListPage from './pages/ReadingListPage'
 import BoostsPage from './pages/BoostsPage'
 import SettingsPage from './pages/SettingsPage'
 
+import SplitOverlay from './components/SplitOverlay'
 import { AutofillSavePrompt } from './components/AutofillSavePrompt'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useLocalStorage } from './hooks/useLocalStorage'
@@ -292,7 +293,7 @@ export default function App(): React.ReactElement {
   const handleNavigate = useCallback(
     (value: string) => {
       setChromePage(null)
-      if (activeId !== null) window.aura.tabs.navigate(activeId, value)
+      if (activeId !== null) window.aura.split.navigateFocused(activeId, value)
     },
     [activeId]
   )
@@ -343,7 +344,6 @@ export default function App(): React.ReactElement {
         : (idx + 1) % tabs.length
       window.aura.tabs.activate(tabs[next].id)
     },
-    onSwitchTab: (i) => { if (tabs[i]) window.aura.tabs.activate(tabs[i].id) },
     onToggleSidebar: () => setSidebarCollapsed((c) => !c)
   })
 
@@ -530,14 +530,14 @@ export default function App(): React.ReactElement {
           {!verticalTabs && (
             <div className="chrome-top-row">
               <TabBar
-                tabs={tabs}
-                activeId={activeId}
-                onSelect={handleSelect}
-                onClose={handleClose}
-                onNew={handleNew}
-                isPrivate={isPrivate}
-                onChangeGroup={handleChangeGroup}
-              />
+              tabs={tabs}
+              activeId={activeId}
+              onSelect={handleSelect}
+              onClose={handleClose}
+              onNew={handleNew}
+              isPrivate={isPrivate}
+              onChangeGroup={handleChangeGroup}
+            />
               <div className="drag-spacer" />
               <WindowControls />
             </div>
@@ -607,6 +607,8 @@ export default function App(): React.ReactElement {
                 : <NewTabDashboard onNavigate={handleNavigate} />
               : null}
         </div>
+
+        <SplitOverlay activeId={activeId} />
 
         <FindBar
           visible={findBarOpen}

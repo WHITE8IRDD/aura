@@ -41,19 +41,9 @@ export function registerShortcuts(win: BrowserWindow, tabs: TabManager): void {
       win.webContents.send('shortcut:nextTab', shift)
     }
 
-    // Ctrl+1..9 → switch to tab N
-    if (ctrl && /^[1-9]$/.test(key)) {
-      win.webContents.send('shortcut:switchTab', parseInt(key, 10) - 1)
-    }
-
     // Ctrl+B → toggle sidebar
     if (ctrl && !shift && key === 'b') {
       win.webContents.send('shortcut:toggleSidebar')
-    }
-
-    // Ctrl+Shift+E → toggle vertical tabs
-    if (ctrl && shift && key === 'e') {
-      win.webContents.send('shortcut:toggleVerticalTabs')
     }
 
     // Ctrl+Shift+T → reopen last closed tab

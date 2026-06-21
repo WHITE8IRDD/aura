@@ -368,6 +368,7 @@ button:focus-visible {
 .tab.sleeping .tab-favicon { filter: grayscale(0.7); }
 .tab.muted { opacity: 0.85; }
 .tab-muted-indicator { font-size: 10px; opacity: 0.7; margin-right: 2px; }
+.tab-split-badge { font-size: 9px; opacity: 0.6; margin-right: 3px; letter-spacing: -1px; font-weight: 700; color: var(--accent, #6366f1); }
 
 /* ====================================================================
    STAGE 8.6 — Toolbar
@@ -509,6 +510,9 @@ button:focus-visible {
   transition: background 0.12s, color 0.12s;
 }
 .util-btn:hover { background: var(--toolbar-hover-bg); color: var(--toolbar-text); }
+.util-btn.active { background: rgba(99, 102, 241, 0.14); color: var(--accent, #6366f1); }
+.util-btn.active:hover { background: rgba(99, 102, 241, 0.20); }
+.util-btn svg { transition: fill 0.18s ease, color 0.18s ease; }
 .ninja-util:hover { background: rgba(178, 124, 245, 0.15); }
 .util-divider { width: 1px; height: 16px; background: var(--stroke); margin: 0 4px; }
 
@@ -3254,6 +3258,41 @@ html[data-ninja="true"] .ninja-pill,
 }
 
 /* ====================================================================
+   Workspace pill
+   ==================================================================== */
+.toolbar-ws-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
+  margin: 0 2px;
+  background: var(--hover-bg);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+  user-select: none;
+}
+.toolbar-ws-pill:hover {
+  background: var(--active-bg);
+}
+.ws-pill-emoji {
+  font-size: 16px;
+  line-height: 1;
+}
+.ws-pill-name {
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ====================================================================
    Toolbar brand mark
    ==================================================================== */
 .toolbar-brand-btn {
@@ -3306,5 +3345,381 @@ html[data-ninja="true"] .ninja-pill,
 }
 .toolbar-perf-btn:active {
   transform: scale(0.94);
+}
+
+/* ====================================================================
+   Workspace settings
+   ==================================================================== */
+.ws-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+.ws-settings-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-muted);
+  border-radius: 10px;
+  padding: 12px 16px;
+  transition: border-color 0.15s ease;
+}
+.ws-settings-card.active {
+  border-color: var(--aura-accent);
+}
+.ws-settings-card-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ws-settings-card-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.ws-settings-emoji {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.ws-settings-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ws-settings-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-settings-badge {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--aura-accent);
+}
+.ws-settings-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.sett-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.sett-btn-icon:hover { background: var(--bg-elev); color: var(--text-primary); }
+.sett-btn-icon.danger:hover { color: var(--danger); }
+.sett-btn-icon:disabled { opacity: 0.3; cursor: default; }
+.sett-btn-icon:disabled:hover { background: transparent; color: var(--text-secondary); }
+
+.ws-settings-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ws-settings-edit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ws-settings-edit-row label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.ws-settings-edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.ws-emoji-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ws-emoji-btn {
+  font-size: 18px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.ws-emoji-btn:hover { background: var(--bg-elev); }
+.ws-emoji-btn.selected { border-color: var(--aura-accent); background: var(--bg-elev); }
+
+.ws-color-picker {
+  display: flex;
+  gap: 6px;
+}
+.ws-color-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.ws-color-btn:hover { transform: scale(1.15); }
+.ws-color-btn.selected { border-color: var(--text-primary); transform: scale(1.1); }
+
+.ws-settings-create {
+  margin-top: 16px;
+  background: var(--card-bg);
+  border: 1px dashed var(--border-muted);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ====================================================================
+   STAGE 10C.4 — Split View — Premium overlay design
+   ==================================================================== */
+
+.split-overlay {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+  pointer-events: none;
+  z-index: 40;
+  background: transparent;
+}
+
+.split-overlay.is-dragging * {
+  user-select: none !important;
+}
+
+/* ── PANE ────────────────────────────────────────────────── */
+.split-pane {
+  position: relative;
+  height: 100%;
+  pointer-events: none;
+}
+
+.split-pane-inner {
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  pointer-events: auto;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  clip-path: polygon(
+    0 0, 100% 0, 100% 100%, 0 100%,
+    0 0,
+    3px 3px, 3px calc(100% - 3px),
+    calc(100% - 3px) calc(100% - 3px), calc(100% - 3px) 3px,
+    3px 3px, 0 0
+  );
+}
+
+.split-pane.focused .split-pane-inner {
+  border-color: var(--accent, #6366f1);
+  box-shadow:
+    inset 0 0 0 1px rgba(99, 102, 241, 0.18),
+    0 0 0 1px rgba(99, 102, 241, 0.10);
+}
+
+.split-pane:not(.focused) .split-pane-inner {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+[data-theme="light"] .split-pane:not(.focused) .split-pane-inner {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* ── PANE CONTROLS (top floating chip) ──────────────────── */
+.split-pane-controls {
+  position: absolute;
+  top: 12px;
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: rgba(20, 20, 24, 0.78);
+  backdrop-filter: blur(14px) saturate(1.6);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+[data-theme="light"] .split-pane-controls {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.split-pane.left-pane .split-pane-controls {
+  left: 12px;
+}
+
+.split-pane.right-pane .split-pane-controls {
+  right: 12px;
+}
+
+.split-pane:hover .split-pane-controls,
+.split-pane.focused .split-pane-controls {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.split-control-btn {
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.12s ease, color 0.12s ease, transform 0.08s ease;
+  font-family: inherit;
+}
+
+[data-theme="light"] .split-control-btn {
+  color: rgba(0, 0, 0, 0.72);
+}
+
+.split-control-btn:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 1);
+}
+
+[data-theme="light"] .split-control-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 1);
+}
+
+.split-control-btn:active {
+  transform: scale(0.94);
+}
+
+.split-control-close:hover {
+  background: #ff453a;
+  color: white;
+}
+
+/* ── DIVIDER ─────────────────────────────────────────────── */
+.split-divider {
+  position: relative;
+  flex-shrink: 0;
+  height: 100%;
+  background: transparent;
+  cursor: col-resize;
+  pointer-events: auto;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+}
+
+.split-divider-track {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  transition: background 0.18s ease, width 0.18s ease;
+}
+
+[data-theme="light"] .split-divider-track {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.split-divider:hover .split-divider-track,
+.split-overlay.is-dragging .split-divider-track {
+  background: var(--accent, #6366f1);
+  width: 2px;
+}
+
+.split-divider-grip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 4px;
+  background: rgba(28, 28, 32, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+[data-theme="light"] .split-divider-grip {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(0, 0, 0, 0.10);
+}
+
+.split-divider-grip span {
+  display: block;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+[data-theme="light"] .split-divider-grip span {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.split-divider:hover .split-divider-grip,
+.split-overlay.is-dragging .split-divider-grip {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.split-overlay.is-dragging .split-divider-grip span {
+  background: var(--accent, #6366f1);
+}
+
+/* ── TAB BADGE ──────────────────────────────────────────── */
+.tab-split-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 5px;
+  width: 14px;
+  height: 14px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--accent, #6366f1);
+  background: rgba(99, 102, 241, 0.15);
+  border-radius: 4px;
+  letter-spacing: 0;
 }
 

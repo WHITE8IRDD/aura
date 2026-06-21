@@ -313,7 +313,7 @@ const api = {
       const l = (): void => cb()
       ipcRenderer.on('shortcut:openSettings', l)
       return () => ipcRenderer.removeListener('shortcut:openSettings', l)
-    }
+    },
   },
 
   groups: {
@@ -634,6 +634,38 @@ const api = {
       cleared: Record<string, number>
       errors: string[]
     }> => ipcRenderer.invoke('clearData:execute', options)
+  },
+
+  split: {
+    open: (tabId: number, url: string): Promise<void> =>
+      ipcRenderer.invoke('split:open', tabId, url),
+    close: (tabId: number): Promise<void> =>
+      ipcRenderer.invoke('split:close', tabId),
+    isSplit: (tabId: number): Promise<boolean> =>
+      ipcRenderer.invoke('split:isSplit', tabId),
+    getState: (tabId: number): Promise<{
+      tabId: number; splitUrl: string; focusedPane: 'primary' | 'split'; ratio: number
+    } | null> => ipcRenderer.invoke('split:getState', tabId),
+    setFocusedPane: (tabId: number, pane: 'primary' | 'split'): Promise<void> =>
+      ipcRenderer.invoke('split:setFocusedPane', tabId, pane),
+    toggleFocusedPane: (tabId: number): Promise<void> =>
+      ipcRenderer.invoke('split:toggleFocusedPane', tabId),
+    navigateFocused: (tabId: number, url: string): Promise<void> =>
+      ipcRenderer.invoke('split:navigateFocused', tabId, url),
+    navigateNonFocused: (tabId: number, url: string): Promise<void> =>
+      ipcRenderer.invoke('split:navigateNonFocused', tabId, url),
+    navigateSplitPane: (tabId: number, url: string): Promise<void> =>
+      ipcRenderer.invoke('split:navigateSplitPane', tabId, url),
+    setRatio: (tabId: number, ratio: number): Promise<void> =>
+      ipcRenderer.invoke('split:setRatio', tabId, ratio),
+    getAll: (): Promise<Array<{
+      tabId: number; splitUrl: string; focusedPane: 'primary' | 'split'; ratio: number
+    }>> => ipcRenderer.invoke('split:getAll'),
+    onSplitChanged: (cb: () => void): (() => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('split:changed', handler)
+      return () => ipcRenderer.removeListener('split:changed', handler)
+    }
   },
 
   autofill: {

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   IconHistory, IconDownload, IconExtension, IconSettings,
-  IconUser, IconSidebar
+  IconUser, IconSidebar, IconSplit
 } from './Icons'
 import NinjaAvatar from './NinjaAvatar'
 import { MediaHub } from './MediaHub'
@@ -33,6 +33,35 @@ export default function UtilityCluster({
 }: Props): React.ReactElement {
   const [pageTranslated, setPageTranslated] = useState(false)
   const [translatedTabId, setTranslatedTabId] = useState<number | null>(null)
+  const [splitActive, setSplitActive] = useState(false)
+
+  useEffect(() => {
+    if (!activeTab) { setSplitActive(false); return }
+    window.aura.split.isSplit(activeTab.id).then(setSplitActive)
+  }, [activeTab?.id])
+
+  useEffect(() => {
+    return window.aura.split.onSplitChanged(() => {
+      if (!activeTab) { setSplitActive(false); return }
+      window.aura.split.isSplit(activeTab.id).then(setSplitActive)
+    })
+  }, [activeTab])
+
+  const handleToggleSplit = useCallback(async (): Promise<void> => {
+    if (!activeTab) return
+    if (splitActive) {
+      await window.aura.split.close(activeTab.id)
+      return
+    }
+    // Enter split: use current tab + the most recent other tab
+    const state = await window.aura.tabs.getState()
+    const list = state?.tabs ?? []
+    if (!state?.activeId || list.length < 2) return
+    const other = list.find((t: { id: number }) => t.id !== state.activeId)
+    if (other) {
+      await window.aura.split.open(activeTab.id, other.url || 'aura://newtab')
+    }
+  }, [activeTab, splitActive])
 
   useEffect(() => {
     if (activeTab?.id !== translatedTabId) {
@@ -63,6 +92,12 @@ export default function UtilityCluster({
         <IconDownload size={15} />
       </button>
       <MediaHub />
+      <button className={`util-btn${splitActive ? ' active' : ''}`}
+        title={splitActive ? 'Exit split view (Ctrl+\\)' : 'Enter split view (Ctrl+\\)'}
+        onClick={handleToggleSplit}
+        aria-pressed={splitActive}>
+        <IconSplit size={15} filled={splitActive} />
+      </button>
       <button className="util-btn ninja-util" title="Ninja Mode" onClick={onOpenNinja}>
         <NinjaAvatar size={18} />
       </button>

@@ -139,6 +139,47 @@ const MIGRATIONS: Migration[] = [
       DELETE FROM settings WHERE key LIKE 'ai%';
       DELETE FROM settings WHERE key IN ('ntpShowGreeting', 'ntpShowMascot', 'ntpMascotStyle');
     `)
+  },
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS workspaces (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        emoji TEXT NOT NULL DEFAULT '🌐',
+        color TEXT NOT NULL DEFAULT '#6366f1',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+    `)
+    try {
+      db.exec(`ALTER TABLE tab_sessions ADD COLUMN workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE`)
+    } catch { /* column already exists */ }
+
+    const count = db.prepare('SELECT COUNT(*) as c FROM workspaces').get() as { c: number }
+    if (count.c === 0) {
+      const defaultId = '00000000-0000-0000-0000-000000000001'
+      db.prepare(`
+        INSERT INTO workspaces (id, name, emoji, color, sort_order)
+        VALUES (?, 'Personal', '🌐', '#6366f1', 0)
+      `).run(defaultId)
+    }
+
+    // ALWAYS run backfill — idempotent, cheap, safe
+    const personal = db.prepare('SELECT id FROM workspaces ORDER BY sort_order ASC LIMIT 1').get() as { id: string } | undefined
+    if (personal) {
+      db.prepare(`UPDATE tab_sessions SET workspace_id = ? WHERE workspace_id IS NULL OR workspace_id = ''`).run(personal.id)
+    }
+
+    // Ensure activeWorkspaceId exists
+    const active = db.prepare("SELECT value FROM settings WHERE key = 'activeWorkspaceId'").get() as { value: string } | undefined
+    if (!active && personal) {
+      db.prepare(`
+        INSERT INTO settings (key, value, updated_at)
+        VALUES ('activeWorkspaceId', ?, unixepoch())
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+      `).run(personal.id)
+    }
   }
 ]
 
