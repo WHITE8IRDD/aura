@@ -24,7 +24,7 @@ import ReadingListPage from './pages/ReadingListPage'
 import BoostsPage from './pages/BoostsPage'
 import SettingsPage from './pages/SettingsPage'
 
-import SplitOverlay from './components/SplitOverlay'
+import { SplitOverlay } from './components/SplitOverlay'
 import { AutofillSavePrompt } from './components/AutofillSavePrompt'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useLocalStorage } from './hooks/useLocalStorage'
@@ -626,7 +626,7 @@ export default function App(): React.ReactElement {
               : null}
         </div>
 
-        <SplitOverlay activeId={activeId} />
+        <SplitOverlay tabId={activeId} />
 
         <FindBar
           visible={findBarOpen}

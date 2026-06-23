@@ -20,7 +20,7 @@ export function useTheme(): void {
       if (!preset) preset = getPresetById('aura-dark')!
 
       if (preset.variant !== resolved) {
-        preset = getPresetById(resolved === 'light' ? 'aura-light' : 'aura-dark')!
+        preset = getPresetById(resolved === 'light' ? 'aura-dark' : 'aura-dark')!
       }
 
       if (!mounted) return

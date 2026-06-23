@@ -97,6 +97,9 @@ export default function TabBar({
       case 'close-split':
         window.aura.split.close(tab.id)
         break
+      case 'swap-panes':
+        window.aura.split.toggleFocusedPane(tab.id)
+        break
     }
   }
 
@@ -205,7 +208,14 @@ function Tab({
         <span className="tab-favicon-placeholder" aria-hidden="true" />
       )}
 
-      {hasSplit && <span className="tab-split-badge" title="Split view active">||</span>}
+      {hasSplit && (
+        <span className="tab-split-badge" title="Split view active">
+          <svg width="10" height="10" viewBox="0 0 10 10">
+            <rect x="0" y="0" width="4" height="10" rx="1" fill="currentColor"/>
+            <rect x="6" y="0" width="4" height="10" rx="1" fill="currentColor"/>
+          </svg>
+        </span>
+      )}
 
       {tab.muted && <span className="tab-muted-indicator" title="Muted">🔇</span>}
 

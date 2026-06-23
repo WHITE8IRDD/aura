@@ -4,6 +4,7 @@ import { TabManager } from './tabs'
 import { isInternal, normalizeInput } from './url'
 import { getAccessibilityWebPreferences, applyDefaultZoom } from './accessibility'
 import { attachContextMenu } from './contextMenu'
+import { getSetting, setSetting } from './settings'
 
 export interface SplitState {
   tabId: number
@@ -55,7 +56,7 @@ export class SplitManager {
       splitView: view,
       splitUrl: normalizedUrl,
       focusedPane: 'primary',
-      ratio: 0.5
+      ratio: this.getSavedRatio()
     }
 
     this.splits.set(tabId, state)
@@ -108,10 +109,21 @@ export class SplitManager {
     this.notify()
   }
 
+  getSavedRatio(): number {
+    const val = getSetting('splitRatio' as any)
+    const ratio = typeof val === 'number' ? val : parseFloat(val as string)
+    return isFinite(ratio) ? Math.max(0.15, Math.min(0.85, ratio)) : 0.5
+  }
+
+  saveRatio(tabId: number, ratio: number): void {
+    setSetting('splitRatio' as any, ratio)
+  }
+
   setRatio(tabId: number, ratio: number): void {
     const state = this.splits.get(tabId)
     if (!state) return
     state.ratio = Math.max(0.15, Math.min(0.85, ratio))
+    this.saveRatio(tabId, state.ratio)
     const tm = TabManager.findTab(tabId)
     if (tm) this.layoutForTab(tm, tabId)
   }
@@ -119,6 +131,9 @@ export class SplitManager {
   navigateSplitPane(tabId: number, url: string): void {
     const state = this.splits.get(tabId)
     if (!state) return
+    if (url === 'back') { state.splitView.webContents.goBack(); return }
+    if (url === 'forward') { state.splitView.webContents.goForward(); return }
+    if (url === 'reload') { state.splitView.webContents.reload(); return }
     const normalized = normalizeInput(url)
     state.splitUrl = normalized
     state.splitView.webContents.loadURL(normalized)
@@ -131,11 +146,15 @@ export class SplitManager {
   navigateFocusedPane(tm: TabManager, tabId: number, url: string): void {
     const state = this.splits.get(tabId)
     if (!state) {
-      tm.navigate(tabId, url)
+      if (url === 'back') tm.goBack(tabId)
+      else if (url === 'forward') tm.goForward(tabId)
+      else tm.navigate(tabId, url)
       return
     }
     if (state.focusedPane === 'primary') {
-      tm.navigate(tabId, url)
+      if (url === 'back') tm.goBack(tabId)
+      else if (url === 'forward') tm.goForward(tabId)
+      else tm.navigate(tabId, url)
     } else {
       this.navigateSplitPane(tabId, url)
     }

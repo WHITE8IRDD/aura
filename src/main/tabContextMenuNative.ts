@@ -28,6 +28,7 @@ export type TabMenuAction =
   | { type: 'reopen-closed' }
   | { type: 'open-in-split' }
   | { type: 'close-split' }
+  | { type: 'swap-panes' }
   | null
 
 export function showTabContextMenu(
@@ -71,9 +72,20 @@ export function showTabContextMenu(
       },
       { type: 'separator' },
       {
-        label: ctx.isSplit ? 'Close Split View' : 'Open in Split View',
+        label: 'Open in Split View',
+        visible: !ctx.isSplit,
         accelerator: 'CmdOrCtrl+/',
-        click: () => respond(ctx.isSplit ? { type: 'close-split' } : { type: 'open-in-split' })
+        click: () => respond({ type: 'open-in-split' })
+      },
+      {
+        label: 'Close Split',
+        visible: ctx.isSplit,
+        click: () => respond({ type: 'close-split' })
+      },
+      {
+        label: 'Swap Panes',
+        visible: ctx.isSplit,
+        click: () => respond({ type: 'swap-panes' })
       },
       {
         label: 'Bookmark Tab\u2026',

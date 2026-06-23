@@ -181,7 +181,7 @@ function migrateLegacyTheme(): void {
     delete cache['theme']
     if (old === 'light') {
       cache['themeMode'] = 'light'
-      cache['themePreset'] = 'aura-light'
+      cache['themePreset'] = 'aura-dark'
     } else if (old === 'dark') {
       cache['themeMode'] = 'dark'
       cache['themePreset'] = 'aura-dark'

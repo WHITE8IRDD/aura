@@ -1,170 +1,166 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-
-interface SplitInfo {
-  tabId: number
-  splitUrl: string
-  focusedPane: 'primary' | 'split'
-  ratio: number
-}
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 
 interface Props {
-  activeId: number | null
+  tabId: number | null
 }
 
-const CHROME_HEIGHT = 80
-const DIVIDER_W = 8
-const PANE_GAP = 6
-const PANE_RADIUS = 10
-const PANE_INSET = 2
-
-export default function SplitOverlay({ activeId }: Props): React.ReactElement {
-  const [split, setSplit] = useState<SplitInfo | null>(null)
-  const [dragging, setDragging] = useState(false)
-  const overlayRef = useRef<HTMLDivElement>(null)
-  const dragRef = useRef(false)
-
-  useEffect(() => {
-    if (activeId === null) { setSplit(null); return }
-    window.aura.split.getState(activeId).then((s) => setSplit(s as SplitInfo | null))
-  }, [activeId])
+export function SplitOverlay({ tabId }: Props) {
+  const [ratio, setRatio] = useState(0.5)
+  const [isDragging, setIsDragging] = useState(false)
+  const [focusedPane, setFocusedPane] = useState<'primary' | 'split'>('primary')
+  const [primaryUrl, setPrimaryUrl] = useState('')
+  const [splitUrl, setSplitUrl] = useState('')
+  const [leftInput, setLeftInput] = useState('')
+  const [rightInput, setRightInput] = useState('')
+  const [isSplit, setIsSplit] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const rafRef = useRef<number>(0)
 
   useEffect(() => {
-    return window.aura.split.onSplitChanged(() => {
-      if (activeId === null) { setSplit(null); return }
-      window.aura.split.getState(activeId).then((s) => setSplit(s as SplitInfo | null))
+    if (tabId === null) { setIsSplit(false); return }
+    window.aura.split.getState(tabId).then((state) => {
+      if (!state) { setIsSplit(false); return }
+      setIsSplit(true)
+      setRatio(state.ratio)
+      setFocusedPane(state.focusedPane)
+      setSplitUrl(state.splitUrl)
+      setRightInput(state.splitUrl)
     })
-  }, [activeId])
+  }, [tabId])
 
   useEffect(() => {
-    const onMove = (e: MouseEvent): void => {
-      if (!dragRef.current || !overlayRef.current || !activeId) return
-      const rect = overlayRef.current.getBoundingClientRect()
-      const sidebar = document.querySelector('.sidebar')
-      const sidebarWidth = sidebar?.getBoundingClientRect().width ?? 0
-      const relX = e.clientX - rect.left - sidebarWidth
-      const avail = rect.width - sidebarWidth
-      if (avail <= 0) return
-      let ratio = relX / avail
-      ratio = Math.max(0.15, Math.min(0.85, ratio))
-      window.aura.split.setRatio(activeId, ratio)
-    }
-    const onUp = (): void => {
-      if (dragRef.current) {
-        dragRef.current = false
-        setDragging(false)
-        document.body.style.cursor = ''
-        document.body.style.userSelect = ''
+    if (tabId === null) return
+    return window.aura.split.onSplitChanged(() => {
+      window.aura.split.getState(tabId).then((state) => {
+        if (!state) { setIsSplit(false); return }
+        setRatio(state.ratio)
+        setFocusedPane(state.focusedPane)
+        setSplitUrl(state.splitUrl)
+      })
+    })
+  }, [tabId])
+
+  useEffect(() => {
+    window.aura.tabs.getState().then((s) => {
+      const tab = s.tabs.find((t: any) => t.id === tabId)
+      if (tab) {
+        setPrimaryUrl(tab.url || '')
+        setLeftInput(tab.url || '')
       }
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [activeId])
+    })
+  }, [tabId])
 
-  const startDrag = useCallback((e: React.MouseEvent): void => {
+  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    if (tabId === null) return
     e.preventDefault()
-    dragRef.current = true
-    setDragging(true)
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-  }, [])
+    setIsDragging(true)
 
-  const resetRatio = useCallback((): void => {
-    if (!activeId) return
-    window.aura.split.setRatio(activeId, 0.5)
-  }, [activeId])
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!containerRef.current) return
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(() => {
+        const rect = containerRef.current!.getBoundingClientRect()
+        const newRatio = (moveEvent.clientX - rect.left) / rect.width
+        const clamped = Math.min(0.85, Math.max(0.15, newRatio))
+        setRatio(clamped)
+        window.aura.split.setRatio(tabId, clamped)
+      })
+    }
 
-  const focusLeft = useCallback((): void => {
-    if (!activeId) return
-    window.aura.split.setFocusedPane(activeId, 'primary')
-  }, [activeId])
+    const onMouseUp = () => {
+      setIsDragging(false)
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
 
-  const focusRight = useCallback((): void => {
-    if (!activeId) return
-    window.aura.split.setFocusedPane(activeId, 'split')
-  }, [activeId])
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }, [tabId])
 
-  const closeSplit = useCallback((e: React.MouseEvent): void => {
-    e.stopPropagation()
-    if (!activeId) return
-    window.aura.split.close(activeId)
-    setSplit(null)
-  }, [activeId])
+  const handlePaneClick = (pane: 'primary' | 'split') => {
+    if (tabId === null) return
+    setFocusedPane(pane)
+    window.aura.split.setFocusedPane(tabId, pane)
+  }
 
-  if (!split) return null
+  const handleLeftNavigate = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (tabId === null || e.key !== 'Enter') return
+    window.aura.split.navigateNonFocused(tabId, leftInput)
+  }
 
-  const ratio = split.ratio
-  const focusedLeft = split.focusedPane === 'primary'
-  const focusedRight = split.focusedPane === 'split'
+  const handleRightNavigate = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (tabId === null || e.key !== 'Enter') return
+    window.aura.split.navigateFocused(tabId, rightInput)
+  }
+
+  if (!isSplit || tabId === null) return null
 
   return (
     <div
-      ref={overlayRef}
-      className={`split-overlay ${dragging ? 'is-dragging' : ''}`}
-      style={{ top: CHROME_HEIGHT }}
+      ref={containerRef}
+      className={`split-overlay${isDragging ? ' is-dragging' : ''}`}
     >
-      {/* LEFT pane frame */}
+      {/* LEFT PANE */}
       <div
-        className={`split-pane left-pane ${focusedLeft ? 'focused' : ''}`}
-        style={{
-          width: `calc(${ratio * 100}% - ${DIVIDER_W / 2}px)`,
-          padding: `${PANE_GAP}px 0 ${PANE_GAP}px ${PANE_GAP}px`
-        }}
-        onMouseDown={focusLeft}
+        className={`split-pane split-pane-primary${focusedPane === 'primary' ? ' split-pane-focused' : ''}`}
+        style={{ width: `${ratio * 100}%` }}
+        onClick={() => handlePaneClick('primary')}
       >
-        <div
-          className="split-pane-inner"
-          style={{ borderRadius: PANE_RADIUS }}
-        />
-        <div className="split-pane-controls">
+        <div className="split-pane-toolbar">
           <button
-            className="split-control-btn split-control-close"
-            title="Close split view"
-            onClick={closeSplit}
-          >
-            ✕
-          </button>
+            className="split-nav-btn"
+            onClick={() => window.aura.tabs.goBack(tabId)}
+          >←</button>
+          <button
+            className="split-nav-btn"
+            onClick={() => window.aura.tabs.goForward(tabId)}
+          >→</button>
+          <input
+            className="split-address-input"
+            value={leftInput}
+            onChange={(e) => setLeftInput(e.target.value)}
+            onKeyDown={handleLeftNavigate}
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       </div>
 
       {/* DIVIDER */}
       <div
-        className="split-divider"
-        style={{ width: DIVIDER_W }}
-        onMouseDown={startDrag}
-        onDoubleClick={resetRatio}
-        title="Drag to resize  ·  Double-click to reset"
+        className={`split-divider${isDragging ? ' split-divider-dragging' : ''}`}
+        onMouseDown={handleDividerMouseDown}
       >
-        <div className="split-divider-track" />
-        <div className="split-divider-grip">
-          <span /><span /><span />
-        </div>
+        <div className="split-divider-handle" />
       </div>
 
-      {/* RIGHT pane frame */}
+      {/* RIGHT PANE */}
       <div
-        className={`split-pane right-pane ${focusedRight ? 'focused' : ''}`}
-        style={{
-          width: `calc(${(1 - ratio) * 100}% - ${DIVIDER_W / 2}px)`,
-          padding: `${PANE_GAP}px ${PANE_GAP}px ${PANE_GAP}px 0`
-        }}
-        onMouseDown={focusRight}
+        className={`split-pane split-pane-split${focusedPane === 'split' ? ' split-pane-focused' : ''}`}
+        style={{ flex: 1 }}
+        onClick={() => handlePaneClick('split')}
       >
-        <div
-          className="split-pane-inner"
-          style={{ borderRadius: PANE_RADIUS }}
-        />
-        <div className="split-pane-controls">
+        <div className="split-pane-toolbar">
           <button
-            className="split-control-btn split-control-close"
-            title="Close split view"
-            onClick={closeSplit}
-          >
-            ✕
-          </button>
+            className="split-nav-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              window.aura.split.navigateFocused(tabId, 'back')
+            }}
+          >←</button>
+          <button
+            className="split-nav-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              window.aura.split.navigateFocused(tabId, 'forward')
+            }}
+          >→</button>
+          <input
+            className="split-address-input"
+            value={rightInput}
+            onChange={(e) => setRightInput(e.target.value)}
+            onKeyDown={handleRightNavigate}
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       </div>
     </div>

@@ -291,7 +291,7 @@ async function createWindow(): Promise<void> {
     if (parent) togglePerfHud(parent)
   })
 
-  // STAGE 10C.4 — Split View toggle shortcut
+  // STAGE 13 — Split View shortcuts
   globalShortcut.register('CommandOrControl+/', () => {
     const focused = BrowserWindow.getFocusedWindow()
     if (!focused || !tabs || !splitManager) return
@@ -305,6 +305,24 @@ async function createWindow(): Promise<void> {
       if (other) {
         splitManager.openSplit(tabs, activeId, other.url)
       }
+    }
+  })
+
+  globalShortcut.register('CommandOrControl+[', () => {
+    const focused = BrowserWindow.getFocusedWindow()
+    if (!focused || !tabs || !splitManager) return
+    const activeId = tabs.getActiveId()
+    if (activeId !== null) {
+      splitManager.setFocusedPane(activeId, 'primary')
+    }
+  })
+
+  globalShortcut.register('CommandOrControl+]', () => {
+    const focused = BrowserWindow.getFocusedWindow()
+    if (!focused || !tabs || !splitManager) return
+    const activeId = tabs.getActiveId()
+    if (activeId !== null) {
+      splitManager.setFocusedPane(activeId, 'split')
     }
   })
 
