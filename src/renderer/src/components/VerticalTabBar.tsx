@@ -146,19 +146,19 @@ export function VerticalTabBar({
   }, [draggingId, tabs])
 
   return (
-    <div className={`v-tabs-container ${isCollapsed ? 'v-tabs-collapsed' : ''}`}>
-      <div className="v-tabs-header">
-        <button
-          className="v-tabs-collapse-btn"
-          onClick={onToggleCollapse}
-          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M3 2 V12 M6 7 L10 4 M6 7 L10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
+    <div style={{ display: 'flex', height: '100%', position: 'relative' }}>
+      <div className={`v-tabs-container ${isCollapsed ? 'v-tabs-collapsed' : ''}`}>
+        <div className="v-tabs-header">
+          <button
+            className="v-tabs-collapse-btn"
+            onClick={onToggleCollapse}
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M3 2 V12 M6 7 L10 4 M6 7 L10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
 
-        {!isCollapsed && (
           <button
             className={`v-tabs-grid-btn ${groupsPanelOpen ? 'v-tabs-grid-btn-active' : ''}`}
             onClick={() => setGroupsPanelOpen(prev => !prev)}
@@ -171,26 +171,9 @@ export function VerticalTabBar({
               <rect x="8" y="8" width="4" height="4" rx="1" fill="currentColor"/>
             </svg>
           </button>
-        )}
-      </div>
+        </div>
 
-      {groupsPanelOpen ? (
-        <TabOrganizerPanel
-          groups={groups}
-          tabs={tabs}
-          onClose={() => setGroupsPanelOpen(false)}
-          onCreateGroup={() => window.aura.groups.create('')}
-          onRenameGroup={(id, name) => window.aura.groups.rename(id, name)}
-          onChangeGroupColor={(id, color) => window.aura.groups.setColor(id, color)}
-          onDeleteGroup={(id) => window.aura.groups.delete(id)}
-          onRemoveTabFromGroup={(tabId) => window.aura.groups.removeTab(tabId)}
-          onSelectTab={(tabId) => {
-            window.aura.tabs.activate(tabId)
-            setGroupsPanelOpen(false)
-          }}
-        />
-      ) : (
-        <>
+        <div className="v-tabs-body">
           {pinnedTabs.length > 0 && (
             <div className="v-tabs-pinned-section">
               {pinnedTabs.map(tab => (
@@ -218,6 +201,7 @@ export function VerticalTabBar({
                 group={group}
                 tabs={tabs}
                 activeId={activeId}
+                isCollapsed={isCollapsed}
                 onSelectTab={handleSelect}
                 onCloseTab={handleClose}
                 onTabContextMenu={handleContextMenu}
@@ -260,7 +244,45 @@ export function VerticalTabBar({
               {isCollapsed ? '+' : '+ New Tab'}
             </button>
           </div>
-        </>
+
+          <div className="v-tabs-spacer" />
+        </div>
+      </div>
+
+      {groupsPanelOpen && (
+        <div className="tab-organizer-overlay">
+          <TabOrganizerPanel
+            groups={groups}
+            tabs={tabs}
+            onClose={() => setGroupsPanelOpen(false)}
+            onCreateGroup={async () => {
+              const id = await window.aura.groups.create('')
+              if (id) {
+                setGroups(prev => [...prev, { id, name: '', color: '#9ca3af', collapsed: false, tabIds: [] }])
+              }
+              return id
+            }}
+            onRenameGroup={(id, name) => {
+              setGroups(prev => prev.map(g => g.id === id ? { ...g, name } : g))
+              window.aura.groups.rename(id, name)
+            }}
+            onChangeGroupColor={(id, color) => {
+              setGroups(prev => prev.map(g => g.id === id ? { ...g, color } : g))
+              window.aura.groups.setColor(id, color)
+            }}
+            onDeleteGroup={(id) => {
+              setGroups(prev => prev.filter(g => g.id !== id))
+              window.aura.groups.delete(id)
+            }}
+            onRemoveTabFromGroup={(tabId) => {
+              setGroups(prev => prev.map(g => ({ ...g, tabIds: g.tabIds.filter(id => id !== tabId) })))
+              window.aura.groups.removeTab(tabId)
+            }}
+            onSelectTab={(tabId) => {
+              window.aura.tabs.activate(tabId)
+            }}
+          />
+        </div>
       )}
     </div>
   )

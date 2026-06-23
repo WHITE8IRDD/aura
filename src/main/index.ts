@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage, globalShortcut } from 'electron'
 import { join } from 'path'
 
+app.name = 'Aura'
+
 // ─── Global error suppression ────────────────────────────────
 process.on('uncaughtException', (err) => {
   console.error('[uncaughtException]', err)

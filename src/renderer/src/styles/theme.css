@@ -4542,7 +4542,255 @@ html[data-ninja="true"] .ninja-pill,
 }
 
 .v-tabs-collapsed {
-  width: 50px;
+  width: 50px !important;
+}
+
+.v-tabs-collapsed .v-tabs-header {
+  flex-direction: column !important;
+  height: auto !important;
+  padding: 8px 4px !important;
+  gap: 4px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  justify-content: center !important;
+}
+
+.v-tabs-collapsed .v-tabs-collapse-btn,
+.v-tabs-collapsed .v-tabs-grid-btn {
+  width: 30px !important;
+  height: 30px !important;
+  border-radius: 7px !important;
+}
+
+.v-tabs-collapsed .v-tabs-grid-btn {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.v-tabs-collapsed .v-tabs-body {
+  align-items: center !important;
+}
+
+.v-tabs-collapsed .v-tabs-pinned-section {
+  padding: 4px !important;
+  gap: 4px !important;
+  border-bottom: none !important;
+  margin-bottom: 4px !important;
+}
+
+.v-tabs-collapsed .v-tabs-pinned-section .v-tab {
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  align-items: center !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  transition: background 0.12s ease !important;
+}
+
+.v-tabs-collapsed .v-tabs-pinned-section .v-tab:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.v-tabs-collapsed .v-tabs-pinned-section .v-tab-active {
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+
+.v-tabs-collapsed .v-tabs-list {
+  padding: 0 4px !important;
+  gap: 4px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+.v-tabs-collapsed .v-tabs-footer {
+  padding: 4px !important;
+  border-top: none !important;
+  flex-grow: 0 !important;
+}
+
+.v-tabs-collapsed .v-tab,
+.v-tabs-collapsed .v-tabs-pinned-section .v-tab,
+.v-tabs-collapsed .v-tab-grouped .v-tab {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.v-tabs-collapsed .v-tab:hover,
+.v-tabs-collapsed .v-tabs-pinned-section .v-tab:hover,
+.v-tabs-collapsed .v-tab-grouped .v-tab:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.v-tabs-collapsed .v-tab-active,
+.v-tabs-collapsed .v-tabs-pinned-section .v-tab-active,
+.v-tabs-collapsed .v-tab-grouped .v-tab-active {
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+
+.v-tabs-collapsed .v-tab-active::before {
+  display: none !important;
+}
+
+.v-tabs-collapsed .v-tab-favicon {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.v-tabs-collapsed .v-tab-favicon img {
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 3px !important;
+}
+
+.v-tabs-collapsed .v-tab-title {
+  display: none !important;
+}
+
+.v-tabs-collapsed .v-tab-close-btn {
+  display: none !important;
+}
+
+.v-tabs-collapsed .v-tab-audio-badge,
+.v-tabs-collapsed .v-tab-mute-badge,
+.v-tabs-collapsed .v-tab-sleep-badge {
+  width: 5px !important;
+  height: 5px !important;
+  bottom: -1px !important;
+  right: -1px !important;
+}
+
+.v-tabs-collapsed .v-tab-group {
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+.v-tabs-collapsed .v-tab-group-pill {
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  position: relative !important;
+  margin-bottom: 2px !important;
+}
+
+.v-tabs-collapsed .v-tab-group-pill-active {
+  box-shadow: 0 0 0 2px var(--accent, #3b82f6) !important;
+}
+
+.v-tabs-collapsed .v-tab-group-pill-main {
+  display: none !important;
+}
+
+.v-tabs-collapsed .v-tab-group-pill-dots {
+  display: none !important;
+}
+
+.v-tabs-collapsed .v-tab-group-pill-collapse {
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 1 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+}
+
+.v-tabs-collapsed .v-tab-group-pill-collapse:hover {
+  background: rgba(0, 0, 0, 0.15) !important;
+}
+
+.v-tabs-collapsed .v-tab-group-pill-collapse svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.v-tabs-collapsed .v-tab-group-body {
+  padding: 4px 0 4px 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 3px !important;
+  position: relative !important;
+}
+
+.v-tabs-collapsed .v-tab-group-body::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--group-color, var(--border, rgba(255,255,255,0.15)));
+  border-radius: 1px;
+  opacity: 0.5;
+}
+
+.v-tabs-collapsed .v-tab-grouped {
+  width: auto !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+.v-tabs-collapsed .v-tab-grouped .v-tab {
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.12s ease !important;
+}
+
+.v-tabs-collapsed .v-tab-grouped .v-tab:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.v-tabs-collapsed .v-tab-grouped .v-tab-active {
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+
+.v-tabs-collapsed .v-tab-grouped .v-tab-favicon {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.v-tabs-collapsed .v-tab-grouped .v-tab-favicon img {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.v-tabs-collapsed .v-tabs-new-btn {
+  width: 30px !important;
+  height: 30px !important;
+  padding: 0 !important;
+  border-radius: 7px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  font-size: 16px !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  border: none !important;
+}
+
+.v-tabs-collapsed .v-tabs-new-btn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: white !important;
+}
+
+.v-tabs-collapsed .v-tabs-search-wrap {
+  display: none !important;
+}
+
+.v-tabs-collapsed .v-tabs-divider {
+  display: none !important;
 }
 
 .v-tabs-header {
@@ -4616,6 +4864,14 @@ html[data-ninja="true"] .ninja-pill,
   border-radius: 3px;
 }
 
+.v-tabs-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .v-tabs-divider {
   height: 1px;
   background: var(--border);
@@ -4623,12 +4879,13 @@ html[data-ninja="true"] .ninja-pill,
 }
 
 .v-tabs-list {
-  flex: 1;
+  flex: 0 0 auto;
   overflow-y: auto;
   padding: 4px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-height: 0;
 }
 
 .v-tabs-list::-webkit-scrollbar {
@@ -4647,6 +4904,12 @@ html[data-ninja="true"] .ninja-pill,
 .v-tabs-footer {
   padding: 6px;
   flex-shrink: 0;
+  flex-grow: 0;
+}
+
+.v-tabs-spacer {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .v-tabs-new-btn {
@@ -4902,13 +5165,48 @@ html[data-ninja="true"] .ninja-pill,
 
 /* ── Tab Organizer Panel ─────────────────────────────────── */
 
-.tab-organizer-panel {
-  flex: 1;
+.tab-organizer-overlay {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  height: 100%;
+  width: 260px;
+  background: var(--bg-secondary, #1a1a20);
+  border-right: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  z-index: 50;
+  animation: tab-organizer-slide-in 0.18s ease-out;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
+}
+
+@keyframes tab-organizer-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.tab-organizer-overlay .tab-organizer-panel {
+  height: 100%;
+  width: 100%;
+  border: none;
   padding: 14px;
+  box-shadow: none;
+}
+
+.tab-organizer-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-secondary);
+  padding: 14px;
+  gap: 10px;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .tab-organizer-header {

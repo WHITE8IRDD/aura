@@ -15,6 +15,7 @@ interface VerticalTabGroupProps {
   group: TabGroupData
   tabs: TabState[]
   activeId: number | null
+  isCollapsed?: boolean
   onSelectTab: (id: number) => void
   onCloseTab: (id: number) => void
   onTabContextMenu: (e: React.MouseEvent, tab: TabState) => void
@@ -31,6 +32,7 @@ export const VerticalTabGroup = memo(function VerticalTabGroup({
   group,
   tabs,
   activeId,
+  isCollapsed,
   onSelectTab,
   onCloseTab,
   onTabContextMenu,
@@ -46,6 +48,7 @@ export const VerticalTabGroup = memo(function VerticalTabGroup({
   const [isDragOver, setIsDragOver] = useState(false)
 
   const groupTabs = tabs.filter(t => group.tabIds.includes(t.id))
+  const isActiveGroup = group.tabIds.includes(activeId ?? -1)
 
   const handlePillDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -92,38 +95,42 @@ export const VerticalTabGroup = memo(function VerticalTabGroup({
     <>
       <div className="v-tab-group">
         <div
-          className={`v-tab-group-pill ${isDragOver ? 'v-tab-group-pill-drag-over' : ''}`}
+          className={`v-tab-group-pill ${isDragOver ? 'v-tab-group-pill-drag-over' : ''} ${isActiveGroup ? 'v-tab-group-pill-active' : ''}`}
           style={{ background: group.color }}
           onContextMenu={handleContextMenu}
           onDragOver={handlePillDragOver}
           onDragLeave={handlePillDragLeave}
           onDrop={handlePillDrop}
         >
-          <button
-            className="v-tab-group-pill-main"
-            onClick={onToggleCollapse}
-            title={group.name || 'Tab group'}
-          >
-            <span className="v-tab-group-pill-name">
-              {group.name || ''}
-            </span>
-          </button>
+          {!isCollapsed && (
+            <button
+              className="v-tab-group-pill-main"
+              onClick={onToggleCollapse}
+              title={group.name || 'Tab group'}
+            >
+              <span className="v-tab-group-pill-name">
+                {group.name || ''}
+              </span>
+            </button>
+          )}
 
-          <button
-            className="v-tab-group-pill-dots"
-            onClick={(e) => {
-              e.stopPropagation()
-              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-              setMenuPos({ x: rect.left, y: rect.top })
-            }}
-            title="Group options"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="3" r="1.2" fill="currentColor"/>
-              <circle cx="7" cy="7" r="1.2" fill="currentColor"/>
-              <circle cx="7" cy="11" r="1.2" fill="currentColor"/>
-            </svg>
-          </button>
+          {!isCollapsed && (
+            <button
+              className="v-tab-group-pill-dots"
+              onClick={(e) => {
+                e.stopPropagation()
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                setMenuPos({ x: rect.left, y: rect.top })
+              }}
+              title="Group options"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <circle cx="7" cy="3" r="1.2" fill="currentColor"/>
+                <circle cx="7" cy="7" r="1.2" fill="currentColor"/>
+                <circle cx="7" cy="11" r="1.2" fill="currentColor"/>
+              </svg>
+            </button>
+          )}
 
           <button
             className="v-tab-group-pill-collapse"
