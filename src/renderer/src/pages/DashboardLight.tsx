@@ -3,7 +3,7 @@ import { IconSparkle, IconMic, IconPlus, IconMore } from '../components/Icons'
 import WidgetGrid from '../widgets/WidgetGrid'
 import { showNativeInputMenu } from '../lib/buildInputMenu'
 import { useSettings } from '../hooks/useSettings'
-import auraMarkBlack from '../assets/brand/BALCK.png'
+import auraMarkBlack from '../assets/brand/aura-mark-colored.png'
 
 interface Props {
   onNavigate: (url: string) => void

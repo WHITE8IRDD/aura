@@ -9,6 +9,7 @@ export function AppearanceSection(): React.ReactElement {
   const [loaded, setLoaded] = useState(false)
   const [forceDark, setForceDark] = useState(false)
   const [showRestartBanner, setShowRestartBanner] = useState(false)
+  const [useVerticalTabs, setUseVerticalTabs] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -17,11 +18,13 @@ export function AppearanceSection(): React.ReactElement {
       const p = await window.aura.settings.get('themePreset') as string
       const r = await window.aura.theme.getResolved() as 'light' | 'dark'
       const fd = await window.aura.settings.get('forceDarkOnWebsites') as boolean
+      const vt = await window.aura.settings.get('tabsLayout') as string
       if (cancelled) return
       setMode(m)
       setPreset(p)
       setResolved(r)
       setForceDark(fd)
+      setUseVerticalTabs(vt === 'vertical')
       setLoaded(true)
     }
     load()
@@ -106,6 +109,29 @@ export function AppearanceSection(): React.ReactElement {
             )
           })}
         </div>
+      </div>
+
+      <div className="sett-card">
+        <h3 className="sett-card-title">Layout</h3>
+        <label className="sett-toggle">
+          <div className="sett-toggle-body">
+            <div className="sett-toggle-label">
+              Vertical tabs
+            </div>
+            <div className="sett-toggle-desc">
+              Show tabs vertically on the left side instead of horizontally at the top.
+            </div>
+          </div>
+          <div className={`sett-toggle-switch${useVerticalTabs ? ' on' : ''}`}>
+            <input type="checkbox" checked={useVerticalTabs}
+              onChange={async (e) => {
+                const checked = e.target.checked
+                setUseVerticalTabs(checked)
+                await window.aura.settings.set('tabsLayout', checked ? 'vertical' : 'horizontal')
+              }} />
+            <span className="sett-toggle-knob" />
+          </div>
+        </label>
       </div>
 
       <div className="sett-card">

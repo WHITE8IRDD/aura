@@ -24,6 +24,7 @@ import ReadingListPage from './pages/ReadingListPage'
 import BoostsPage from './pages/BoostsPage'
 import SettingsPage from './pages/SettingsPage'
 
+import { VerticalTabBar } from './components/VerticalTabBar'
 import { SplitOverlay } from './components/SplitOverlay'
 import { AutofillSavePrompt } from './components/AutofillSavePrompt'
 import { useKeyboard } from './hooks/useKeyboard'
@@ -81,6 +82,7 @@ export default function App(): React.ReactElement {
   )
   const [hasBarBookmarks, setHasBarBookmarks] = useState(false)
   const [reloadHint, setReloadHint] = useState<string | null>(null)
+  const [vTabsCollapsed, setVTabsCollapsed] = useLocalStorage<boolean>('aura:vtabs-collapsed', false)
 
   useEffect(() => {
     const unsub = window.aura.accessibility?.onReloadHint?.((reason) => {
@@ -154,7 +156,7 @@ export default function App(): React.ReactElement {
     return window.aura.bookmarks.onUpdate(load)
   }, [])
 
-  const effectiveSidebarWidth = verticalTabs ? verticalWidth : 0
+  const effectiveSidebarWidth = verticalTabs ? (vTabsCollapsed ? 56 : 240) : 0
 
   useEffect(() => {
     void window.aura.layout.setSidebarWidth(effectiveSidebarWidth)
@@ -509,29 +511,14 @@ export default function App(): React.ReactElement {
   }
 
   return (
-    <div className="app-root">
+    <div className="app-root" style={verticalTabs ? { display: 'flex' } as React.CSSProperties : undefined}>
       {verticalTabs && (
-        <Sidebar
-          toolbarMenuHandlers={toolbarMenuHandlers}
-          collapsed={sidebarCollapsed}
-          verticalTabsMode={verticalTabs}
-          width={verticalWidth}
-          resizing={isResizing}
-          onToggle={() => setSidebarCollapsed((c) => !c)}
-          onAction={handleSidebarAction}
-          onResizeStart={onResizeStart}
-        >
-          <TabBar
-            tabs={tabs}
-            activeId={activeId}
-            onSelect={handleSelect}
-            onClose={handleClose}
-            onNew={handleNew}
-            isPrivate={isPrivate}
-            vertical
-            onChangeGroup={handleChangeGroup}
-          />
-        </Sidebar>
+        <VerticalTabBar
+          tabs={tabs}
+          activeId={activeId}
+          isCollapsed={vTabsCollapsed}
+          onToggleCollapse={() => setVTabsCollapsed(!vTabsCollapsed)}
+        />
       )}
 
       <div className="main-area">
