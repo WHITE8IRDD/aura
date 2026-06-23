@@ -7,6 +7,7 @@ import { getGroupForTab, removeTabFromAnyGroup } from './tab-groups'
 import { getAccessibilityWebPreferences, applyDefaultZoom } from './accessibility'
 import { attachContextMenu } from './contextMenu'
 import { saveTabs } from './sessions'
+import { sendRestoreToTab } from './mediaResume'
 
 export interface TabState {
   id: number
@@ -560,9 +561,12 @@ export class TabManager {
         plugins: true,
         webgl: true,
         experimentalFeatures: true,
+        additionalArguments: this._isPrivate ? ['--aura-private-tab'] : [],
         ...getAccessibilityWebPreferences()
       }
     })
+    console.log('[aura:tabs] creating WebContentsView, isPrivate=', this._isPrivate,
+      'additionalArguments=', this._isPrivate ? ['--aura-private-tab'] : [])
     rec.view = view
     if (rec.muted) view.webContents.setAudioMuted(true)
 
@@ -626,8 +630,10 @@ export class TabManager {
     wc.on('did-start-loading', () => { rec.loading = true; clearLoadingTimeout(); this.emit() })
     wc.on('did-stop-loading', () => { rec.loading = false; clearLoadingTimeout(); syncUrl() })
     wc.on('did-finish-load', () => {
+      console.log('[aura:tabs] did-finish-load', { url: rec.url, isPrivate: this._isPrivate })
       armLoadingTimeout()
       recordVisit(rec.url, rec.title, this.isPrivate)
+      if (!this._isPrivate) sendRestoreToTab(wc, rec.url)
     })
 
     wc.on('page-title-updated', (_e, title) => {
@@ -638,7 +644,10 @@ export class TabManager {
       rec.favicon = favicons[0] ?? null; this.emit()
     })
     wc.on('did-navigate', syncUrl)
-    wc.on('did-navigate-in-page', syncUrl)
+    wc.on('did-navigate-in-page', () => {
+      syncUrl()
+      if (!this._isPrivate) sendRestoreToTab(wc, rec.url)
+    })
     wc.on('did-fail-load', (_e, errorCode, errorDescription, _validatedURL, isMainFrame) => {
       if (errorCode === -3 || !isMainFrame) return
       rec.loading = false; clearLoadingTimeout()

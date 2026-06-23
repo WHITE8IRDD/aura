@@ -142,6 +142,43 @@ const MIGRATIONS: Migration[] = [
   },
   (db) => {
     db.exec(`
+      CREATE TABLE IF NOT EXISTS media_playback (
+        url_key TEXT PRIMARY KEY,
+        duration REAL,
+        last_updated INTEGER NOT NULL,
+        resume_pos TEXT NOT NULL,
+        title TEXT,
+        favicon TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_media_playback_updated
+        ON media_playback(last_updated DESC);
+    `)
+  },
+  (db) => {
+    // Rename current_time to resume_pos to avoid SQLite keyword conflict.
+    // SQLite's current_time keyword always returns HH:MM:SS regardless of
+    // stored value when accessed via better-sqlite3 in Electron's full app
+    // context. Using a non-keyword column name fixes the issue.
+    const col = db.prepare("SELECT name FROM pragma_table_info('media_playback') WHERE name = 'current_time'").get()
+    if (col) {
+      db.exec(`
+        CREATE TABLE media_playback_new (
+          url_key TEXT PRIMARY KEY,
+          duration REAL,
+          last_updated INTEGER NOT NULL,
+          resume_pos TEXT NOT NULL,
+          title TEXT,
+          favicon TEXT
+        );
+        INSERT INTO media_playback_new SELECT url_key, duration, last_updated, CAST(current_time AS TEXT), title, favicon FROM media_playback;
+        DROP TABLE media_playback;
+        ALTER TABLE media_playback_new RENAME TO media_playback;
+        CREATE INDEX IF NOT EXISTS idx_media_playback_updated ON media_playback(last_updated DESC);
+      `)
+    }
+  },
+  (db) => {
+    db.exec(`
       CREATE TABLE IF NOT EXISTS workspaces (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,

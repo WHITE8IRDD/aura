@@ -72,7 +72,7 @@ export function showTabContextMenu(
       { type: 'separator' },
       {
         label: ctx.isSplit ? 'Close Split View' : 'Open in Split View',
-        accelerator: 'CmdOrCtrl+\\',
+        accelerator: 'CmdOrCtrl+/',
         click: () => respond(ctx.isSplit ? { type: 'close-split' } : { type: 'open-in-split' })
       },
       {

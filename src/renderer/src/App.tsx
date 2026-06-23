@@ -441,9 +441,18 @@ export default function App(): React.ReactElement {
 
   useEffect(() => {
     return window.aura.shortcuts.onReaderMode(() => {
-      if (activeTab && !activeTab.internal) setReaderActive((v) => !v)
+      if (activeTab && !activeTab.internal) {
+        if (readerActive) {
+          void window.aura.reader.exit(activeId!)
+          setReaderActive(false)
+        } else {
+          void window.aura.reader.enter(activeId!).then((r) => {
+            if (r.ok) setReaderActive(true)
+          })
+        }
+      }
     })
-  }, [activeTab])
+  }, [activeTab, readerActive, activeId])
 
   useEffect(() => {
     return window.aura.shortcuts.onToggleBookmarksBar(() => {
@@ -576,7 +585,16 @@ export default function App(): React.ReactElement {
             bookmarkSignal={bookmarkSignal}
             onOpenFindBar={() => setFindBarOpen(true)}
             onToggleReader={() => {
-              if (activeTab && !activeTab.internal) setReaderActive((v) => !v)
+              if (activeTab && !activeTab.internal) {
+                if (readerActive) {
+                  void window.aura.reader.exit(activeId!)
+                  setReaderActive(false)
+                } else {
+                  void window.aura.reader.enter(activeId!).then((r) => {
+                    if (r.ok) setReaderActive(true)
+                  })
+                }
+              }
             }}
             readerActive={readerActive}
             onSaveToReadingList={handleSaveToReadingList}

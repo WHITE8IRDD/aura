@@ -1,5 +1,20 @@
 import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage, globalShortcut } from 'electron'
 import { join } from 'path'
+
+// ─── Global error suppression ────────────────────────────────
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err)
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason)
+})
+
+const origShowErrorBox = dialog.showErrorBox.bind(dialog)
+dialog.showErrorBox = (title: string, content: string) => {
+  console.error(`[suppressed error dialog] ${title}: ${content}`
+)}
+
 import { TabManager } from './tabs'
 import { registerInputContextMenuIPC } from './inputContextMenu'
 import { registerMediaHubMenuIPC } from './mediaHubMenu'
@@ -31,6 +46,13 @@ import { setupPermissionPrompts, respondToPermission } from './security/permissi
 import { isPhishingDomain } from './blocker/phishing'
 import { fetchFavicon } from './favicons'
 import { setupMediaWatcher, registerMediaControllerIPC } from './mediaController'
+import {
+  registerMediaResumeHandlers,
+  forceFlush as forceFlushMediaResume,
+  gcStaleEntries as gcStaleMediaEntries,
+  cleanCorruptedEntries,
+  sendRestoreToTab
+} from './mediaResume'
 import { registerClearBrowsingDataIPC } from './clearBrowsingData'
 import { registerAutofillIPC, maybePromptSave } from './autofill'
 import { applyZoomToAllTabs } from './accessibility'
@@ -45,7 +67,8 @@ import {
   deleteDownloadRecord, clearCompletedDownloads
 } from './downloads'
 import { captureTab, saveScreenshot, copyScreenshotToClipboard } from './screenshot'
-import { getReaderPayload } from './reader'
+import { extractArticle, probeReaderable, getReaderPayload } from './reader'
+import type { ReaderArticle } from './reader'
 import {
   addReadingItem, deleteReadingItem, markRead, listReadingItems, clearRead
 } from './reading-list'
@@ -99,7 +122,10 @@ app.commandLine.appendSwitch('enable-features', [
   'AcceleratedVideoDecodeLinuxGL',
   'UseSkiaRenderer',
   'UseChromeOSDirectVideoDecoder',
-  'WebContentsForceDark'
+  'WebContentsForceDark',
+  'Vulkan',
+  'Vp9kSVCHWDecoding',
+  'UseMultiPlaneFormatForSoftwareVideo'
 ].join(','))
 
 app.commandLine.appendSwitch('enable-gpu-rasterization')
@@ -164,6 +190,9 @@ let splitManager: SplitManager | null = null
 let ninja: NinjaWindowManager | null = null
 let iconPath = ''
 
+const readerCache = new Map<string | number, ReaderArticle>()
+const readerProbeCache = new Map<string | number, boolean>()
+
 const startupReady = app.whenReady().then(async () => {
   console.log('[Aura] Opening database…')
   getDb()
@@ -184,6 +213,11 @@ const startupReady = app.whenReady().then(async () => {
   registerMediaControllerIPC()
   registerMediaHubMenuIPC()
   registerMediaHubWindowIPC()
+  console.log('[aura:media] registering media resume IPC handlers')
+  registerMediaResumeHandlers()
+  cleanCorruptedEntries()
+  console.log('[aura:media] running gcStaleMediaEntries')
+  gcStaleMediaEntries()
   console.log('[Aura] Ready')
 })
 
@@ -258,7 +292,7 @@ async function createWindow(): Promise<void> {
   })
 
   // STAGE 10C.4 — Split View toggle shortcut
-  globalShortcut.register('CommandOrControl+\\', () => {
+  globalShortcut.register('CommandOrControl+/', () => {
     const focused = BrowserWindow.getFocusedWindow()
     if (!focused || !tabs || !splitManager) return
     const activeId = tabs.getActiveId()
@@ -346,7 +380,11 @@ function getSplitManager(e: Electron.IpcMainInvokeEvent): SplitManager | null {
 
 // ---- Tab IPC ----
 ipcMain.handle('tabs:create', (e, url?: string) => getTabsForEvent(e)?.create(url))
-ipcMain.handle('tabs:close', (e, id: number) => getTabsForEvent(e)?.close(id))
+ipcMain.handle('tabs:close', (e, id: number) => {
+  readerCache.delete(id)
+  readerProbeCache.delete(id)
+  getTabsForEvent(e)?.close(id)
+})
 ipcMain.handle('tabs:activate', (e, id: number) => {
   const tm = getTabsForEvent(e)
   if (!tm) return
@@ -524,6 +562,73 @@ ipcMain.handle('split:getAll', (e) => {
     }
   }
   return result
+})
+
+// ── Reader Mode IPC ──────────────────────────────────────────
+
+ipcMain.handle('reader:probe', async (_e, tabId: string | number) => {
+  try {
+    const tab = tabs?.getTab?.(tabId)
+    if (!tab?.view) return { readerable: false }
+    const url = tab.view.webContents.getURL()
+    if (!url || url.startsWith('aura://') || url.startsWith('about:')) {
+      return { readerable: false }
+    }
+    const html = await tab.view.webContents.executeJavaScript(
+      'document.documentElement.outerHTML',
+      true
+    )
+    const result = probeReaderable(html, url)
+    readerProbeCache.set(tabId, result.readerable)
+    return result
+  } catch {
+    return { readerable: false }
+  }
+})
+
+ipcMain.handle('reader:enter', async (_e, tabId: string | number) => {
+  try {
+    const tab = tabs?.getTab?.(tabId)
+    if (!tab?.view) return { ok: false, error: 'no tab' }
+    const sourceUrl = tab.view.webContents.getURL()
+    if (!sourceUrl || sourceUrl.startsWith('aura://')) {
+      return { ok: false, error: 'not an article page' }
+    }
+    const html = await tab.view.webContents.executeJavaScript(
+      'document.documentElement.outerHTML',
+      true
+    )
+    const article = extractArticle(html, sourceUrl)
+    if (!article) return { ok: false, error: 'extraction failed' }
+    readerCache.set(tabId, article)
+    return { ok: true, article }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('reader:exit', async (_e, tabId: string | number) => {
+  const article = readerCache.get(tabId)
+  if (article) {
+    tabs?.navigate?.(tabId, article.sourceUrl)
+    readerCache.delete(tabId)
+    readerProbeCache.delete(tabId)
+  } else {
+    const tab = tabs?.getTab?.(tabId)
+    if (tab?.view?.webContents.canGoBack()) {
+      tab.view.webContents.goBack()
+    }
+  }
+  return { ok: true }
+})
+
+ipcMain.handle('reader:getCurrent', async (_e, tabId: string | number) => {
+  return readerCache.get(tabId) ?? null
+})
+
+ipcMain.handle('reader:isActive', (_e, tabId: string | number) => {
+  const article = readerCache.get(tabId)
+  return !!article
 })
 
 ipcMain.handle('layout:setSidebarWidth', (e, width: number) =>
@@ -714,7 +819,7 @@ ipcMain.on('autofill:formSubmitted', (e, captured) => {
 
 app.whenReady().then(() => { void createWindow() })
 
-app.on('before-quit', () => {
+function forceShutdownMediaFlush() {
   for (const win of BrowserWindow.getAllWindows()) {
     const ninjaAny = ninja as unknown as {
       isNinjaWindow?: (id: number) => boolean
@@ -726,12 +831,29 @@ app.on('before-quit', () => {
       try { tm.forceFlushSession?.() } catch {}
     }
   }
+  forceFlushMediaResume()
+}
+
+app.on('before-quit', (event) => {
+  try { forceShutdownMediaFlush() } catch {}
   maybeClearOnQuit()
 })
 
 app.on('will-quit', () => {
+  try { forceFlushMediaResume() } catch {}
   globalShortcut.unregisterAll()
 })
+
+function handleShutdownSignal() {
+  try { forceFlushMediaResume() } catch {}
+  closeDb()
+  app.quit()
+  process.exit(0)
+}
+
+process.on('SIGTERM', () => { handleShutdownSignal() })
+process.on('SIGINT', () => { handleShutdownSignal() })
+process.on('SIGHUP', () => { handleShutdownSignal() })
 
 app.on('window-all-closed', () => {
   closeDb()

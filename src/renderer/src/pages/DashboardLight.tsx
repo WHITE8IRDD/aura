@@ -3,7 +3,7 @@ import { IconSparkle, IconMic, IconPlus, IconMore } from '../components/Icons'
 import WidgetGrid from '../widgets/WidgetGrid'
 import { showNativeInputMenu } from '../lib/buildInputMenu'
 import { useSettings } from '../hooks/useSettings'
-import auraWordmark from '../assets/brand/aura-wordmark-colored.png'
+import auraMarkBlack from '../assets/brand/BALCK.png'
 
 interface Props {
   onNavigate: (url: string) => void
@@ -62,7 +62,8 @@ export default function DashboardLight({
       <button className="layout-toggle-floating" onClick={onSwitchLayout}>Switch layout</button>
       <div className="dash-light-inner">
         <div className="ntp-hero">
-          <img src={auraWordmark} alt="Aura" className="ntp-hero-wordmark-img" draggable={false} />
+          <img src={auraMarkBlack} alt="" className="ntp-hero-mark-img" draggable={false} />
+          <span className="ntp-hero-wordmark-text">Aura</span>
         </div>
         <header className="dash-light-hero">
           <div className="dash-light-greeting-block">

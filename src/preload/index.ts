@@ -636,6 +636,19 @@ const api = {
     }> => ipcRenderer.invoke('clearData:execute', options)
   },
 
+  reader: {
+    probe: (tabId: string | number): Promise<{ readerable: boolean; reason?: string }> =>
+      ipcRenderer.invoke('reader:probe', tabId),
+    enter: (tabId: string | number): Promise<{ ok: boolean; error?: string; article?: any }> =>
+      ipcRenderer.invoke('reader:enter', tabId),
+    exit: (tabId: string | number): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('reader:exit', tabId),
+    getCurrent: (tabId: string | number): Promise<any> =>
+      ipcRenderer.invoke('reader:getCurrent', tabId),
+    isActive: (tabId: string | number): Promise<boolean> =>
+      ipcRenderer.invoke('reader:isActive', tabId),
+  },
+
   split: {
     open: (tabId: number, url: string): Promise<void> =>
       ipcRenderer.invoke('split:open', tabId, url),

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { showNativeInputMenu } from '../lib/buildInputMenu'
 import { useSettings } from '../hooks/useSettings'
-import auraWordmark from '../assets/brand/aura-wordmark-colored.png'
+import auraHeroDark from '../../../../resources/icons/text AURA without backgground colord.png'
 
 interface Props {
   onNavigate: (url: string) => void
@@ -65,7 +65,7 @@ export default function DashboardDark({
       </button>
       <div className="aurora-center">
         <div className="ntp-hero">
-          <img src={auraWordmark} alt="Aura" className="ntp-hero-wordmark-img" draggable={false} />
+          <img src={auraHeroDark} alt="Aura" className="ntp-hero-full-img" draggable={false} />
         </div>
         <form className="aurora-searchbar" onSubmit={handleSubmit}>
           <div className="aurora-cursor-bar" />

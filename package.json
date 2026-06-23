@@ -46,11 +46,16 @@
       "resources/**/*"
     ]
   },
+  "overrides": {
+    "better-sqlite3": "11.7.0"
+  },
   "dependencies": {
     "@cliqz/adblocker-electron": "^1.34.0",
-    "better-sqlite3": "^12.11.1",
+    "@mozilla/readability": "^0.6.0",
+    "better-sqlite3": "11.7.0",
     "cross-fetch": "^4.1.0",
     "framer-motion": "^12.40.0",
+    "linkedom": "^0.18.12",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   }

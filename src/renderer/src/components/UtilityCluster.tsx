@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   IconHistory, IconDownload, IconExtension, IconSettings,
-  IconUser, IconSidebar, IconSplit
+  IconUser, IconSidebar, IconSplit, IconReader
 } from './Icons'
 import NinjaAvatar from './NinjaAvatar'
 import { MediaHub } from './MediaHub'
@@ -23,22 +23,58 @@ interface Props {
   onToggleVerticalTabs: () => void
   verticalTabs: boolean
   activeTab?: TabState | null
+  readerActive?: boolean
+  onToggleReader?: () => void
 }
 
 export default function UtilityCluster({
   onOpenHistory, onOpenDownloads, onOpenExtensions,
   onOpenSettings, onOpenProfile, onOpenNinja,
   onOpenCommandPalette, onToggleVerticalTabs,
-  verticalTabs, activeTab
+  verticalTabs, activeTab,
+  readerActive: propReaderActive, onToggleReader: propOnToggleReader
 }: Props): React.ReactElement {
   const [pageTranslated, setPageTranslated] = useState(false)
   const [translatedTabId, setTranslatedTabId] = useState<number | null>(null)
   const [splitActive, setSplitActive] = useState(false)
+  const [readerAvailable, setReaderAvailable] = useState(false)
+  const [readerActive, setReaderActive] = useState(false)
+  const effectiveReaderActive = propReaderActive ?? readerActive
 
   useEffect(() => {
     if (!activeTab) { setSplitActive(false); return }
     window.aura.split.isSplit(activeTab.id).then(setSplitActive)
   }, [activeTab?.id])
+
+  useEffect(() => {
+    if (!activeTab) {
+      setReaderAvailable(false)
+      setReaderActive(false)
+      return
+    }
+    let cancelled = false
+    const checkReader = async (): Promise<void> => {
+      try {
+        const active = await window.aura.reader.isActive(activeTab.id)
+        if (cancelled) return
+        setReaderActive(!!active)
+        if (active) {
+          setReaderAvailable(true)
+        } else {
+          const probe = await window.aura.reader.probe(activeTab.id)
+          if (!cancelled) setReaderAvailable(!!probe?.readerable)
+        }
+      } catch {
+        if (!cancelled) {
+          setReaderAvailable(false)
+          setReaderActive(false)
+        }
+      }
+    }
+    void checkReader()
+    const t = setTimeout(checkReader, 1200)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [activeTab?.id, activeTab?.url, propReaderActive])
 
   useEffect(() => {
     return window.aura.split.onSplitChanged(() => {
@@ -47,20 +83,41 @@ export default function UtilityCluster({
     })
   }, [activeTab])
 
-  const handleToggleSplit = useCallback(async (): Promise<void> => {
-    if (!activeTab) return
-    if (splitActive) {
-      await window.aura.split.close(activeTab.id)
+  const handleToggleReader = useCallback(async (): Promise<void> => {
+    if (propOnToggleReader) {
+      propOnToggleReader()
       return
     }
-    // Enter split: use current tab + the most recent other tab
-    const state = await window.aura.tabs.getState()
-    const list = state?.tabs ?? []
-    if (!state?.activeId || list.length < 2) return
-    const other = list.find((t: { id: number }) => t.id !== state.activeId)
-    if (other) {
-      await window.aura.split.open(activeTab.id, other.url || 'aura://newtab')
+    if (!activeTab) return
+    if (readerActive) {
+      await window.aura.reader.exit(activeTab.id)
+      setReaderActive(false)
+    } else {
+      const result = await window.aura.reader.enter(activeTab.id)
+      if (result.ok) {
+        setReaderActive(true)
+        setReaderAvailable(true)
+      }
     }
+  }, [activeTab, readerActive, propOnToggleReader])
+
+  const handleToggleSplit = useCallback(async (): Promise<void> => {
+    if (splitActive) {
+      if (activeTab) await window.aura.split.close(activeTab.id)
+      return
+    }
+
+    if (!activeTab) return
+    const tabState = await window.aura.tabs.getState()
+    const list = tabState?.tabs ?? []
+    const activeId = tabState?.activeId
+
+    if (!activeId || list.length < 2) return
+
+    const other = list.find((t: { id: number }) => t.id !== activeId)
+    if (!other) return
+
+    await window.aura.split.open(activeId, other.url ?? 'about:blank')
   }, [activeTab, splitActive])
 
   useEffect(() => {
@@ -92,8 +149,14 @@ export default function UtilityCluster({
         <IconDownload size={15} />
       </button>
       <MediaHub />
+      <button className={`util-btn reader-toggle-btn${effectiveReaderActive ? ' active' : ''}${!readerAvailable ? ' hidden' : ''}`}
+        title={effectiveReaderActive ? 'Exit reader (Ctrl+Shift+R)' : 'Reader mode (Ctrl+Shift+R)'}
+        onClick={handleToggleReader}
+        aria-pressed={effectiveReaderActive}>
+        <IconReader size={15} filled={effectiveReaderActive} />
+      </button>
       <button className={`util-btn${splitActive ? ' active' : ''}`}
-        title={splitActive ? 'Exit split view (Ctrl+\\)' : 'Enter split view (Ctrl+\\)'}
+        title={splitActive ? 'Exit split view (Ctrl+/)' : 'Enter split view (Ctrl+/)'}
         onClick={handleToggleSplit}
         aria-pressed={splitActive}>
         <IconSplit size={15} filled={splitActive} />

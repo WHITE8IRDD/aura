@@ -27,6 +27,13 @@ export interface ThemePreset {
     danger: string
     warning: string
     success: string
+    ntpGlowPrimary: string
+    ntpGlowSecondary: string
+    ntpTitleGradient: string
+    toolbarHoverBg: string
+    toolbarText: string
+    ntpHeroText: string
+    bgHover: string
   }
 }
 
@@ -59,7 +66,14 @@ export const THEME_PRESETS: ThemePreset[] = [
       sidebarBg: '#0a0a0c',
       danger: '#ef4444',
       warning: '#f59e0b',
-      success: '#10b981'
+      success: '#10b981',
+      ntpGlowPrimary: 'radial-gradient(circle at 50% 50%, rgba(118, 75, 162, 0.15) 0%, transparent 60%)',
+      ntpGlowSecondary: 'radial-gradient(circle at 30% 70%, rgba(102, 126, 234, 0.12) 0%, transparent 50%)',
+      ntpTitleGradient: 'linear-gradient(135deg, #ffffff 0%, #c8c8d8 100%)',
+      toolbarHoverBg: 'rgba(255, 255, 255, 0.08)',
+      toolbarText: 'rgba(255, 255, 255, 0.96)',
+      ntpHeroText: '#ffffff',
+      bgHover: 'rgba(255, 255, 255, 0.08)'
     }
   },
   {
@@ -90,7 +104,14 @@ export const THEME_PRESETS: ThemePreset[] = [
       sidebarBg: '#eeeef1',
       danger: '#dc2626',
       warning: '#d97706',
-      success: '#059669'
+      success: '#059669',
+      ntpGlowPrimary: 'radial-gradient(circle at 50% 50%, rgba(118, 75, 162, 0.08) 0%, transparent 60%)',
+      ntpGlowSecondary: 'radial-gradient(circle at 30% 70%, rgba(102, 126, 234, 0.06) 0%, transparent 50%)',
+      ntpTitleGradient: 'linear-gradient(135deg, #0f0f14 0%, #2d2d3a 100%)',
+      toolbarHoverBg: 'rgba(15, 15, 20, 0.06)',
+      toolbarText: '#0f0f14',
+      ntpHeroText: '#0f0f14',
+      bgHover: 'rgba(0, 0, 0, 0.06)'
     }
   },
   {
@@ -121,7 +142,14 @@ export const THEME_PRESETS: ThemePreset[] = [
       sidebarBg: '#000000',
       danger: '#f87171',
       warning: '#fbbf24',
-      success: '#34d399'
+      success: '#34d399',
+      ntpGlowPrimary: 'radial-gradient(circle at 50% 50%, rgba(118, 75, 162, 0.15) 0%, transparent 60%)',
+      ntpGlowSecondary: 'radial-gradient(circle at 30% 70%, rgba(102, 126, 234, 0.12) 0%, transparent 50%)',
+      ntpTitleGradient: 'linear-gradient(135deg, #ffffff 0%, #c8c8d8 100%)',
+      toolbarHoverBg: 'rgba(255, 255, 255, 0.08)',
+      toolbarText: 'rgba(255, 255, 255, 0.96)',
+      ntpHeroText: '#ffffff',
+      bgHover: 'rgba(255, 255, 255, 0.08)'
     }
   },
   {
@@ -152,7 +180,14 @@ export const THEME_PRESETS: ThemePreset[] = [
       sidebarBg: '#161616',
       danger: '#ee5396',
       warning: '#ff832b',
-      success: '#42be65'
+      success: '#42be65',
+      ntpGlowPrimary: 'radial-gradient(circle at 50% 50%, rgba(118, 75, 162, 0.15) 0%, transparent 60%)',
+      ntpGlowSecondary: 'radial-gradient(circle at 30% 70%, rgba(102, 126, 234, 0.12) 0%, transparent 50%)',
+      ntpTitleGradient: 'linear-gradient(135deg, #ffffff 0%, #c8c8d8 100%)',
+      toolbarHoverBg: 'rgba(255, 255, 255, 0.08)',
+      toolbarText: 'rgba(255, 255, 255, 0.96)',
+      ntpHeroText: '#ffffff',
+      bgHover: 'rgba(255, 255, 255, 0.08)'
     }
   },
   {
@@ -183,7 +218,14 @@ export const THEME_PRESETS: ThemePreset[] = [
       sidebarBg: '#11111b',
       danger: '#f38ba8',
       warning: '#fab387',
-      success: '#a6e3a1'
+       success: '#a6e3a1',
+      ntpGlowPrimary: 'radial-gradient(circle at 50% 50%, rgba(118, 75, 162, 0.15) 0%, transparent 60%)',
+      ntpGlowSecondary: 'radial-gradient(circle at 30% 70%, rgba(102, 126, 234, 0.12) 0%, transparent 50%)',
+      ntpTitleGradient: 'linear-gradient(135deg, #ffffff 0%, #c8c8d8 100%)',
+      toolbarHoverBg: 'rgba(255, 255, 255, 0.08)',
+      toolbarText: 'rgba(255, 255, 255, 0.96)',
+      ntpHeroText: '#ffffff',
+      bgHover: 'rgba(255, 255, 255, 0.08)'
     }
   },
   {
@@ -214,7 +256,14 @@ export const THEME_PRESETS: ThemePreset[] = [
       sidebarBg: '#232634',
       danger: '#e78284',
       warning: '#ef9f76',
-      success: '#a6d189'
+      success: '#a6d189',
+      ntpGlowPrimary: 'radial-gradient(circle at 50% 50%, rgba(118, 75, 162, 0.15) 0%, transparent 60%)',
+      ntpGlowSecondary: 'radial-gradient(circle at 30% 70%, rgba(102, 126, 234, 0.12) 0%, transparent 50%)',
+      ntpTitleGradient: 'linear-gradient(135deg, #ffffff 0%, #c8c8d8 100%)',
+      toolbarHoverBg: 'rgba(255, 255, 255, 0.08)',
+      toolbarText: 'rgba(255, 255, 255, 0.96)',
+      ntpHeroText: '#ffffff',
+      bgHover: 'rgba(255, 255, 255, 0.08)'
     }
   },
   {
@@ -245,7 +294,14 @@ export const THEME_PRESETS: ThemePreset[] = [
       sidebarBg: '#181926',
       danger: '#ed8796',
       warning: '#f5a97f',
-      success: '#a6da95'
+      success: '#a6da95',
+      ntpGlowPrimary: 'radial-gradient(circle at 50% 50%, rgba(118, 75, 162, 0.15) 0%, transparent 60%)',
+      ntpGlowSecondary: 'radial-gradient(circle at 30% 70%, rgba(102, 126, 234, 0.12) 0%, transparent 50%)',
+      ntpTitleGradient: 'linear-gradient(135deg, #ffffff 0%, #c8c8d8 100%)',
+      toolbarHoverBg: 'rgba(255, 255, 255, 0.08)',
+      toolbarText: 'rgba(255, 255, 255, 0.96)',
+      ntpHeroText: '#ffffff',
+      bgHover: 'rgba(255, 255, 255, 0.08)'
     }
   },
   {
@@ -276,7 +332,14 @@ export const THEME_PRESETS: ThemePreset[] = [
       sidebarBg: '#16161e',
       danger: '#f7768e',
       warning: '#e0af68',
-      success: '#9ece6a'
+      success: '#9ece6a',
+      ntpGlowPrimary: 'radial-gradient(circle at 50% 50%, rgba(118, 75, 162, 0.15) 0%, transparent 60%)',
+      ntpGlowSecondary: 'radial-gradient(circle at 30% 70%, rgba(102, 126, 234, 0.12) 0%, transparent 50%)',
+      ntpTitleGradient: 'linear-gradient(135deg, #ffffff 0%, #c8c8d8 100%)',
+      toolbarHoverBg: 'rgba(255, 255, 255, 0.08)',
+      toolbarText: 'rgba(255, 255, 255, 0.96)',
+      ntpHeroText: '#ffffff',
+      bgHover: 'rgba(255, 255, 255, 0.08)'
     }
   },
   {
@@ -307,7 +370,14 @@ export const THEME_PRESETS: ThemePreset[] = [
       sidebarBg: '#191724',
       danger: '#eb6f92',
       warning: '#f6c177',
-      success: '#9ccfd8'
+      success: '#9ccfd8',
+      ntpGlowPrimary: 'radial-gradient(circle at 50% 50%, rgba(118, 75, 162, 0.15) 0%, transparent 60%)',
+      ntpGlowSecondary: 'radial-gradient(circle at 30% 70%, rgba(102, 126, 234, 0.12) 0%, transparent 50%)',
+      ntpTitleGradient: 'linear-gradient(135deg, #ffffff 0%, #c8c8d8 100%)',
+      toolbarHoverBg: 'rgba(255, 255, 255, 0.08)',
+      toolbarText: 'rgba(255, 255, 255, 0.96)',
+      ntpHeroText: '#ffffff',
+      bgHover: 'rgba(255, 255, 255, 0.08)'
     }
   },
   {
@@ -338,7 +408,14 @@ export const THEME_PRESETS: ThemePreset[] = [
       sidebarBg: '#16181c',
       danger: '#e06c75',
       warning: '#e5c07b',
-      success: '#98c379'
+      success: '#98c379',
+      ntpGlowPrimary: 'radial-gradient(circle at 50% 50%, rgba(118, 75, 162, 0.15) 0%, transparent 60%)',
+      ntpGlowSecondary: 'radial-gradient(circle at 30% 70%, rgba(102, 126, 234, 0.12) 0%, transparent 50%)',
+      ntpTitleGradient: 'linear-gradient(135deg, #ffffff 0%, #c8c8d8 100%)',
+      toolbarHoverBg: 'rgba(255, 255, 255, 0.08)',
+      toolbarText: 'rgba(255, 255, 255, 0.96)',
+      ntpHeroText: '#ffffff',
+      bgHover: 'rgba(255, 255, 255, 0.08)'
     }
   },
   {
@@ -369,7 +446,14 @@ export const THEME_PRESETS: ThemePreset[] = [
       sidebarBg: '#1c212b',
       danger: '#f28779',
       warning: '#ffad66',
-      success: '#bae67e'
+      success: '#bae67e',
+      ntpGlowPrimary: 'radial-gradient(circle at 50% 50%, rgba(118, 75, 162, 0.15) 0%, transparent 60%)',
+      ntpGlowSecondary: 'radial-gradient(circle at 30% 70%, rgba(102, 126, 234, 0.12) 0%, transparent 50%)',
+      ntpTitleGradient: 'linear-gradient(135deg, #ffffff 0%, #c8c8d8 100%)',
+      toolbarHoverBg: 'rgba(255, 255, 255, 0.08)',
+      toolbarText: 'rgba(255, 255, 255, 0.96)',
+      ntpHeroText: '#ffffff',
+      bgHover: 'rgba(255, 255, 255, 0.08)'
     }
   }
 ]
@@ -402,9 +486,16 @@ export const NINJA_PRESET: ThemePreset = {
     sidebarBg: '#1a1a1e',
     danger: '#f87171',
     warning: '#fbbf24',
-    success: '#34d399'
+      success: '#34d399',
+      ntpGlowPrimary: 'radial-gradient(circle at 50% 50%, rgba(118, 75, 162, 0.15) 0%, transparent 60%)',
+      ntpGlowSecondary: 'radial-gradient(circle at 30% 70%, rgba(102, 126, 234, 0.12) 0%, transparent 50%)',
+      ntpTitleGradient: 'linear-gradient(135deg, #ffffff 0%, #c8c8d8 100%)',
+      toolbarHoverBg: 'rgba(255, 255, 255, 0.08)',
+      toolbarText: 'rgba(255, 255, 255, 0.96)',
+      ntpHeroText: '#ffffff',
+      bgHover: 'rgba(255, 255, 255, 0.08)'
+    }
   }
-}
 
 export function getPresetById(id: string): ThemePreset | undefined {
   return THEME_PRESETS.find(p => p.id === id)
@@ -440,6 +531,13 @@ export function applyPresetToDOM(preset: ThemePreset): void {
   root.style.setProperty('--danger', c.danger)
   root.style.setProperty('--warning', c.warning)
   root.style.setProperty('--success', c.success)
+  root.style.setProperty('--ntp-glow-primary', c.ntpGlowPrimary)
+  root.style.setProperty('--ntp-glow-secondary', c.ntpGlowSecondary)
+  root.style.setProperty('--ntp-title-gradient', c.ntpTitleGradient)
+  root.style.setProperty('--toolbar-hover-bg', c.toolbarHoverBg)
+  root.style.setProperty('--toolbar-text', c.toolbarText)
+  root.style.setProperty('--ntp-hero-text', c.ntpHeroText)
+  root.style.setProperty('--bg-hover', c.bgHover)
 
   // Legacy CSS variables used by existing theme.css
   root.style.setProperty('--bg', c.bgPrimary)

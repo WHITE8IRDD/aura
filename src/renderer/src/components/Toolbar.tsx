@@ -406,6 +406,8 @@ export default function Toolbar(props: Props): React.ReactElement {
           onToggleVerticalTabs={onToggleVerticalTabs}
           verticalTabs={verticalTabs}
           activeTab={tab}
+          onToggleReader={onToggleReader}
+          readerActive={readerActive}
         />
 
         <div className="toolbar-group-separator" />
