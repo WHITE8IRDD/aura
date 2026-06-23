@@ -1,5 +1,7 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { VerticalTabItem } from './VerticalTabItem'
+import { VerticalTabSearch } from './VerticalTabSearch'
+import { VerticalTabGroup, type TabGroupData } from './VerticalTabGroup'
 import { TabState } from '../types'
 
 interface VerticalTabBarProps {
@@ -7,19 +9,36 @@ interface VerticalTabBarProps {
   activeId: number | null
   isCollapsed: boolean
   onToggleCollapse: () => void
+  onOpenTabSearch?: () => void
 }
 
 export function VerticalTabBar({
   tabs,
   activeId,
   isCollapsed,
-  onToggleCollapse
+  onToggleCollapse,
+  onOpenTabSearch
 }: VerticalTabBarProps) {
   const [draggingId, setDraggingId] = useState<number | null>(null)
+  const [groups, setGroups] = useState<TabGroupData[]>([])
   const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const load = async () => {
+      const list = await window.aura.groups.list()
+      setGroups(list as TabGroupData[])
+    }
+    load()
+    return window.aura.tabs.onUpdate(() => {
+      window.aura.groups.list().then(list => setGroups(list as TabGroupData[]))
+    })
+  }, [])
 
   const pinnedTabs = tabs.filter(t => t.pinned)
   const regularTabs = tabs.filter(t => !t.pinned)
+
+  const groupedTabIds = new Set(groups.flatMap(g => g.tabIds))
+  const ungroupedTabs = regularTabs.filter(t => !groupedTabIds.has(t.id))
 
   const handleSelect = (id: number) => window.aura.tabs.activate(id)
   const handleClose = (id: number) => window.aura.tabs.close(id)
@@ -61,6 +80,17 @@ export function VerticalTabBar({
       case 'bookmark':
         window.aura.bookmarks.add(tab.url, tab.title).catch(() => {})
         break
+      case 'add-to-new-group': {
+        const name = prompt('Group name:')?.trim()
+        if (!name) break
+        const color = '#A6C0F1'
+        const group = await window.aura.groups.create(name, color)
+        await window.aura.groups.addTab(group.id, tab.id)
+        break
+      }
+      case 'remove-from-group':
+        await window.aura.groups.removeTab(tab.id)
+        break
       case 'close':
         if (tab.pinned) window.aura.tabs.unpin(tab.id)
         window.aura.tabs.close(tab.id)
@@ -71,6 +101,12 @@ export function VerticalTabBar({
       case 'close-right':
         const idx = tabs.findIndex(t => t.id === tab.id)
         if (idx >= 0) tabs.slice(idx + 1).forEach(t => window.aura.tabs.close(t.id))
+        break
+      case 'close-duplicates':
+        window.aura.tabs.closeDuplicates()
+        break
+      case 'reopen-closed':
+        window.aura.tabs.reopenClosed()
         break
     }
   }
@@ -103,9 +139,35 @@ export function VerticalTabBar({
           onClick={onToggleCollapse}
           title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {isCollapsed ? '›' : '‹'}
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M3 2 V12 M6 7 L10 4 M6 7 L10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </button>
+
+        {!isCollapsed && (
+          <button
+            className="v-tabs-grid-btn"
+            onClick={() => onOpenTabSearch?.()}
+            title="Tab overview"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <rect x="2" y="2" width="4" height="4" rx="1" fill="currentColor"/>
+              <rect x="8" y="2" width="4" height="4" rx="1" fill="currentColor"/>
+              <rect x="2" y="8" width="4" height="4" rx="1" fill="currentColor"/>
+              <rect x="8" y="8" width="4" height="4" rx="1" fill="currentColor"/>
+            </svg>
+          </button>
+        )}
       </div>
+
+      {!isCollapsed && (
+        <div className="v-tabs-search-wrap">
+          <VerticalTabSearch
+            tabs={tabs}
+            onSelectTab={handleSelect}
+          />
+        </div>
+      )}
 
       {pinnedTabs.length > 0 && (
         <div className="v-tabs-pinned-section">
@@ -128,7 +190,33 @@ export function VerticalTabBar({
       )}
 
       <div className="v-tabs-list" ref={listRef}>
-        {regularTabs.map(tab => (
+        {groups.map(group => (
+          <VerticalTabGroup
+            key={group.id}
+            group={group}
+            tabs={tabs}
+            activeId={activeId}
+            onSelectTab={handleSelect}
+            onCloseTab={handleClose}
+            onTabContextMenu={handleContextMenu}
+            onToggleCollapse={() => window.aura.groups.toggleCollapsed(group.id)}
+            onRenameGroup={(name) => window.aura.groups.rename(group.id, name)}
+            onChangeGroupColor={(color) => window.aura.groups.setColor(group.id, color)}
+            onNewTabInGroup={async () => {
+              const tabId = await window.aura.tabs.create()
+              await window.aura.groups.addTab(group.id, tabId)
+            }}
+            onCloseGroup={() => {
+              group.tabIds.forEach(id => window.aura.tabs.close(id))
+            }}
+            onUngroup={() => {
+              group.tabIds.forEach(id => window.aura.groups.removeTab(id))
+            }}
+            onDeleteGroup={() => window.aura.groups.delete(group.id)}
+          />
+        ))}
+
+        {ungroupedTabs.map(tab => (
           <VerticalTabItem
             key={tab.id}
             tab={tab}
