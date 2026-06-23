@@ -156,7 +156,7 @@ export default function App(): React.ReactElement {
     return window.aura.bookmarks.onUpdate(load)
   }, [])
 
-  const effectiveSidebarWidth = verticalTabs ? (vTabsCollapsed ? 56 : 240) : 0
+  const effectiveSidebarWidth = verticalTabs ? (vTabsCollapsed ? 50 : 220) : 0
 
   useEffect(() => {
     void window.aura.layout.setSidebarWidth(effectiveSidebarWidth)

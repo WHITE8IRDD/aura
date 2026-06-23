@@ -57,22 +57,27 @@ export function GroupContextMenu({
       if (!menuRef.current) return
 
       const rect = menuRef.current.getBoundingClientRect()
-      const menuWidth = rect.width || 260
+      const menuWidth = rect.width || 240
       const menuHeight = rect.height || 400
       const vw = window.innerWidth
       const vh = window.innerHeight
+      const SAFETY_MARGIN = 16
 
-      let x = position.x - menuWidth - 8
+      let x = position.x - menuWidth - SAFETY_MARGIN
 
-      if (x < 8) {
-        x = 8
+      if (x < SAFETY_MARGIN) {
+        x = SAFETY_MARGIN
+      }
+
+      if (x + menuWidth > vw - SAFETY_MARGIN) {
+        x = vw - menuWidth - SAFETY_MARGIN
       }
 
       let y = position.y
-      if (y + menuHeight > vh - 8) {
-        y = vh - menuHeight - 8
+      if (y + menuHeight > vh - SAFETY_MARGIN) {
+        y = vh - menuHeight - SAFETY_MARGIN
       }
-      if (y < 8) y = 8
+      if (y < SAFETY_MARGIN) y = SAFETY_MARGIN
 
       setAdjustedPos({ x, y })
     })
