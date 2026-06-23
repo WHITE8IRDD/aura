@@ -4573,6 +4573,7 @@ html[data-ninja="true"] .ninja-pill,
   padding: 4px !important;
   gap: 4px !important;
   border-bottom: none !important;
+  margin-top: 2px !important;
   margin-bottom: 4px !important;
 }
 
@@ -4682,6 +4683,7 @@ html[data-ninja="true"] .ninja-pill,
 
 .v-tabs-collapsed .v-tab-group-pill-active {
   box-shadow: 0 0 0 2px var(--accent, #3b82f6) !important;
+  position: relative !important;
 }
 
 .v-tabs-collapsed .v-tab-group-pill-main {
