@@ -1,19 +1,19 @@
-import React, { useState } from 'react'
+import React, { useState, memo } from 'react'
 import { TabState } from '../types'
 
 interface VerticalTabItemProps {
   tab: TabState
   isActive: boolean
   isCollapsed: boolean
-  onSelect: () => void
-  onClose: () => void
-  onContextMenu: (e: React.MouseEvent) => void
-  onDragStart: (e: React.DragEvent) => void
-  onDragOver: (e: React.DragEvent) => void
-  onDrop: (e: React.DragEvent) => void
+  onSelect: (id: number) => void
+  onClose: (id: number) => void
+  onContextMenu: (e: React.MouseEvent, tab: TabState) => void
+  onDragStart?: (e: React.DragEvent, id: number) => void
+  onDragOver?: (e: React.DragEvent) => void
+  onDrop?: (e: React.DragEvent, id: number) => void
 }
 
-export function VerticalTabItem({
+export const VerticalTabItem = memo(function VerticalTabItem({
   tab,
   isActive,
   isCollapsed,
@@ -26,16 +26,16 @@ export function VerticalTabItem({
 }: VerticalTabItemProps) {
   const [isHovered, setIsHovered] = useState(false)
 
-  const handleClose = (e: React.MouseEvent) => {
+  const handleCloseClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    onClose()
+    onClose(tab.id)
   }
 
   const handleNativeDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', String(tab.id))
     e.dataTransfer.setData('application/x-aura-tab-id', String(tab.id))
-    if (onDragStart) onDragStart(e)
+    if (onDragStart) onDragStart(e, tab.id)
   }
 
   const displayTitle = tab.title || tab.url || 'New Tab'
@@ -43,14 +43,14 @@ export function VerticalTabItem({
   return (
     <div
       className={`v-tab ${isActive ? 'v-tab-active' : ''} ${isCollapsed ? 'v-tab-collapsed' : ''}`}
-      onClick={onSelect}
-      onContextMenu={onContextMenu}
+      onClick={() => onSelect(tab.id)}
+      onContextMenu={(e) => onContextMenu(e, tab)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       draggable
       onDragStart={handleNativeDragStart}
       onDragOver={onDragOver}
-      onDrop={onDrop}
+      onDrop={(e) => onDrop?.(e, tab.id)}
       title={isCollapsed ? displayTitle : ''}
     >
       <div className="v-tab-favicon">
@@ -76,7 +76,7 @@ export function VerticalTabItem({
       {!isCollapsed && isHovered && (
         <button
           className="v-tab-close-btn"
-          onClick={handleClose}
+          onClick={handleCloseClick}
           title="Close tab"
         >
           ×
@@ -84,4 +84,4 @@ export function VerticalTabItem({
       )}
     </div>
   )
-}
+})

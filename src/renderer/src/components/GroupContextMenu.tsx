@@ -44,6 +44,7 @@ export function GroupContextMenu({
 }: GroupContextMenuProps) {
   const [name, setName] = useState(currentName)
   const menuRef = useRef<HTMLDivElement>(null)
+  const renameTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const [adjustedPos, setAdjustedPos] = useState(position)
 
   useEffect(() => {
@@ -86,13 +87,23 @@ export function GroupContextMenu({
   }, [position])
 
   useEffect(() => {
+    return () => {
+      if (renameTimerRef.current) clearTimeout(renameTimerRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        if (renameTimerRef.current) clearTimeout(renameTimerRef.current)
         onClose()
       }
     }
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        if (renameTimerRef.current) clearTimeout(renameTimerRef.current)
+        onClose()
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     document.addEventListener('keydown', handleEscape)
@@ -102,14 +113,25 @@ export function GroupContextMenu({
     }
   }, [onClose])
 
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setName(value)
+    if (renameTimerRef.current) clearTimeout(renameTimerRef.current)
+    renameTimerRef.current = setTimeout(() => {
+      if (value !== currentName) onRename(value)
+    }, 400)
+  }
+
   const handleNameSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
+      if (renameTimerRef.current) clearTimeout(renameTimerRef.current)
       onRename(name)
       onClose()
     }
   }
 
   const handleNameBlur = () => {
+    if (renameTimerRef.current) clearTimeout(renameTimerRef.current)
     if (name !== currentName) {
       onRename(name)
     }
@@ -133,7 +155,7 @@ export function GroupContextMenu({
         type="text"
         placeholder="Name this group"
         value={name}
-        onChange={(e) => setName(e.target.value)}
+        onChange={handleNameChange}
         onBlur={handleNameBlur}
         onKeyDown={handleNameSubmit}
         autoFocus

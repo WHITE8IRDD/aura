@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, memo } from 'react'
 import { VerticalTabItem } from './VerticalTabItem'
 import { GroupContextMenu } from './GroupContextMenu'
 import { TabState } from '../types'
@@ -27,7 +27,7 @@ interface VerticalTabGroupProps {
   onDeleteGroup: () => void
 }
 
-export function VerticalTabGroup({
+export const VerticalTabGroup = memo(function VerticalTabGroup({
   group,
   tabs,
   activeId,
@@ -60,7 +60,7 @@ export function VerticalTabGroup({
     }
   }
 
-  const handlePillDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+  const handlePillDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
     setIsDragOver(false)
@@ -78,11 +78,7 @@ export function VerticalTabGroup({
 
     if (group.tabIds.includes(tabId)) return
 
-    try {
-      await window.aura.groups.addTab(group.id, tabId)
-    } catch (err) {
-      console.error('[VerticalTabGroup] addTab failed:', err)
-    }
+    window.aura.groups.addTab(group.id, tabId)
   }
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -160,12 +156,9 @@ export function VerticalTabGroup({
                   tab={tab}
                   isActive={tab.id === activeId}
                   isCollapsed={false}
-                  onSelect={() => onSelectTab(tab.id)}
-                  onClose={() => onCloseTab(tab.id)}
-                  onContextMenu={(e) => onTabContextMenu(e, tab)}
-                  onDragStart={() => {}}
-                  onDragOver={() => {}}
-                  onDrop={() => {}}
+                  onSelect={onSelectTab}
+                  onClose={onCloseTab}
+                  onContextMenu={onTabContextMenu}
                 />
               </div>
             ))}
@@ -195,4 +188,4 @@ export function VerticalTabGroup({
       )}
     </>
   )
-}
+})

@@ -34,17 +34,17 @@ export function VerticalTabBar({
   useEffect(() => {
     loadGroups()
 
-    const unsubscribe = window.aura.tabs.onUpdate(() => {
+    const unsubTabs = window.aura.tabs.onUpdate(() => {
       loadGroups()
     })
 
-    const interval = setInterval(() => {
+    const unsubGroups = window.aura.groups.onChanged(() => {
       loadGroups()
-    }, 1000)
+    })
 
     return () => {
-      if (typeof unsubscribe === 'function') unsubscribe()
-      clearInterval(interval)
+      if (typeof unsubTabs === 'function') unsubTabs()
+      if (typeof unsubGroups === 'function') unsubGroups()
     }
   }, [loadGroups])
 
@@ -54,11 +54,11 @@ export function VerticalTabBar({
   const groupedTabIds = new Set(groups.flatMap(g => g.tabIds))
   const ungroupedTabs = regularTabs.filter(t => !groupedTabIds.has(t.id))
 
-  const handleSelect = (id: number) => window.aura.tabs.activate(id)
-  const handleClose = (id: number) => window.aura.tabs.close(id)
-  const handleNewTab = () => window.aura.tabs.create()
+  const handleSelect = useCallback((id: number) => window.aura.tabs.activate(id), [])
+  const handleClose = useCallback((id: number) => window.aura.tabs.close(id), [])
+  const handleNewTab = useCallback(() => window.aura.tabs.create(), [])
 
-  const handleContextMenu = async (e: React.MouseEvent, tab: TabState): Promise<void> => {
+  const handleContextMenu = useCallback(async (e: React.MouseEvent, tab: TabState): Promise<void> => {
     e.preventDefault()
     const canReopenClosed = await window.aura.tabs.hasClosedTabs()
     const action = await window.aura.tabContextMenu.show({
@@ -123,19 +123,19 @@ export function VerticalTabBar({
         window.aura.tabs.reopenClosed()
         break
     }
-  }
+  }, [tabs, activeId])
 
-  const handleDragStart = (e: React.DragEvent, id: number) => {
+  const handleDragStart = useCallback((e: React.DragEvent, id: number) => {
     setDraggingId(id)
     e.dataTransfer.effectAllowed = 'move'
-  }
+  }, [])
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-  }
+  }, [])
 
-  const handleDrop = (e: React.DragEvent, targetId: number) => {
+  const handleDrop = useCallback((e: React.DragEvent, targetId: number) => {
     e.preventDefault()
     if (draggingId === null || draggingId === targetId) return
     const targetIndex = tabs.findIndex(t => t.id === targetId)
@@ -143,7 +143,7 @@ export function VerticalTabBar({
       window.aura.tabs.reorder(draggingId, targetIndex)
     }
     setDraggingId(null)
-  }
+  }, [draggingId, tabs])
 
   return (
     <div className={`v-tabs-container ${isCollapsed ? 'v-tabs-collapsed' : ''}`}>
@@ -179,27 +179,11 @@ export function VerticalTabBar({
           groups={groups}
           tabs={tabs}
           onClose={() => setGroupsPanelOpen(false)}
-          onCreateGroup={async () => {
-            const id = await window.aura.groups.create('')
-            await loadGroups()
-            return id
-          }}
-          onRenameGroup={async (id, name) => {
-            await window.aura.groups.rename(id, name)
-            await loadGroups()
-          }}
-          onChangeGroupColor={async (id, color) => {
-            await window.aura.groups.setColor(id, color)
-            await loadGroups()
-          }}
-          onDeleteGroup={async (id) => {
-            await window.aura.groups.delete(id)
-            await loadGroups()
-          }}
-          onRemoveTabFromGroup={async (tabId) => {
-            await window.aura.groups.removeTab(tabId)
-            await loadGroups()
-          }}
+          onCreateGroup={() => window.aura.groups.create('')}
+          onRenameGroup={(id, name) => window.aura.groups.rename(id, name)}
+          onChangeGroupColor={(id, color) => window.aura.groups.setColor(id, color)}
+          onDeleteGroup={(id) => window.aura.groups.delete(id)}
+          onRemoveTabFromGroup={(tabId) => window.aura.groups.removeTab(tabId)}
           onSelectTab={(tabId) => {
             window.aura.tabs.activate(tabId)
             setGroupsPanelOpen(false)
@@ -215,12 +199,12 @@ export function VerticalTabBar({
                   tab={tab}
                   isActive={tab.id === activeId}
                   isCollapsed={true}
-                  onSelect={() => handleSelect(tab.id)}
-                  onClose={() => handleClose(tab.id)}
-                  onContextMenu={(e) => handleContextMenu(e, tab)}
-                  onDragStart={(e) => handleDragStart(e, tab.id)}
+                  onSelect={handleSelect}
+                  onClose={handleClose}
+                  onContextMenu={handleContextMenu}
+                  onDragStart={handleDragStart}
                   onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, tab.id)}
+                  onDrop={handleDrop}
                 />
               ))}
               <div className="v-tabs-divider" />
@@ -238,33 +222,16 @@ export function VerticalTabBar({
                 onCloseTab={handleClose}
                 onTabContextMenu={handleContextMenu}
                 onToggleCollapse={() => window.aura.groups.toggleCollapsed(group.id)}
-                onRenameGroup={async (name) => {
-                  await window.aura.groups.rename(group.id, name)
-                  await loadGroups()
+                onRenameGroup={(name) => window.aura.groups.rename(group.id, name)}
+                onChangeGroupColor={(color) => window.aura.groups.setColor(group.id, color)}
+                onNewTabInGroup={() => {
+                  window.aura.tabs.create().then(tabId => {
+                    window.aura.groups.addTab(group.id, tabId)
+                  })
                 }}
-                onChangeGroupColor={async (color) => {
-                  await window.aura.groups.setColor(group.id, color)
-                  await loadGroups()
-                }}
-                onNewTabInGroup={async () => {
-                  const tabId = await window.aura.tabs.create()
-                  await window.aura.groups.addTab(group.id, tabId)
-                  await loadGroups()
-                }}
-                onCloseGroup={async () => {
-                  group.tabIds.forEach(id => window.aura.tabs.close(id))
-                  await loadGroups()
-                }}
-                onUngroup={async () => {
-                  for (const id of group.tabIds) {
-                    await window.aura.groups.removeTab(id)
-                  }
-                  await loadGroups()
-                }}
-                onDeleteGroup={async () => {
-                  await window.aura.groups.delete(group.id)
-                  await loadGroups()
-                }}
+                onCloseGroup={() => group.tabIds.forEach(id => window.aura.tabs.close(id))}
+                onUngroup={() => group.tabIds.forEach(id => window.aura.groups.removeTab(id))}
+                onDeleteGroup={() => window.aura.groups.delete(group.id)}
               />
             ))}
 
@@ -274,12 +241,12 @@ export function VerticalTabBar({
                 tab={tab}
                 isActive={tab.id === activeId}
                 isCollapsed={isCollapsed}
-                onSelect={() => handleSelect(tab.id)}
-                onClose={() => handleClose(tab.id)}
-                onContextMenu={(e) => handleContextMenu(e, tab)}
-                onDragStart={(e) => handleDragStart(e, tab.id)}
+                onSelect={handleSelect}
+                onClose={handleClose}
+                onContextMenu={handleContextMenu}
+                onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, tab.id)}
+                onDrop={handleDrop}
               />
             ))}
           </div>

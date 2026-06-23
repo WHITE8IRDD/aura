@@ -743,13 +743,41 @@ ipcMain.handle('boosts:update',
 ipcMain.handle('boosts:delete', (_e, id: number) => deleteBoost(id))
 ipcMain.handle('boosts:list', () => listBoosts())
 
-ipcMain.handle('groups:create', (_e, name: string, color: string) => createGroup(name, color))
-ipcMain.handle('groups:delete', (_e, id: string) => deleteGroup(id))
-ipcMain.handle('groups:rename', (_e, id: string, name: string) => renameGroup(id, name))
-ipcMain.handle('groups:setColor', (_e, id: string, color: string) => setGroupColor(id, color))
-ipcMain.handle('groups:toggleCollapsed', (_e, id: string) => toggleCollapsed(id))
-ipcMain.handle('groups:addTab', (_e, groupId: string, tabId: number) => addTabToGroup(groupId, tabId))
-ipcMain.handle('groups:removeTab', (_e, tabId: number) => removeTabFromAnyGroup(tabId))
+function broadcastGroupChange(): void {
+  BrowserWindow.getAllWindows().forEach(w => {
+    if (!w.isDestroyed()) w.webContents.send('groups:changed')
+  })
+}
+
+ipcMain.handle('groups:create', (_e, name: string, color: string) => {
+  const id = createGroup(name, color)
+  broadcastGroupChange()
+  return id
+})
+ipcMain.handle('groups:delete', (_e, id: string) => {
+  deleteGroup(id)
+  broadcastGroupChange()
+})
+ipcMain.handle('groups:rename', (_e, id: string, name: string) => {
+  renameGroup(id, name)
+  broadcastGroupChange()
+})
+ipcMain.handle('groups:setColor', (_e, id: string, color: string) => {
+  setGroupColor(id, color)
+  broadcastGroupChange()
+})
+ipcMain.handle('groups:toggleCollapsed', (_e, id: string) => {
+  toggleCollapsed(id)
+  broadcastGroupChange()
+})
+ipcMain.handle('groups:addTab', (_e, groupId: string, tabId: number) => {
+  addTabToGroup(groupId, tabId)
+  broadcastGroupChange()
+})
+ipcMain.handle('groups:removeTab', (_e, tabId: number) => {
+  removeTabFromAnyGroup(tabId)
+  broadcastGroupChange()
+})
 ipcMain.handle('groups:list', () => listGroups())
 ipcMain.handle('groups:snapshot', () => snapshotGroups())
 

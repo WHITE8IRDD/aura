@@ -325,7 +325,12 @@ const api = {
     addTab: (groupId: string, tabId: number) => ipcRenderer.invoke('groups:addTab', groupId, tabId),
     removeTab: (tabId: number) => ipcRenderer.invoke('groups:removeTab', tabId),
     list: () => ipcRenderer.invoke('groups:list'),
-    snapshot: () => ipcRenderer.invoke('groups:snapshot')
+    snapshot: () => ipcRenderer.invoke('groups:snapshot'),
+    onChanged: (cb: () => void): (() => void) => {
+      const l = (): void => cb()
+      ipcRenderer.on('groups:changed', l)
+      return () => ipcRenderer.removeListener('groups:changed', l)
+    }
   },
 
   readingList: {
