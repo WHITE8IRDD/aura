@@ -518,7 +518,6 @@ export default function App(): React.ReactElement {
           activeId={activeId}
           isCollapsed={vTabsCollapsed}
           onToggleCollapse={() => setVTabsCollapsed(!vTabsCollapsed)}
-          onOpenTabSearch={() => setTabSearchOpen(true)}
         />
       )}
 

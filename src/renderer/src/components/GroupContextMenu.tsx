@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 interface GroupContextMenuProps {
   groupId: string
@@ -12,6 +13,7 @@ interface GroupContextMenuProps {
   onCloseGroup: () => void
   onUngroup: () => void
   onDeleteGroup: () => void
+  onMoveToNewWindow?: () => void
 }
 
 const GROUP_COLORS = [
@@ -37,10 +39,46 @@ export function GroupContextMenu({
   onNewTabInGroup,
   onCloseGroup,
   onUngroup,
-  onDeleteGroup
+  onDeleteGroup,
+  onMoveToNewWindow
 }: GroupContextMenuProps) {
   const [name, setName] = useState(currentName)
   const menuRef = useRef<HTMLDivElement>(null)
+  const [adjustedPos, setAdjustedPos] = useState(position)
+
+  useEffect(() => {
+    setName(currentName)
+  }, [currentName])
+
+  useEffect(() => {
+    if (!menuRef.current) return
+
+    const raf = requestAnimationFrame(() => {
+      if (!menuRef.current) return
+
+      const rect = menuRef.current.getBoundingClientRect()
+      const menuWidth = rect.width || 260
+      const menuHeight = rect.height || 400
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+
+      let x = position.x - menuWidth - 8
+
+      if (x < 8) {
+        x = 8
+      }
+
+      let y = position.y
+      if (y + menuHeight > vh - 8) {
+        y = vh - menuHeight - 8
+      }
+      if (y < 8) y = 8
+
+      setAdjustedPos({ x, y })
+    })
+
+    return () => cancelAnimationFrame(raf)
+  }, [position])
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -66,87 +104,122 @@ export function GroupContextMenu({
     }
   }
 
-  return (
+  const handleNameBlur = () => {
+    if (name !== currentName) {
+      onRename(name)
+    }
+  }
+
+  return createPortal(
     <div
       ref={menuRef}
-      className="group-context-menu"
+      className="gcm-menu"
       style={{
         position: 'fixed',
-        left: position.x,
-        top: position.y,
-        zIndex: 99999
+        left: adjustedPos.x,
+        top: adjustedPos.y,
+        zIndex: 99999,
+        maxHeight: 'calc(100vh - 16px)',
+        overflowY: 'auto'
       }}
     >
       <input
-        className="group-name-input"
+        className="gcm-name-input"
         type="text"
         placeholder="Name this group"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        onBlur={() => name !== currentName && onRename(name)}
+        onBlur={handleNameBlur}
         onKeyDown={handleNameSubmit}
         autoFocus
       />
 
-      <div className="group-color-swatches">
+      <div className="gcm-color-row">
         {GROUP_COLORS.map(color => (
           <button
             key={color.name}
-            className={`group-color-swatch ${currentColor === color.value ? 'group-color-active' : ''}`}
+            className={`gcm-color-dot ${currentColor === color.value ? 'gcm-color-dot-active' : ''}`}
             style={{ background: color.value }}
             onClick={() => onChangeColor(color.value)}
             title={color.name}
+            aria-label={color.name}
           />
         ))}
       </div>
 
-      <div className="group-menu-divider" />
+      <div className="gcm-divider" />
 
       <button
-        className="group-menu-item"
+        className="gcm-item"
         onClick={() => { onNewTabInGroup(); onClose() }}
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect x="2" y="2" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/>
-          <path d="M7 4 V10 M4 7 H10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-        </svg>
-        <span>New tab in group</span>
-        <span className="group-menu-shortcut">Alt+Shift+C</span>
+        <span className="gcm-item-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M8 5 V11 M5 8 H11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+        </span>
+        <span className="gcm-item-label">New tab in group</span>
+        <span className="gcm-item-shortcut">Alt+Shift+C</span>
       </button>
 
+      {onMoveToNewWindow && (
+        <button
+          className="gcm-item"
+          onClick={() => { onMoveToNewWindow(); onClose() }}
+        >
+          <span className="gcm-item-icon">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="3" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+              <path d="M10 6 L13 6 V9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              <path d="M12 12 L10 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+          </span>
+          <span className="gcm-item-label">Move group to new window</span>
+        </button>
+      )}
+
       <button
-        className="group-menu-item"
+        className="gcm-item"
         onClick={() => { onCloseGroup(); onClose() }}
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect x="2" y="2" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/>
-          <path d="M5 5 L9 9 M9 5 L5 9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-        </svg>
-        <span>Close group</span>
-        <span className="group-menu-shortcut">Alt+Shift+W</span>
+        <span className="gcm-item-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M6 6 L10 10 M10 6 L6 10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+        </span>
+        <span className="gcm-item-label">Close group</span>
+        <span className="gcm-item-shortcut">Alt+Shift+W</span>
       </button>
 
-      <div className="group-menu-divider" />
+      <div className="gcm-divider" />
 
       <button
-        className="group-menu-item"
+        className="gcm-item"
         onClick={() => { onUngroup(); onClose() }}
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M3 7 H11 M3 4 H11 M3 10 H7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-        </svg>
-        <span>Ungroup</span>
+        <span className="gcm-item-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 5 L7 5 M3 8 L9 8 M3 11 L7 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            <path d="M11 4 L14 7 L11 10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </span>
+        <span className="gcm-item-label">Ungroup</span>
       </button>
 
       <button
-        className="group-menu-item group-menu-item-danger"
+        className="gcm-item gcm-item-danger"
         onClick={() => { onDeleteGroup(); onClose() }}
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M3 4 H11 M5 4 V11 M9 4 V11 M4 4 V2 H10 V4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        <span>Delete group</span>
+        <span className="gcm-item-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 4 H13 M5.5 4 V12 M10.5 4 V12 M5 4 V2 H11 V4 M4 4 V13 H12 V4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </span>
+        <span className="gcm-item-label">Delete group</span>
       </button>
-    </div>
+    </div>,
+    document.body
   )
 }

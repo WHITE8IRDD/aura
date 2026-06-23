@@ -31,6 +31,13 @@ export function VerticalTabItem({
     onClose()
   }
 
+  const handleNativeDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(tab.id))
+    e.dataTransfer.setData('application/x-aura-tab-id', String(tab.id))
+    if (onDragStart) onDragStart(e)
+  }
+
   const displayTitle = tab.title || tab.url || 'New Tab'
 
   return (
@@ -41,7 +48,7 @@ export function VerticalTabItem({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       draggable
-      onDragStart={onDragStart}
+      onDragStart={handleNativeDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
       title={isCollapsed ? displayTitle : ''}

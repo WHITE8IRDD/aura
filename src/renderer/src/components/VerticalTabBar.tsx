@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { VerticalTabItem } from './VerticalTabItem'
-import { VerticalTabSearch } from './VerticalTabSearch'
 import { VerticalTabGroup, type TabGroupData } from './VerticalTabGroup'
+import { TabOrganizerPanel } from './TabOrganizerPanel'
 import { TabState } from '../types'
 
 interface VerticalTabBarProps {
@@ -9,30 +9,44 @@ interface VerticalTabBarProps {
   activeId: number | null
   isCollapsed: boolean
   onToggleCollapse: () => void
-  onOpenTabSearch?: () => void
 }
 
 export function VerticalTabBar({
   tabs,
   activeId,
   isCollapsed,
-  onToggleCollapse,
-  onOpenTabSearch
+  onToggleCollapse
 }: VerticalTabBarProps) {
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const [groups, setGroups] = useState<TabGroupData[]>([])
+  const [groupsPanelOpen, setGroupsPanelOpen] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    const load = async () => {
+  const loadGroups = useCallback(async () => {
+    try {
       const list = await window.aura.groups.list()
-      setGroups(list as TabGroupData[])
+      setGroups(list || [])
+    } catch {
+      setGroups([])
     }
-    load()
-    return window.aura.tabs.onUpdate(() => {
-      window.aura.groups.list().then(list => setGroups(list as TabGroupData[]))
-    })
   }, [])
+
+  useEffect(() => {
+    loadGroups()
+
+    const unsubscribe = window.aura.tabs.onUpdate(() => {
+      loadGroups()
+    })
+
+    const interval = setInterval(() => {
+      loadGroups()
+    }, 1000)
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe()
+      clearInterval(interval)
+    }
+  }, [loadGroups])
 
   const pinnedTabs = tabs.filter(t => t.pinned)
   const regularTabs = tabs.filter(t => !t.pinned)
@@ -146,8 +160,8 @@ export function VerticalTabBar({
 
         {!isCollapsed && (
           <button
-            className="v-tabs-grid-btn"
-            onClick={() => onOpenTabSearch?.()}
+            className={`v-tabs-grid-btn ${groupsPanelOpen ? 'v-tabs-grid-btn-active' : ''}`}
+            onClick={() => setGroupsPanelOpen(prev => !prev)}
             title="Tab overview"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -160,87 +174,127 @@ export function VerticalTabBar({
         )}
       </div>
 
-      {!isCollapsed && (
-        <div className="v-tabs-search-wrap">
-          <VerticalTabSearch
-            tabs={tabs}
-            onSelectTab={handleSelect}
-          />
-        </div>
+      {groupsPanelOpen ? (
+        <TabOrganizerPanel
+          groups={groups}
+          tabs={tabs}
+          onClose={() => setGroupsPanelOpen(false)}
+          onCreateGroup={async () => {
+            const id = await window.aura.groups.create('')
+            await loadGroups()
+            return id
+          }}
+          onRenameGroup={async (id, name) => {
+            await window.aura.groups.rename(id, name)
+            await loadGroups()
+          }}
+          onChangeGroupColor={async (id, color) => {
+            await window.aura.groups.setColor(id, color)
+            await loadGroups()
+          }}
+          onDeleteGroup={async (id) => {
+            await window.aura.groups.delete(id)
+            await loadGroups()
+          }}
+          onRemoveTabFromGroup={async (tabId) => {
+            await window.aura.groups.removeTab(tabId)
+            await loadGroups()
+          }}
+          onSelectTab={(tabId) => {
+            window.aura.tabs.activate(tabId)
+            setGroupsPanelOpen(false)
+          }}
+        />
+      ) : (
+        <>
+          {pinnedTabs.length > 0 && (
+            <div className="v-tabs-pinned-section">
+              {pinnedTabs.map(tab => (
+                <VerticalTabItem
+                  key={tab.id}
+                  tab={tab}
+                  isActive={tab.id === activeId}
+                  isCollapsed={true}
+                  onSelect={() => handleSelect(tab.id)}
+                  onClose={() => handleClose(tab.id)}
+                  onContextMenu={(e) => handleContextMenu(e, tab)}
+                  onDragStart={(e) => handleDragStart(e, tab.id)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, tab.id)}
+                />
+              ))}
+              <div className="v-tabs-divider" />
+            </div>
+          )}
+
+          <div className="v-tabs-list" ref={listRef}>
+            {groups.map(group => (
+              <VerticalTabGroup
+                key={group.id}
+                group={group}
+                tabs={tabs}
+                activeId={activeId}
+                onSelectTab={handleSelect}
+                onCloseTab={handleClose}
+                onTabContextMenu={handleContextMenu}
+                onToggleCollapse={() => window.aura.groups.toggleCollapsed(group.id)}
+                onRenameGroup={async (name) => {
+                  await window.aura.groups.rename(group.id, name)
+                  await loadGroups()
+                }}
+                onChangeGroupColor={async (color) => {
+                  await window.aura.groups.setColor(group.id, color)
+                  await loadGroups()
+                }}
+                onNewTabInGroup={async () => {
+                  const tabId = await window.aura.tabs.create()
+                  await window.aura.groups.addTab(group.id, tabId)
+                  await loadGroups()
+                }}
+                onCloseGroup={async () => {
+                  group.tabIds.forEach(id => window.aura.tabs.close(id))
+                  await loadGroups()
+                }}
+                onUngroup={async () => {
+                  for (const id of group.tabIds) {
+                    await window.aura.groups.removeTab(id)
+                  }
+                  await loadGroups()
+                }}
+                onDeleteGroup={async () => {
+                  await window.aura.groups.delete(group.id)
+                  await loadGroups()
+                }}
+              />
+            ))}
+
+            {ungroupedTabs.map(tab => (
+              <VerticalTabItem
+                key={tab.id}
+                tab={tab}
+                isActive={tab.id === activeId}
+                isCollapsed={isCollapsed}
+                onSelect={() => handleSelect(tab.id)}
+                onClose={() => handleClose(tab.id)}
+                onContextMenu={(e) => handleContextMenu(e, tab)}
+                onDragStart={(e) => handleDragStart(e, tab.id)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, tab.id)}
+              />
+            ))}
+          </div>
+
+          <div className="v-tabs-footer">
+            <button
+              className="v-tabs-new-btn"
+              onClick={handleNewTab}
+              title="New tab"
+            >
+              {isCollapsed ? '+' : '+ New Tab'}
+            </button>
+          </div>
+        </>
       )}
-
-      {pinnedTabs.length > 0 && (
-        <div className="v-tabs-pinned-section">
-          {pinnedTabs.map(tab => (
-            <VerticalTabItem
-              key={tab.id}
-              tab={tab}
-              isActive={tab.id === activeId}
-              isCollapsed={true}
-              onSelect={() => handleSelect(tab.id)}
-              onClose={() => handleClose(tab.id)}
-              onContextMenu={(e) => handleContextMenu(e, tab)}
-              onDragStart={(e) => handleDragStart(e, tab.id)}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, tab.id)}
-            />
-          ))}
-          <div className="v-tabs-divider" />
-        </div>
-      )}
-
-      <div className="v-tabs-list" ref={listRef}>
-        {groups.map(group => (
-          <VerticalTabGroup
-            key={group.id}
-            group={group}
-            tabs={tabs}
-            activeId={activeId}
-            onSelectTab={handleSelect}
-            onCloseTab={handleClose}
-            onTabContextMenu={handleContextMenu}
-            onToggleCollapse={() => window.aura.groups.toggleCollapsed(group.id)}
-            onRenameGroup={(name) => window.aura.groups.rename(group.id, name)}
-            onChangeGroupColor={(color) => window.aura.groups.setColor(group.id, color)}
-            onNewTabInGroup={async () => {
-              const tabId = await window.aura.tabs.create()
-              await window.aura.groups.addTab(group.id, tabId)
-            }}
-            onCloseGroup={() => {
-              group.tabIds.forEach(id => window.aura.tabs.close(id))
-            }}
-            onUngroup={() => {
-              group.tabIds.forEach(id => window.aura.groups.removeTab(id))
-            }}
-            onDeleteGroup={() => window.aura.groups.delete(group.id)}
-          />
-        ))}
-
-        {ungroupedTabs.map(tab => (
-          <VerticalTabItem
-            key={tab.id}
-            tab={tab}
-            isActive={tab.id === activeId}
-            isCollapsed={isCollapsed}
-            onSelect={() => handleSelect(tab.id)}
-            onClose={() => handleClose(tab.id)}
-            onContextMenu={(e) => handleContextMenu(e, tab)}
-            onDragStart={(e) => handleDragStart(e, tab.id)}
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, tab.id)}
-          />
-        ))}
-      </div>
-
-      <div className="v-tabs-footer">
-        <button
-          className="v-tabs-new-btn"
-          onClick={handleNewTab}
-          title="New tab"
-        >
-          {isCollapsed ? '+' : '+ New Tab'}
-        </button>
-      </div>
     </div>
   )
 }
