@@ -106,6 +106,11 @@ import { registerImageSaverWindowIPC } from './imageSaverWindow'
 import { registerPerfHudWindowIPC, togglePerfHud } from './perfHudWindow'
 import { SplitManager } from './splitManager'
 import { writeFile } from 'fs/promises'
+import {
+  installUnpacked, installCrx, enableExtension, disableExtension,
+  deleteExtension, listExtensions, getExtension, getIconDataUrl,
+  reloadEnabledExtensions, pickFolder, pickCrx
+} from './extensionManager'
 
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
@@ -220,6 +225,8 @@ const startupReady = app.whenReady().then(async () => {
   cleanCorruptedEntries()
   console.log('[aura:media] running gcStaleMediaEntries')
   gcStaleMediaEntries()
+  console.log('[Aura/ext] Reloading enabled extensions…')
+  await reloadEnabledExtensions()
   console.log('[Aura] Ready')
 })
 
@@ -838,6 +845,35 @@ registerImageSaverIPC()
 registerTranslatorWindowIPC()
 registerImageSaverWindowIPC()
 registerPerfHudWindowIPC()
+
+// STAGE 16 — Chrome Extension System
+ipcMain.handle('extensions:list', () => listExtensions())
+ipcMain.handle('extensions:get', (_e, id: string) => getExtension(id))
+ipcMain.handle('extensions:installFolder', async () => {
+  const folder = await pickFolder()
+  if (!folder) return { success: false, cancelled: true }
+  return installUnpacked(folder)
+})
+ipcMain.handle('extensions:installCrx', async () => {
+  const crxPath = await pickCrx()
+  if (!crxPath) return { success: false, cancelled: true }
+  return installCrx(crxPath)
+})
+ipcMain.handle('extensions:enable', (_e, id: string) => enableExtension(id))
+ipcMain.handle('extensions:disable', (_e, id: string) => disableExtension(id))
+ipcMain.handle('extensions:delete', (_e, id: string) => deleteExtension(id))
+ipcMain.handle('extensions:openStore', () => {
+  try {
+    if (tabs) {
+      tabs.create('https://chromewebstore.google.com/category/extensions')
+      return { success: true }
+    }
+    return { success: false, error: 'No tab manager available' }
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+})
+ipcMain.handle('extensions:getIcon', (_e, id: string) => getIconDataUrl(id))
 
 ipcMain.on('videoDl:request', async (_e, { url, filename }: { url: string; filename: string }) => {
   if (!url || url.startsWith('blob:') || url.startsWith('data:')) return

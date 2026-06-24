@@ -217,6 +217,23 @@ const MIGRATIONS: Migration[] = [
         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
       `).run(personal.id)
     }
+  },
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS extensions (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        version TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        author TEXT NOT NULL DEFAULT '',
+        homeUrl TEXT NOT NULL DEFAULT '',
+        iconPath TEXT NOT NULL DEFAULT '',
+        sourceType TEXT NOT NULL DEFAULT 'unpacked',
+        sourcePath TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        installed_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+    `)
   }
 ]
 

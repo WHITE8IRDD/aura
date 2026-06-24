@@ -686,6 +686,32 @@ const api = {
     }
   },
 
+  extensions: {
+    list: (): Promise<Array<{
+      id: string; name: string; version: string; description: string
+      author: string; homeUrl: string; iconPath: string
+      sourceType: string; sourcePath: string; enabled: number; installed_at: number
+    }>> => ipcRenderer.invoke('extensions:list'),
+    get: (id: string): Promise<{
+      id: string; name: string; version: string; description: string
+      author: string; homeUrl: string; iconPath: string
+      sourceType: string; sourcePath: string; enabled: number; installed_at: number
+    } | undefined> => ipcRenderer.invoke('extensions:get', id),
+    installFolder: (): Promise<{ success: boolean; id?: string; error?: string; cancelled?: boolean }> =>
+      ipcRenderer.invoke('extensions:installFolder'),
+    installCrx: (): Promise<{ success: boolean; id?: string; error?: string; cancelled?: boolean }> =>
+      ipcRenderer.invoke('extensions:installCrx'),
+    enable: (id: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('extensions:enable', id),
+    disable: (id: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('extensions:disable', id),
+    delete: (id: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('extensions:delete', id),
+    openStore: (): Promise<void> => ipcRenderer.invoke('extensions:openStore'),
+    getIcon: (id: string): Promise<string | null> =>
+      ipcRenderer.invoke('extensions:getIcon', id),
+  },
+
   autofill: {
     isAvailable: (): Promise<boolean> => ipcRenderer.invoke('autofill:isAvailable'),
 
