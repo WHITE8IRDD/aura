@@ -1,168 +1,237 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+// src/renderer/src/components/SplitOverlay.tsx
+// V2 — Fixes: X button, favicon, pane border
 
-interface Props {
-  tabId: number | null
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import '../styles/split-view.css'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface SplitState {
+  ratio: number
+  focusedPane: 'primary' | 'split'
+  splitUrl: string
 }
 
-export function SplitOverlay({ tabId }: Props) {
-  const [ratio, setRatio] = useState(0.5)
-  const [isDragging, setIsDragging] = useState(false)
-  const [focusedPane, setFocusedPane] = useState<'primary' | 'split'>('primary')
-  const [primaryUrl, setPrimaryUrl] = useState('')
-  const [splitUrl, setSplitUrl] = useState('')
-  const [leftInput, setLeftInput] = useState('')
-  const [rightInput, setRightInput] = useState('')
-  const [isSplit, setIsSplit] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const rafRef = useRef<number>(0)
+interface SplitOverlayProps {
+  tabId: number
+  primaryUrl: string
+  splitState: SplitState
+  onRatioChange?: (ratio: number) => void
+  onFocusChange?: (pane: 'primary' | 'split') => void
+  onClose?: (pane: 'primary' | 'split') => void
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DIVIDER_W  = 8
+const PANE_INSET = 2
+const MIN_RATIO  = 0.2
+const MAX_RATIO  = 0.8
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Google favicon service — far more reliable than fetching /favicon.ico directly
+function faviconSrc(url: string): string {
+  try {
+    const domain = new URL(url).hostname
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
+  } catch {
+    return ''
+  }
+}
+
+function domainFromUrl(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
+
+// ─── PillBadge ────────────────────────────────────────────────────────────────
+
+interface PillBadgeProps {
+  url: string
+  pane: 'primary' | 'split'
+  onClose: (pane: 'primary' | 'split') => void
+}
+
+const PillBadge: React.FC<PillBadgeProps> = ({ url, pane, onClose }) => {
+  const [faviconError, setFaviconError] = useState(false)
+  const domain = domainFromUrl(url)
+  const favicon = faviconSrc(url)
+
+  // FIX BUG 1: onMouseDown fires before parent pane click, stopPropagation prevents pane focus
+  const handleCloseMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      e.preventDefault()
+      onClose(pane)
+    },
+    [pane, onClose]
+  )
+
+  return (
+    <div className="sv-pill">
+      {/* FIX BUG 2: Google favicon service instead of /favicon.ico */}
+      {!faviconError && favicon ? (
+        <img
+          src={favicon}
+          alt=""
+          className="sv-pill-favicon"
+          onError={() => setFaviconError(true)}
+          draggable={false}
+        />
+      ) : (
+        <div className="sv-pill-favicon-fallback" />
+      )}
+
+      <span className="sv-pill-domain">{domain}</span>
+
+      <button
+        className="sv-pill-close"
+        onMouseDown={handleCloseMouseDown}
+        aria-label={`Close ${pane === 'primary' ? 'left' : 'right'} pane`}
+        title="Close pane"
+        type="button"
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
+// ─── SplitOverlay ─────────────────────────────────────────────────────────────
+
+const SplitOverlay: React.FC<SplitOverlayProps> = ({
+  tabId,
+  primaryUrl,
+  splitState,
+  onRatioChange,
+  onFocusChange,
+  onClose,
+}) => {
+  const containerRef   = useRef<HTMLDivElement>(null)
+  const isDragging     = useRef(false)
+  const dragStartX     = useRef(0)
+  const dragStartRatio = useRef(splitState.ratio)
+
+  const [ratio,    setRatio]    = useState(splitState.ratio)
+  const [dragging, setDragging] = useState(false)
 
   useEffect(() => {
-    if (tabId === null) { setIsSplit(false); return }
-    window.aura.split.getState(tabId).then((state) => {
-      if (!state) { setIsSplit(false); return }
-      setIsSplit(true)
-      setRatio(state.ratio)
-      setFocusedPane(state.focusedPane)
-      setSplitUrl(state.splitUrl)
-      setRightInput(state.splitUrl)
-    })
-  }, [tabId])
+    setRatio(splitState.ratio)
+  }, [splitState.ratio])
+
+  // ── Divider drag ───────────────────────────────────────────────────────────
+
+  const handleDividerMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      isDragging.current     = true
+      dragStartX.current     = e.clientX
+      dragStartRatio.current = ratio
+      setDragging(true)
+    },
+    [ratio]
+  )
 
   useEffect(() => {
-    if (tabId === null) return
-    return window.aura.split.onSplitChanged(() => {
-      window.aura.split.getState(tabId).then((state) => {
-        if (!state) { setIsSplit(false); return }
-        setRatio(state.ratio)
-        setFocusedPane(state.focusedPane)
-        setSplitUrl(state.splitUrl)
-      })
-    })
-  }, [tabId])
-
-  useEffect(() => {
-    window.aura.tabs.getState().then((s) => {
-      const tab = s.tabs.find((t: any) => t.id === tabId)
-      if (tab) {
-        setPrimaryUrl(tab.url || '')
-        setLeftInput(tab.url || '')
-      }
-    })
-  }, [tabId])
-
-  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
-    if (tabId === null) return
-    e.preventDefault()
-    setIsDragging(true)
-
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      if (!containerRef.current) return
-      cancelAnimationFrame(rafRef.current)
-      rafRef.current = requestAnimationFrame(() => {
-        const rect = containerRef.current!.getBoundingClientRect()
-        const newRatio = (moveEvent.clientX - rect.left) / rect.width
-        const clamped = Math.min(0.85, Math.max(0.15, newRatio))
-        setRatio(clamped)
-        window.aura.split.setRatio(tabId, clamped)
-      })
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !containerRef.current) return
+      const rect       = containerRef.current.getBoundingClientRect()
+      const totalWidth = rect.width - DIVIDER_W - PANE_INSET * 2
+      const dx         = e.clientX - dragStartX.current
+      const dRatio     = dx / totalWidth
+      const newRatio   = Math.min(MAX_RATIO, Math.max(MIN_RATIO, dragStartRatio.current + dRatio))
+      setRatio(newRatio)
+      onRatioChange?.(newRatio)
+      window.aura?.split?.setRatio(tabId, newRatio)
     }
-
     const onMouseUp = () => {
-      setIsDragging(false)
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
+      if (!isDragging.current) return
+      isDragging.current = false
+      setDragging(false)
     }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup',   onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup',   onMouseUp)
+    }
+  }, [tabId, onRatioChange])
 
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
-  }, [tabId])
+  // ── Pane focus ─────────────────────────────────────────────────────────────
 
-  const handlePaneClick = (pane: 'primary' | 'split') => {
-    if (tabId === null) return
-    setFocusedPane(pane)
-    window.aura.split.setFocusedPane(tabId, pane)
-  }
+  const handlePaneMouseDown = useCallback(
+    (pane: 'primary' | 'split') => {
+      onFocusChange?.(pane)
+      window.aura?.split?.setFocusedPane(tabId, pane)
+    },
+    [tabId, onFocusChange]
+  )
 
-  const handleLeftNavigate = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (tabId === null || e.key !== 'Enter') return
-    window.aura.split.navigateNonFocused(tabId, leftInput)
-  }
+  // ── Close pane ─────────────────────────────────────────────────────────────
 
-  const handleRightNavigate = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (tabId === null || e.key !== 'Enter') return
-    window.aura.split.navigateFocused(tabId, rightInput)
-  }
+  // FIX BUG 1: typeof guard so we don't crash if closeLeftView/closeRightView
+  // don't exist — falls back to window.aura.split.close(tabId)
+  const handleClose = useCallback(
+    (pane: 'primary' | 'split') => {
+      onClose?.(pane)
+      if (pane === 'primary') {
+        if (typeof window.aura?.split?.closeLeftView === 'function') {
+          window.aura.split.closeLeftView(tabId)
+        } else {
+          window.aura.split.close(tabId)
+        }
+      } else {
+        if (typeof window.aura?.split?.closeRightView === 'function') {
+          window.aura.split.closeRightView(tabId)
+        } else {
+          window.aura.split.close(tabId)
+        }
+      }
+    },
+    [tabId, onClose]
+  )
 
-  if (!isSplit || tabId === null) return null
+  const leftIsActive  = splitState.focusedPane === 'primary'
+  const rightIsActive = splitState.focusedPane === 'split'
 
   return (
     <div
       ref={containerRef}
-      className={`split-overlay${isDragging ? ' is-dragging' : ''}`}
+      className="sv-root"
+      style={{ '--sv-ratio': ratio } as React.CSSProperties}
     >
-      {/* LEFT PANE */}
+      {/* LEFT PANE FRAME */}
       <div
-        className={`split-pane split-pane-primary${focusedPane === 'primary' ? ' split-pane-focused' : ''}`}
-        style={{ width: `${ratio * 100}%` }}
-        onClick={() => handlePaneClick('primary')}
+        className={`sv-pane sv-pane-left${leftIsActive ? ' sv-pane-active' : ' sv-pane-inactive'}`}
+        onMouseDown={() => handlePaneMouseDown('primary')}
       >
-        <div className="split-pane-toolbar">
-          <button
-            className="split-nav-btn"
-            onClick={() => window.aura.tabs.goBack(tabId)}
-          >←</button>
-          <button
-            className="split-nav-btn"
-            onClick={() => window.aura.tabs.goForward(tabId)}
-          >→</button>
-          <input
-            className="split-address-input"
-            value={leftInput}
-            onChange={(e) => setLeftInput(e.target.value)}
-            onKeyDown={handleLeftNavigate}
-            onClick={(e) => e.stopPropagation()}
-          />
+        <div className="sv-badge-strip">
+          <PillBadge url={primaryUrl} pane="primary" onClose={handleClose} />
         </div>
       </div>
 
       {/* DIVIDER */}
       <div
-        className={`split-divider${isDragging ? ' split-divider-dragging' : ''}`}
+        className={`sv-divider${dragging ? ' sv-divider-dragging' : ''}`}
         onMouseDown={handleDividerMouseDown}
-      >
-        <div className="split-divider-handle" />
-      </div>
+        aria-hidden="true"
+      />
 
-      {/* RIGHT PANE */}
+      {/* RIGHT PANE FRAME */}
       <div
-        className={`split-pane split-pane-split${focusedPane === 'split' ? ' split-pane-focused' : ''}`}
-        style={{ flex: 1 }}
-        onClick={() => handlePaneClick('split')}
+        className={`sv-pane sv-pane-right${rightIsActive ? ' sv-pane-active' : ' sv-pane-inactive'}`}
+        onMouseDown={() => handlePaneMouseDown('split')}
       >
-        <div className="split-pane-toolbar">
-          <button
-            className="split-nav-btn"
-            onClick={(e) => {
-              e.stopPropagation()
-              window.aura.split.navigateFocused(tabId, 'back')
-            }}
-          >←</button>
-          <button
-            className="split-nav-btn"
-            onClick={(e) => {
-              e.stopPropagation()
-              window.aura.split.navigateFocused(tabId, 'forward')
-            }}
-          >→</button>
-          <input
-            className="split-address-input"
-            value={rightInput}
-            onChange={(e) => setRightInput(e.target.value)}
-            onKeyDown={handleRightNavigate}
-            onClick={(e) => e.stopPropagation()}
-          />
+        <div className="sv-badge-strip">
+          <PillBadge url={splitState.splitUrl} pane="split" onClose={handleClose} />
         </div>
       </div>
     </div>
   )
 }
+
+export default SplitOverlay

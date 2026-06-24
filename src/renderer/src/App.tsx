@@ -25,7 +25,7 @@ import BoostsPage from './pages/BoostsPage'
 import SettingsPage from './pages/SettingsPage'
 
 import { VerticalTabBar } from './components/VerticalTabBar'
-import { SplitOverlay } from './components/SplitOverlay'
+import SplitOverlay from './components/SplitOverlay'
 import { AutofillSavePrompt } from './components/AutofillSavePrompt'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useLocalStorage } from './hooks/useLocalStorage'
@@ -76,6 +76,9 @@ export default function App(): React.ReactElement {
   const [findBarOpen, setFindBarOpen] = useState(false)
   const [tabSearchOpen, setTabSearchOpen] = useState(false)
   const [readerActive, setReaderActive] = useState(false)
+  const [splitActive, setSplitActive] = useState(false)
+  const [splitState, setSplitState] = useState<{ ratio: number; focusedPane: 'primary' | 'split'; splitUrl: string }>({ ratio: 0.5, focusedPane: 'primary', splitUrl: '' })
+  const [splitSyncTick, setSplitSyncTick] = useState(0)
   const [bookmarksBarVisible, setBookmarksBarVisible] = useLocalStorage<boolean>(
     'aura:bookmarksBarVisible',
     true
@@ -498,6 +501,26 @@ export default function App(): React.ReactElement {
     }
   }, [])
 
+  // Split view — sync state from main process
+  useEffect(() => {
+    if (activeId === null) { setSplitActive(false); return }
+    window.aura.split.getState(activeId).then((state) => {
+      if (state) {
+        setSplitActive(true)
+        setSplitState({ ratio: state.ratio, focusedPane: state.focusedPane, splitUrl: state.splitUrl })
+      } else {
+        setSplitActive(false)
+      }
+    })
+  }, [activeId, splitSyncTick])
+
+  useEffect(() => {
+    if (activeId === null) return
+    return window.aura.split.onSplitChanged(() => {
+      setSplitSyncTick((t) => t + 1)
+    })
+  }, [activeId])
+
   const renderChromePage = (): React.ReactElement | null => {
     const onClose = (): void => setChromePage(null)
     if (chromePage === 'privacy') return <PrivacyDashboard onClose={onClose} />
@@ -613,7 +636,15 @@ export default function App(): React.ReactElement {
               : null}
         </div>
 
-        <SplitOverlay tabId={activeId} />
+        {splitActive && activeId !== null && (
+          <SplitOverlay
+            tabId={activeId}
+            primaryUrl={activeTab?.url ?? ''}
+            splitState={splitState}
+            onRatioChange={(ratio) => setSplitState((s) => ({ ...s, ratio }))}
+            onFocusChange={(pane) => setSplitState((s) => ({ ...s, focusedPane: pane }))}
+          />
+        )}
 
         <FindBar
           visible={findBarOpen}

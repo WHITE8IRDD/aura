@@ -210,6 +210,7 @@ export class SplitManager {
     const PANE_GAP = 6
     const PANE_INSET = 2
     const DIVIDER_W = 8
+    const BADGE_STRIP_H = 40
 
     const W = Math.max(0, width - sidebarWidth)
     const H = Math.max(0, height - chromeHeight)
@@ -222,12 +223,12 @@ export class SplitManager {
     const leftViewX = sidebarWidth + PANE_GAP + PANE_INSET
     const leftViewY = chromeHeight + PANE_GAP + PANE_INSET
     const leftViewW = leftOuterW - PANE_GAP - PANE_INSET * 2
-    const leftViewH = H - PANE_GAP * 2 - PANE_INSET * 2
-
+    const leftViewH = H - BADGE_STRIP_H
+    
     const rightViewX = sidebarWidth + leftOuterW + DIVIDER_W + PANE_INSET
     const rightViewY = chromeHeight + PANE_GAP + PANE_INSET
     const rightViewW = rightOuterW - PANE_GAP - PANE_INSET * 2
-    const rightViewH = H - PANE_GAP * 2 - PANE_INSET * 2
+    const rightViewH = H - BADGE_STRIP_H
 
     rec.view.setBounds({
       x: Math.round(leftViewX), y: Math.round(leftViewY),

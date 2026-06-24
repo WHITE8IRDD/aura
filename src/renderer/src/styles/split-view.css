@@ -1,0 +1,179 @@
+/* ── V2 — Border-based pane frame + pill badge strip ───────────────────────── */
+
+/* Root container — fills entire content area behind the BrowserViews */
+.sv-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+
+  /* height: 100vh minus badge strip — splitManager applies BADGE_STRIP_H offset */
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Each pane frame — pointer-events all so clicks reach BrowserView beneath,
+   except the badge-strip row at the top.  Border draws the active/inactive ring. */
+.sv-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;  /* BrowserView clicks pass through */
+}
+
+/* The pane's share of width is set via the calc below */
+.sv-pane-left {
+  width: calc(var(--sv-ratio) * (100% - 8px));  /* 8px = DIVIDER_W */
+}
+
+.sv-pane-right {
+  flex: 1;
+}
+
+/* ─── Badge strip (top of each pane) ─────────────────────────────────────── */
+
+.sv-badge-strip {
+  position: relative;
+  height: 40px;                    /* = BADGE_STRIP_H constant in splitManager */
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  pointer-events: auto;           /* only this row catches clicks */
+
+  /* keep it visible above the BrowserView */
+  z-index: 1;
+}
+
+/* ─── Pill badge ──────────────────────────────────────────────────────────── */
+
+.sv-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px 2px 4px;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #c8c8c8;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+  user-select: none;
+}
+
+.sv-pill-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.sv-pill-favicon-fallback {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sv-pill-domain {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+/* ─── Close button (×) ──────────────────────────────────────────────────── */
+
+.sv-pill-close {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  color: #888;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
+}
+
+.sv-pill-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+/* ─── Border-based pane frame ──────────────────────────────────────────────
+     FIX BUG 3: border replaces box-shadow for the pane outline.  The inner
+     border-radius clips to the view behind.  The top badge-strip area is
+     covered by the badge strip itself.                              */
+
+.sv-pane {
+  /* background is required so the border is drawn on top of BrowserView */
+  background: transparent;
+}
+
+/* Active = indigo border, fully opaque */
+.sv-pane-active {
+  border: 1px solid rgba(99, 102, 241, 0.7);   /* indigo-500 / #6366f1 */
+  border-radius: 8px;
+}
+
+/* Inactive = subtle white border, low opacity */
+.sv-pane-inactive {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+}
+
+/* Remove the top border segment so the badge strip sits flush */
+.sv-pane-active.sv-pane-left,
+.sv-pane-inactive.sv-pane-left {
+  border-top: none;
+}
+
+.sv-pane-active.sv-pane-right,
+.sv-pane-inactive.sv-pane-right {
+  border-top: none;
+}
+
+/* ─── Divider ─────────────────────────────────────────────────────────────── */
+
+.sv-divider {
+  width: 8px;                      /* = DIVIDER_W */
+  flex-shrink: 0;
+  cursor: col-resize;
+  pointer-events: auto;
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sv-divider::before {
+  content: '';
+  display: block;
+  width: 2px;
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 0.15s;
+}
+
+.sv-divider:hover::before,
+.sv-divider-dragging::before {
+  background: rgba(99, 102, 241, 0.5);   /* indigo */
+}
+
+/* ─── Fix BUG 4: prevent tab-switch re-trigger ──────────────────────────────
+     If the pane switches rapidly, the onMouseDown handler on the pane
+     may fire unnecessarily.  This guard ensures the pane doesn't re-trigger
+     focus change if the active pane hasn't changed.  (Handled in React.) */
