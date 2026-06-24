@@ -31,19 +31,20 @@
   flex: 1;
 }
 
-/* ─── Badge strip (top of each pane) ─────────────────────────────────────── */
+/* ─── Badge strip (bottom of each pane) ──────────────────────────────────── */
 
 .sv-badge-strip {
-  position: relative;
-  height: 40px;                    /* = BADGE_STRIP_H constant in splitManager */
-  flex-shrink: 0;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  pointer-events: none;
   display: flex;
-  align-items: center;
-  padding: 4px 8px;
-  pointer-events: auto;           /* only this row catches clicks */
-
-  /* keep it visible above the BrowserView */
-  z-index: 1;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 10px 8px 0;
+  z-index: 20;
 }
 
 /* ─── Pill badge ──────────────────────────────────────────────────────────── */
@@ -52,18 +53,20 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 8px 2px 4px;
-  border-radius: 12px;
-  font-size: 12px;
-  color: #c8c8c8;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  max-width: 180px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: default;
+  height: 28px;
+  padding: 0 6px 0 8px;
+  background: rgba(22, 22, 26, 0.94);
+  backdrop-filter: blur(16px) saturate(1.8);
+  -webkit-backdrop-filter: blur(16px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   user-select: none;
+  pointer-events: all;
+  max-width: 200px;
+  animation: sv-pill-in 0.15s ease;
+  z-index: 25;
+  position: relative;
 }
 
 .sv-pill-favicon {
@@ -133,15 +136,15 @@
   border-radius: 8px;
 }
 
-/* Remove the top border segment so the badge strip sits flush */
+/* Remove the bottom border segment so the badge strip sits flush */
 .sv-pane-active.sv-pane-left,
 .sv-pane-inactive.sv-pane-left {
-  border-top: none;
+  border-bottom: none;
 }
 
 .sv-pane-active.sv-pane-right,
 .sv-pane-inactive.sv-pane-right {
-  border-top: none;
+  border-bottom: none;
 }
 
 /* ─── Divider ─────────────────────────────────────────────────────────────── */
@@ -171,6 +174,19 @@
 .sv-divider:hover::before,
 .sv-divider-dragging::before {
   background: rgba(99, 102, 241, 0.5);   /* indigo */
+}
+
+/* ─── Pill entrance animation ────────────────────────────────────────────── */
+
+@keyframes sv-pill-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* ─── Fix BUG 4: prevent tab-switch re-trigger ──────────────────────────────
