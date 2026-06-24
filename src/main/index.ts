@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage, globalShortcut } from 'electron'
+import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage, globalShortcut, net } from 'electron'
 import { join } from 'path'
 
 app.name = 'Aura'
@@ -835,6 +835,34 @@ ipcMain.handle('app:relaunch', () => {
   app.exit(0)
 })
 
+function parseSearchResults(raw: string): Array<{ id: string; name: string; description: string; iconUrl: string }> {
+  const results: Array<{ id: string; name: string; description: string; iconUrl: string }> = []
+  try {
+    const outer = JSON.parse(raw)
+    if (!Array.isArray(outer) || outer.length === 0) return results
+    const wrbEntry = outer[0]
+    if (!Array.isArray(wrbEntry) || wrbEntry.length < 3) return results
+    const innerJson = wrbEntry[2]
+    if (typeof innerJson !== 'string') return results
+    const inner = JSON.parse(innerJson)
+    if (!Array.isArray(inner)) return results
+    const items = inner[1]?.[1] || inner[0]?.[1]?.[1] || inner[0]?.[0]?.[1]
+    if (!Array.isArray(items)) return results
+    for (const item of items.slice(0, 10)) {
+      try {
+        if (!Array.isArray(item) || item.length < 2) continue
+        const data = item[1]
+        if (!Array.isArray(data)) continue
+        const id = data[0]; const name = data[2]; const description = data[6] || ''; const iconUrl = data[3] || ''
+        if (typeof id === 'string' && /^[a-p]{32}$/.test(id) && typeof name === 'string') {
+          results.push({ id, name, description: typeof description === 'string' ? description : '', iconUrl: typeof iconUrl === 'string' ? iconUrl : '' })
+        }
+      } catch { continue }
+    }
+  } catch {}
+  return results
+}
+
 registerAboutIPC()
 registerDefaultBrowserIPC()
 registerResetIPC()
@@ -927,6 +955,43 @@ ipcMain.handle('extensions:installFromUrl', async (_e, rawUrl: string) => {
   } catch (err) {
     return { success: false, id: null, error: err instanceof Error ? err.message : 'Installation failed' }
   }
+})
+
+ipcMain.handle('extensions:search', async (_e, query: string) => {
+  if (typeof query !== 'string' || query.trim().length === 0) {
+    return { success: false, results: [], error: 'Empty search query' }
+  }
+
+  const trimmed = query.trim()
+  const searchUrl = 'https://chromewebstore.google.com/_/ChromeWebStoreConsumerFeUi/data/batchexecute'
+  const innerPayload = [[null, [[3, [trimmed, [2], null, null, null, null, null, null, null, null, null, null, null, null, null, null, [10]]]]]]
+  const rpcPayload = [['zTyKYc', JSON.stringify(innerPayload), null, 'generic']]
+  const body = `f.req=${encodeURIComponent(JSON.stringify(rpcPayload))}`
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => { try { request.abort() } catch {}; resolve({ success: false, results: [], error: 'Search timed out' }) }, 10_000)
+    let chunks: Buffer[] = []
+    const request = net.request({ method: 'POST', url: searchUrl, redirect: 'follow' })
+    request.setHeader('Content-Type', 'application/x-www-form-urlencoded;charset=UTF-8')
+    request.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
+    request.on('response', (response) => {
+      if (response.statusCode !== 200) {
+        clearTimeout(timeout); resolve({ success: false, results: [], error: `HTTP ${response.statusCode}` }); return
+      }
+      response.on('data', (chunk) => chunks.push(chunk))
+      response.on('end', () => {
+        clearTimeout(timeout)
+        try {
+          const raw = Buffer.concat(chunks).toString('utf-8').replace(/^\)\]\}'\n?/, '')
+          const results = parseSearchResults(raw)
+          resolve({ success: true, results, error: null })
+        } catch { resolve({ success: false, results: [], error: 'Failed to parse search results' }) }
+      })
+      response.on('error', () => { clearTimeout(timeout); resolve({ success: false, results: [], error: 'Response error' }) })
+    })
+    request.on('error', (err: any) => { clearTimeout(timeout); resolve({ success: false, results: [], error: err?.message || 'Request failed' }) })
+    request.end(body)
+  })
 })
 
 ipcMain.on('videoDl:request', async (_e, { url, filename }: { url: string; filename: string }) => {

@@ -27,6 +27,14 @@ export default function ExtensionsPage({ onClose }: Props): React.ReactElement {
   const [message, setMessage] = useState<string | null>(null)
   const [storeUrl, setStoreUrl] = useState('')
   const [installingFromUrl, setInstallingFromUrl] = useState(false)
+  const [searchResults, setSearchResults] = useState<Array<{
+    id: string
+    name: string
+    description: string
+    iconUrl: string
+  }>>([])
+  const [searching, setSearching] = useState(false)
+  const [showResults, setShowResults] = useState(false)
 
   const load = useCallback(async () => {
     const list = await window.aura.extensions.list()
@@ -92,19 +100,68 @@ export default function ExtensionsPage({ onClose }: Props): React.ReactElement {
     setTimeout(() => setMessage(null), 4000)
   }
 
-  const handleInstallFromUrl = async () => {
-    if (!storeUrl.trim()) {
-      setMessage('Please paste a Chrome Web Store URL')
+  const handleSmartInstall = async () => {
+    const input = storeUrl.trim()
+    if (!input) {
+      setMessage('Please enter an extension name, URL, or ID')
       return
     }
     setMessage(null)
+
+    const isExtensionId = /^[a-p]{32}$/.test(input)
+    const isUrl = input.startsWith('http://') || input.startsWith('https://') ||
+                  input.includes('chromewebstore.google.com') ||
+                  input.includes('chrome.google.com')
+
+    if (isExtensionId || isUrl) {
+      setInstallingFromUrl(true)
+      try {
+        const result = await (window as any).aura.extensions.installFromUrl(input)
+        if (!result?.success) {
+          setMessage(result?.error || 'Failed to install extension')
+        } else {
+          setStoreUrl('')
+          setShowResults(false)
+          setMessage(`Installed: ${result.id}`)
+          await load()
+        }
+      } catch (err: any) {
+        setMessage(err?.message || 'Failed to install extension')
+      } finally {
+        setInstallingFromUrl(false)
+      }
+    } else {
+      setSearching(true)
+      setShowResults(true)
+      try {
+        const result = await (window as any).aura.extensions.search(input)
+        if (result?.success && result.results.length > 0) {
+          setSearchResults(result.results)
+        } else {
+          setSearchResults([])
+          setMessage(result?.error || 'No extensions found. Try pasting the Web Store URL directly.')
+        }
+      } catch (err: any) {
+        setMessage(err?.message || 'Search failed')
+        setSearchResults([])
+      } finally {
+        setSearching(false)
+      }
+    }
+    setTimeout(() => setMessage(null), 4000)
+  }
+
+  const handleInstallSearchResult = async (extensionId: string) => {
+    setMessage(null)
     setInstallingFromUrl(true)
     try {
-      const result = await (window as any).aura.extensions.installFromUrl(storeUrl)
+      const result = await (window as any).aura.extensions.installFromUrl(extensionId)
       if (!result?.success) {
         setMessage(result?.error || 'Failed to install extension')
       } else {
         setStoreUrl('')
+        setShowResults(false)
+        setSearchResults([])
         setMessage(`Installed: ${result.id}`)
         await load()
       }
@@ -135,29 +192,75 @@ export default function ExtensionsPage({ onClose }: Props): React.ReactElement {
 
       <div className="ext-url-install">
         <div className="ext-url-install-header">
-          <h3>Install from Chrome Web Store URL</h3>
-          <p>Paste any Chrome Web Store extension URL or extension ID</p>
+          <h3>Install from Chrome Web Store</h3>
+          <p>Type extension name, paste URL, or enter extension ID</p>
         </div>
         <div className="ext-url-input-row">
           <input
             type="text"
             className="ext-url-input"
-            placeholder="https://chromewebstore.google.com/detail/..."
+            placeholder="e.g. uBlock Origin, or paste URL..."
             value={storeUrl}
-            onChange={(e) => setStoreUrl(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleInstallFromUrl()
+            onChange={(e) => {
+              setStoreUrl(e.target.value)
+              if (showResults) setShowResults(false)
             }}
-            disabled={installingFromUrl}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSmartInstall()
+            }}
+            disabled={installingFromUrl || searching}
           />
           <button
             className="ext-url-install-btn"
-            onClick={handleInstallFromUrl}
-            disabled={installingFromUrl || !storeUrl.trim()}
+            onClick={handleSmartInstall}
+            disabled={(installingFromUrl || searching) || !storeUrl.trim()}
           >
-            {installingFromUrl ? 'Installing...' : 'Install'}
+            {installingFromUrl ? 'Installing...' :
+             searching ? 'Searching...' :
+             'Install'}
           </button>
         </div>
+
+        {showResults && searchResults.length > 0 && (
+          <div className="ext-search-results">
+            <div className="ext-search-results-header">
+              <span>Search Results</span>
+              <button
+                className="ext-search-close"
+                onClick={() => {
+                  setShowResults(false)
+                  setSearchResults([])
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            {searchResults.slice(0, 5).map((result) => (
+              <div key={result.id} className="ext-search-result">
+                <div className="ext-search-result-icon">
+                  {result.iconUrl ? (
+                    <img src={result.iconUrl} alt="" width="32" height="32" />
+                  ) : (
+                    <div className="ext-search-result-icon-fallback">
+                      {result.name[0]?.toUpperCase() || '?'}
+                    </div>
+                  )}
+                </div>
+                <div className="ext-search-result-info">
+                  <div className="ext-search-result-name">{result.name}</div>
+                  <div className="ext-search-result-desc">{result.description}</div>
+                </div>
+                <button
+                  className="ext-search-result-install"
+                  onClick={() => handleInstallSearchResult(result.id)}
+                  disabled={installingFromUrl}
+                >
+                  {installingFromUrl ? '...' : 'Install'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {message && <div className="ext-toast">{message}</div>}

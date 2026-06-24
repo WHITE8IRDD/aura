@@ -5821,3 +5821,127 @@ body > .gcm-menu {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+.ext-search-results {
+  margin-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 12px;
+}
+
+.ext-search-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-secondary, rgba(255,255,255,0.6));
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ext-search-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary, rgba(255,255,255,0.6));
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.ext-search-close:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text-primary, #fff);
+}
+
+.ext-search-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  transition: background 0.12s ease;
+}
+
+.ext-search-result:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.ext-search-result-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.ext-search-result-icon img {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+}
+
+.ext-search-result-icon-fallback {
+  width: 32px;
+  height: 32px;
+  background: var(--accent, #3b82f6);
+  color: white;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ext-search-result-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ext-search-result-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ext-search-result-desc {
+  font-size: 11px;
+  color: var(--text-secondary, rgba(255,255,255,0.6));
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+.ext-search-result-install {
+  padding: 6px 14px;
+  background: var(--accent, #3b82f6);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.12s ease;
+}
+
+.ext-search-result-install:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.ext-search-result-install:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

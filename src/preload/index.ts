@@ -714,6 +714,8 @@ const api = {
       ipcRenderer.invoke('extensions:installFromStoreId', id),
     installFromUrl: (url: string): Promise<{ success: boolean; id?: string | null; error?: string }> =>
       ipcRenderer.invoke('extensions:installFromUrl', url),
+    search: (query: string): Promise<{ success: boolean; results: Array<{ id: string; name: string; description: string; iconUrl: string }>; error?: string }> =>
+      ipcRenderer.invoke('extensions:search', query),
   },
 
   autofill: {
