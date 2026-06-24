@@ -5677,10 +5677,10 @@ body > .gcm-menu {
   position: fixed; top: 10px; right: 10px; z-index: 100;
   background: var(--aura-gradient); color: #000; padding: 8px 16px;
   border-radius: 8px; font-size: 12px; font-weight: 600;
-  animation: extFadeIn 0.2s ease;
+  animation: ext-toast-in 0.2s ease;
 }
 
-@keyframes extFadeIn {
+@keyframes ext-toast-in {
   from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
@@ -5744,204 +5744,351 @@ body > .gcm-menu {
 }
 .ext-delete:hover { color: var(--red); background: rgba(241, 122, 139, 0.1); }
 
-.ext-url-install {
-  margin: 24px 0;
-  padding: 20px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
+/* ── Install card (iOS-style frosted glass) ───────────────────── */
+.ext-install-card {
+  margin: 16px 0;
+  padding: 20px 22px 16px;
+  background: color-mix(in srgb, var(--bg-elev) 70%, transparent);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  border: 1px solid var(--stroke-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  transition: border-color 0.18s, box-shadow 0.18s;
 }
 
-.ext-url-install-header h3 {
-  margin: 0 0 4px;
+.ext-install-card:focus-within {
+  border-color: rgba(166, 192, 241, 0.3);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 0 0 4px rgba(166,192,241,0.04);
+}
+
+.ext-install-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ext-install-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--bg-elev-3);
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.ext-install-title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-primary, #fff);
+  color: var(--text);
+  line-height: 1.3;
 }
 
-.ext-url-install-header p {
-  margin: 0 0 12px;
-  font-size: 12px;
-  color: var(--text-secondary, rgba(255,255,255,0.6));
+.ext-install-subtitle {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.3;
+  margin-top: 1px;
 }
 
-.ext-url-input-row {
+/* ── Search row ───────────────────── */
+.ext-search-row {
   display: flex;
   gap: 8px;
-  align-items: stretch;
+  align-items: center;
 }
 
-.ext-url-input {
+.ext-search-input-wrap {
   flex: 1;
-  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
   padding: 0 12px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 8px;
-  color: var(--text-primary, #fff);
-  font-size: 13px;
-  outline: none;
-  font-family: inherit;
-  transition: border-color 0.12s ease, background 0.12s ease;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  transition: border-color 0.15s, background 0.15s;
 }
 
-.ext-url-input:focus {
-  border-color: var(--accent, #3b82f6);
-  background: rgba(255,255,255,0.08);
+.ext-search-input-wrap:focus-within {
+  border-color: rgba(166, 192, 241, 0.35);
+  background: var(--bg-elev-3);
 }
 
-.ext-url-input::placeholder {
-  color: rgba(255,255,255,0.35);
+.ext-search-icon {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
 }
 
-.ext-url-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ext-url-install-btn {
-  height: 38px;
-  padding: 0 20px;
-  background: var(--accent, #3b82f6);
+.ext-search-input {
+  flex: 1;
   border: none;
-  border-radius: 8px;
-  color: white;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
   font-size: 13px;
+  min-width: 0;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ext-search-input::placeholder {
+  color: var(--text-faint);
+}
+
+.ext-search-clear {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s;
+}
+
+.ext-search-clear:hover {
+  background: var(--bg-elev);
+  color: var(--text-dim);
+}
+
+.ext-install-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 18px;
+  background: var(--aura-gradient);
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--aura-ink);
+  font-family: inherit;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.12s ease;
   white-space: nowrap;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
 }
 
-.ext-url-install-btn:hover:not(:disabled) {
-  opacity: 0.9;
+.ext-install-btn:hover:not(:disabled) {
+  opacity: 0.88;
 }
 
-.ext-url-install-btn:disabled {
+.ext-install-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.ext-search-results {
-  margin-top: 16px;
-  border-top: 1px solid rgba(255,255,255,0.08);
-  padding-top: 12px;
+.ext-install-btn--loading {
+  pointer-events: none;
 }
 
-.ext-search-results-header {
+/* ── Spinner ───────────────────── */
+.ext-btn-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0,0,0,0.2);
+  border-top-color: var(--aura-ink);
+  border-radius: 50%;
+  animation: ext-spin 0.6s linear infinite;
+}
+
+.ext-btn-spinner--sm {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  border-color: rgba(255,255,255,0.15);
+  border-top-color: var(--text);
+}
+
+@keyframes ext-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Dropdown ───────────────────── */
+.ext-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 6px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--stroke-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 18px 48px rgba(0,0,0,0.45);
+  padding: 6px;
+  z-index: 200;
+  overflow: hidden;
+  animation: ext-drop-in 0.15s ease;
+}
+
+@keyframes ext-drop-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.ext-dropdown-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-  font-size: 12px;
-  color: var(--text-secondary, rgba(255,255,255,0.6));
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.ext-search-close {
-  background: none;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
   border: none;
-  color: var(--text-secondary, rgba(255,255,255,0.6));
-  cursor: pointer;
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-}
-
-.ext-search-close:hover {
-  background: rgba(255,255,255,0.08);
-  color: var(--text-primary, #fff);
-}
-
-.ext-search-result {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: transparent;
+  color: var(--text);
   border-radius: 8px;
-  margin-bottom: 6px;
-  transition: background 0.12s ease;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 12.5px;
+  transition: background 0.08s;
+  animation: ext-item-in 0.2s ease backwards;
 }
 
-.ext-search-result:hover {
-  background: rgba(255,255,255,0.05);
+@keyframes ext-item-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
-.ext-search-result-icon {
-  width: 32px;
-  height: 32px;
+.ext-dropdown-item:hover:not(:disabled) {
+  background: var(--bg-elev-3);
+}
+
+.ext-dropdown-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ext-dropdown-icon-wrap {
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
-}
-
-.ext-search-result-icon img {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-}
-
-.ext-search-result-icon-fallback {
-  width: 32px;
-  height: 32px;
-  background: var(--accent, #3b82f6);
-  color: white;
-  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  font-weight: 700;
+  position: relative;
 }
 
-.ext-search-result-info {
+.ext-dropdown-icon-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.ext-dropdown-icon-fallback {
+  display: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--aura-gradient);
+  color: var(--aura-ink);
+  font-size: 13px;
+  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+}
+
+.ext-dropdown-text {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
-.ext-search-result-name {
-  font-size: 13px;
+.ext-dropdown-name {
+  font-size: 12.5px;
   font-weight: 600;
-  color: var(--text-primary, #fff);
-  margin-bottom: 2px;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.ext-search-result-desc {
+.ext-dropdown-desc {
   font-size: 11px;
-  color: var(--text-secondary, rgba(255,255,255,0.6));
+  color: var(--text-faint);
+  white-space: nowrap;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
 }
 
-.ext-search-result-install {
-  padding: 6px 14px;
-  background: var(--accent, #3b82f6);
-  border: none;
-  border-radius: 6px;
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
+.ext-dropdown-badge {
   flex-shrink: 0;
-  transition: opacity 0.12s ease;
+  padding: 2px 7px;
+  background: var(--bg-elev-3);
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.ext-search-result-install:hover:not(:disabled) {
-  opacity: 0.9;
+/* ── Error row ───────────────────── */
+.ext-error-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 9px 12px;
+  background: rgba(241, 122, 139, 0.08);
+  border: 1px solid rgba(241, 122, 139, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--red);
+  animation: ext-drop-in 0.15s ease;
 }
 
-.ext-search-result-install:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+/* ── Icon classes for installed extension cards & autocomplete ── */
+.ext-card-icon,
+.ext-autocomplete-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ext-card-icon img,
+.ext-autocomplete-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.ext-card-icon-fallback,
+.ext-autocomplete-icon-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #6e6e76, #3a3a3f);
+}
+
+.ext-card-icon-fallback.hidden {
+  display: none;
 }

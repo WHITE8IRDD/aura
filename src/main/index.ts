@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage, globalShortcut, net } from 'electron'
-import { join } from 'path'
+import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage, globalShortcut, net, protocol } from 'electron'
+import { join, extname } from 'path'
+import { existsSync } from 'fs'
 
 app.name = 'Aura'
 
@@ -214,6 +215,25 @@ const startupReady = app.whenReady().then(async () => {
   setupPermissionPrompts(session.defaultSession)
   registerSession(session.defaultSession)
   applyChromeUASpoof(session.defaultSession)
+  protocol.handle('app-icon', async (request) => {
+    try {
+      const requestedPath = decodeURIComponent(
+        request.url.replace('app-icon://', '')
+      )
+      if (!existsSync(requestedPath)) {
+        return new Response(null, { status: 404 })
+      }
+      const data = await require('fs').promises.readFile(requestedPath)
+      const ext = extname(requestedPath).toLowerCase()
+      const mime =
+        ext === '.svg' ? 'image/svg+xml' :
+        ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' :
+        'image/png'
+      return new Response(data, { headers: { 'content-type': mime } })
+    } catch {
+      return new Response(null, { status: 404 })
+    }
+  })
   initLanguages()
   setupDownloads()
   registerDownloadsSettingsIPC()

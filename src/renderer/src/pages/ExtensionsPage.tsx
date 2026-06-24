@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { ChromePageHeader } from '../components/ChromePageHeader'
 import { IconExtension, IconClose } from '../components/Icons'
+import { EXTENSIONS_CATALOG, type CatalogEntry, getCatalogIconSrc } from '../data/extensionsCatalog'
 
 interface ExtRecord {
   id: string
@@ -16,6 +17,11 @@ interface ExtRecord {
   installed_at: number
 }
 
+function toAppIconUrl(iconPath: string | null): string | null {
+  if (!iconPath) return null
+  return `app-icon://${encodeURIComponent(iconPath)}`
+}
+
 interface Props {
   onClose: () => void
 }
@@ -26,15 +32,12 @@ export default function ExtensionsPage({ onClose }: Props): React.ReactElement {
   const [installing, setInstalling] = useState<'folder' | 'crx' | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [storeUrl, setStoreUrl] = useState('')
-  const [installingFromUrl, setInstallingFromUrl] = useState(false)
-  const [searchResults, setSearchResults] = useState<Array<{
-    id: string
-    name: string
-    description: string
-    iconUrl: string
-  }>>([])
-  const [searching, setSearching] = useState(false)
-  const [showResults, setShowResults] = useState(false)
+  const [installingId, setInstallingId] = useState<string | null>(null)
+  const [searchResults, setSearchResults] = useState<CatalogEntry[]>([])
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     const list = await window.aura.extensions.list()
@@ -49,6 +52,50 @@ export default function ExtensionsPage({ onClose }: Props): React.ReactElement {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    const input = storeUrl.trim()
+    const isId = /^[a-p]{32}$/.test(input)
+    const isUrl = input.startsWith('http') || input.includes('chromewebstore')
+
+    if (!input || isId || isUrl) {
+      setSearchResults([])
+      setShowDropdown(false)
+      return
+    }
+
+    const q = input.toLowerCase()
+    const results = EXTENSIONS_CATALOG
+      .filter(e =>
+        e.name.toLowerCase().includes(q) ||
+        e.description.toLowerCase().includes(q) ||
+        e.category.toLowerCase().includes(q)
+      )
+      .sort((a, b) => {
+        const aStart = a.name.toLowerCase().startsWith(q) ? 0 : 1
+        const bStart = b.name.toLowerCase().startsWith(q) ? 0 : 1
+        return aStart - bStart
+      })
+      .slice(0, 7)
+
+    setSearchResults(results)
+    setShowDropdown(results.length > 0)
+  }, [storeUrl])
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   const handleInstallFolder = async () => {
     setInstalling('folder')
@@ -100,77 +147,52 @@ export default function ExtensionsPage({ onClose }: Props): React.ReactElement {
     setTimeout(() => setMessage(null), 4000)
   }
 
+  const handleInstallEntry = async (entry: CatalogEntry) => {
+    setShowDropdown(false)
+    setInstallingId(entry.id)
+    setError(null)
+    try {
+      const result = await (window as any).aura.extensions.installFromUrl(entry.id)
+      if (!result?.success) {
+        setError(result?.error || `Failed to install ${entry.name}`)
+      } else {
+        setStoreUrl('')
+      }
+    } catch (err: any) {
+      setError(err?.message || `Failed to install ${entry.name}`)
+    } finally {
+      setInstallingId(null)
+    }
+  }
+
   const handleSmartInstall = async () => {
     const input = storeUrl.trim()
-    if (!input) {
-      setMessage('Please enter an extension name, URL, or ID')
-      return
-    }
-    setMessage(null)
+    if (!input) { setError('Enter an extension name, URL, or ID'); return }
+    setError(null)
 
-    const isExtensionId = /^[a-p]{32}$/.test(input)
-    const isUrl = input.startsWith('http://') || input.startsWith('https://') ||
-                  input.includes('chromewebstore.google.com') ||
-                  input.includes('chrome.google.com')
+    const isId = /^[a-p]{32}$/.test(input)
+    const isUrl = input.startsWith('http') || input.includes('chromewebstore')
 
-    if (isExtensionId || isUrl) {
-      setInstallingFromUrl(true)
+    if (isId || isUrl) {
+      setInstallingId('url')
       try {
         const result = await (window as any).aura.extensions.installFromUrl(input)
         if (!result?.success) {
-          setMessage(result?.error || 'Failed to install extension')
+          setError(result?.error || 'Installation failed')
         } else {
           setStoreUrl('')
-          setShowResults(false)
-          setMessage(`Installed: ${result.id}`)
-          await load()
+          setShowDropdown(false)
         }
       } catch (err: any) {
-        setMessage(err?.message || 'Failed to install extension')
+        setError(err?.message || 'Installation failed')
       } finally {
-        setInstallingFromUrl(false)
+        setInstallingId(null)
       }
+    } else if (searchResults.length > 0) {
+      handleInstallEntry(searchResults[0])
     } else {
-      setSearching(true)
-      setShowResults(true)
-      try {
-        const result = await (window as any).aura.extensions.search(input)
-        if (result?.success && result.results.length > 0) {
-          setSearchResults(result.results)
-        } else {
-          setSearchResults([])
-          setMessage(result?.error || 'No extensions found. Try pasting the Web Store URL directly.')
-        }
-      } catch (err: any) {
-        setMessage(err?.message || 'Search failed')
-        setSearchResults([])
-      } finally {
-        setSearching(false)
-      }
+      setError('No match found — try pasting the extension URL or ID')
     }
-    setTimeout(() => setMessage(null), 4000)
-  }
-
-  const handleInstallSearchResult = async (extensionId: string) => {
-    setMessage(null)
-    setInstallingFromUrl(true)
-    try {
-      const result = await (window as any).aura.extensions.installFromUrl(extensionId)
-      if (!result?.success) {
-        setMessage(result?.error || 'Failed to install extension')
-      } else {
-        setStoreUrl('')
-        setShowResults(false)
-        setSearchResults([])
-        setMessage(`Installed: ${result.id}`)
-        await load()
-      }
-    } catch (err: any) {
-      setMessage(err?.message || 'Failed to install extension')
-    } finally {
-      setInstallingFromUrl(false)
-    }
-    setTimeout(() => setMessage(null), 4000)
   }
 
   return (
@@ -190,75 +212,107 @@ export default function ExtensionsPage({ onClose }: Props): React.ReactElement {
         </div>
       </header>
 
-      <div className="ext-url-install">
-        <div className="ext-url-install-header">
-          <h3>Install from Chrome Web Store</h3>
-          <p>Type extension name, paste URL, or enter extension ID</p>
-        </div>
-        <div className="ext-url-input-row">
-          <input
-            type="text"
-            className="ext-url-input"
-            placeholder="e.g. uBlock Origin, or paste URL..."
-            value={storeUrl}
-            onChange={(e) => {
-              setStoreUrl(e.target.value)
-              if (showResults) setShowResults(false)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSmartInstall()
-            }}
-            disabled={installingFromUrl || searching}
-          />
-          <button
-            className="ext-url-install-btn"
-            onClick={handleSmartInstall}
-            disabled={(installingFromUrl || searching) || !storeUrl.trim()}
-          >
-            {installingFromUrl ? 'Installing...' :
-             searching ? 'Searching...' :
-             'Install'}
-          </button>
+      <div className="ext-install-card">
+        <div className="ext-install-card-header">
+          <div className="ext-install-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+          </div>
+          <div>
+            <h3 className="ext-install-title">Add Extension</h3>
+            <p className="ext-install-subtitle">Search by name, or paste a Chrome Web Store URL</p>
+          </div>
         </div>
 
-        {showResults && searchResults.length > 0 && (
-          <div className="ext-search-results">
-            <div className="ext-search-results-header">
-              <span>Search Results</span>
-              <button
-                className="ext-search-close"
-                onClick={() => {
-                  setShowResults(false)
-                  setSearchResults([])
+        <div className="ext-search-wrap" style={{ position: 'relative' }}>
+          <div className="ext-search-row">
+            <div className="ext-search-input-wrap">
+              <svg className="ext-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input
+                ref={inputRef}
+                type="text"
+                className="ext-search-input"
+                placeholder="uBlock, Dark Reader, Bitwarden…"
+                value={storeUrl}
+                onChange={(e) => setStoreUrl(e.target.value)}
+                onFocus={() => { if (searchResults.length > 0) setShowDropdown(true) }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    if (showDropdown && searchResults.length > 0) handleInstallEntry(searchResults[0])
+                    else handleSmartInstall()
+                  }
+                  if (e.key === 'Escape') setShowDropdown(false)
                 }}
-              >
-                ✕
-              </button>
-            </div>
-            {searchResults.slice(0, 5).map((result) => (
-              <div key={result.id} className="ext-search-result">
-                <div className="ext-search-result-icon">
-                  {result.iconUrl ? (
-                    <img src={result.iconUrl} alt="" width="32" height="32" />
-                  ) : (
-                    <div className="ext-search-result-icon-fallback">
-                      {result.name[0]?.toUpperCase() || '?'}
-                    </div>
-                  )}
-                </div>
-                <div className="ext-search-result-info">
-                  <div className="ext-search-result-name">{result.name}</div>
-                  <div className="ext-search-result-desc">{result.description}</div>
-                </div>
+                disabled={installingId !== null}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {storeUrl && (
                 <button
-                  className="ext-search-result-install"
-                  onClick={() => handleInstallSearchResult(result.id)}
-                  disabled={installingFromUrl}
+                  className="ext-search-clear"
+                  onClick={() => { setStoreUrl(''); setShowDropdown(false); inputRef.current?.focus() }}
+                  tabIndex={-1}
+                  aria-label="Clear"
                 >
-                  {installingFromUrl ? '...' : 'Install'}
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M18 6 6 18M6 6l12 12"/>
+                  </svg>
                 </button>
-              </div>
-            ))}
+              )}
+            </div>
+            <button
+              className={`ext-install-btn${installingId ? ' ext-install-btn--loading' : ''}`}
+              onClick={handleSmartInstall}
+              disabled={installingId !== null || !storeUrl.trim()}
+            >
+              {installingId === 'url' ? (
+                <span className="ext-btn-spinner" />
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 5v14M5 12l7 7 7-7"/>
+                </svg>
+              )}
+              <span>{installingId === 'url' ? 'Installing' : 'Install'}</span>
+            </button>
+          </div>
+
+          {showDropdown && searchResults.length > 0 && (
+            <div ref={dropdownRef} className="ext-dropdown">
+              {searchResults.map((entry, i) => (
+                <button
+                  key={entry.id}
+                  className="ext-dropdown-item"
+                  style={{ animationDelay: `${i * 0.03}s` }}
+                  onClick={() => handleInstallEntry(entry)}
+                  disabled={installingId === entry.id}
+                >
+                  <div className="ext-autocomplete-icon">
+                    {installingId === entry.id ? (
+                      <span className="ext-btn-spinner ext-btn-spinner--sm" />
+                    ) : (
+                      <img src={getCatalogIconSrc(entry)} alt="" width={28} height={28} />
+                    )}
+                  </div>
+                  <div className="ext-dropdown-text">
+                    <span className="ext-dropdown-name">{entry.name}</span>
+                    <span className="ext-dropdown-desc">{entry.description}</span>
+                  </div>
+                  <span className="ext-dropdown-badge">{entry.category}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="ext-error-row">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+            </svg>
+            <span>{error}</span>
           </div>
         )}
       </div>
@@ -279,12 +333,20 @@ export default function ExtensionsPage({ onClose }: Props): React.ReactElement {
         ) : (
           extensions.map((ext) => (
             <div key={ext.id} className="ext-card">
-              <div className="ext-icon">
-                {icons[ext.id] ? (
-                  <img src={icons[ext.id]!} alt="" className="ext-icon-img" />
-                ) : (
-                  <IconExtension size={24} />
-                )}
+              <div className="ext-card-icon">
+                {ext.icon_path ? (
+                  <img
+                    src={toAppIconUrl(ext.icon_path)!}
+                    alt=""
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = 'none'
+                      e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                    }}
+                  />
+                ) : null}
+                <div className={`ext-card-icon-fallback ${ext.icon_path ? 'hidden' : ''}`}>
+                  {ext.name?.[0]?.toUpperCase() || '?'}
+                </div>
               </div>
               <div className="ext-info">
                 <div className="ext-name">{ext.name}</div>

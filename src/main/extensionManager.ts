@@ -1,7 +1,7 @@
 import { app, session, dialog, BrowserWindow, net } from 'electron'
-import { join } from 'path'
+import { join, normalize } from 'path'
 import { readFile, mkdir, readdir, copyFile, rm, rename } from 'fs/promises'
-import { existsSync, readFileSync, createWriteStream, unlinkSync, mkdirSync } from 'fs'
+import { existsSync, readFileSync, createWriteStream, unlinkSync, mkdirSync, readdirSync } from 'fs'
 import { randomUUID } from 'crypto'
 import AdmZip from 'adm-zip'
 import { getDb } from './db'
@@ -75,6 +75,79 @@ function findIcon(dir: string): string {
   return ''
 }
 
+// ─── i18n & icon resolution from manifest ─────────────────────
+
+export function resolveI18nMessage(
+  text: string | undefined,
+  extensionDir: string,
+  defaultLocale?: string
+): string {
+  if (!text) return ''
+
+  const match = text.match(/^__MSG_(.+)__$/)
+  if (!match) return text
+
+  const messageName = match[1]
+  const localesDir = join(extensionDir, '_locales')
+
+  const candidates = [defaultLocale, 'en', 'en_US', 'en_GB'].filter(
+    (v): v is string => !!v
+  )
+
+  try {
+    if (existsSync(localesDir)) {
+      candidates.push(...readdirSync(localesDir))
+    }
+  } catch {
+    // ignore
+  }
+
+  const tried = new Set<string>()
+  for (const locale of candidates) {
+    if (tried.has(locale)) continue
+    tried.add(locale)
+
+    try {
+      const messagesPath = join(localesDir, locale, 'messages.json')
+      if (!existsSync(messagesPath)) continue
+
+      const messages = JSON.parse(readFileSync(messagesPath, 'utf-8'))
+      const value = messages?.[messageName]?.message
+      if (typeof value === 'string' && value.length > 0) {
+        return value
+      }
+    } catch {
+      continue
+    }
+  }
+
+  return messageName.replace(/[_-]+/g, ' ').trim()
+}
+
+export function findBestIconPath(extensionDir: string, manifest: any): string | null {
+  const icons = manifest?.icons
+  if (!icons || typeof icons !== 'object') return null
+
+  const sizes = Object.keys(icons)
+    .map(Number)
+    .filter((n) => !isNaN(n))
+    .sort((a, b) => b - a)
+
+  for (const size of sizes) {
+    const relPath = icons[String(size)]
+    if (typeof relPath !== 'string') continue
+
+    const safeRelPath = relPath.replace(/^\/+/, '')
+    const absPath = normalize(join(extensionDir, safeRelPath))
+
+    if (!absPath.startsWith(normalize(extensionDir))) continue
+
+    if (existsSync(absPath)) return absPath
+  }
+
+  return null
+}
+
 // ─── Database ─────────────────────────────────────────────────
 
 function listDB(): ExtensionRecord[] {
@@ -140,7 +213,8 @@ export async function installUnpacked(sourcePath: string): Promise<{ success: bo
     return { success: false, error: 'Invalid manifest.json' }
   }
 
-  const name = String(manifest.name ?? 'Unnamed Extension')
+  const defaultLocale = manifest.default_locale as string | undefined
+  const rawName = String(manifest.name ?? 'Unnamed Extension')
   const version = String(manifest.version ?? '0.0.0')
 
   // Load from source to verify + get ID
@@ -151,7 +225,7 @@ export async function installUnpacked(sourcePath: string): Promise<{ success: bo
   unloadFromSession(id)
 
   const final = extDir(id)
-  if (existsSync(final)) return { success: false, error: `Extension "${name}" (${id}) is already installed` }
+  if (existsSync(final)) return { success: false, error: `Extension "${rawName}" (${id}) is already installed` }
 
   await ensureDir(extensionsDir())
   try {
@@ -164,10 +238,11 @@ export async function installUnpacked(sourcePath: string): Promise<{ success: bo
   // Load from final location
   await loadIntoSession(final)
 
-  const description = String(manifest.description ?? '')
+  const name = resolveI18nMessage(rawName, final, defaultLocale) || rawName
+  const description = resolveI18nMessage(String(manifest.description ?? ''), final, defaultLocale)
   const author = typeof manifest.author === 'string' ? manifest.author : ''
   const homeUrl = String(manifest.homepage_url ?? '')
-  const iconPath = findIcon(final)
+  const iconPath = findBestIconPath(final, manifest) || ''
 
   upsertDB({
     id, name, version, description, author, homeUrl,
@@ -214,7 +289,8 @@ export async function installCrx(crxPath: string): Promise<{ success: boolean; i
     return { success: false, error: 'Invalid manifest.json in CRX' }
   }
 
-  const name = String(manifest.name ?? 'Unnamed Extension')
+  const defaultLocale = manifest.default_locale as string | undefined
+  const rawName = String(manifest.name ?? 'Unnamed Extension')
   const version = String(manifest.version ?? '0.0.0')
 
   // Extract to temp dir
@@ -240,7 +316,7 @@ export async function installCrx(crxPath: string): Promise<{ success: boolean; i
   const final = extDir(id)
   if (existsSync(final)) {
     await rm(tmp, { recursive: true, force: true }).catch(() => {})
-    return { success: false, error: `Extension "${name}" (${id}) is already installed` }
+    return { success: false, error: `Extension "${rawName}" (${id}) is already installed` }
   }
 
   try {
@@ -259,10 +335,11 @@ export async function installCrx(crxPath: string): Promise<{ success: boolean; i
 
   await loadIntoSession(final)
 
-  const description = String(manifest.description ?? '')
+  const name = resolveI18nMessage(rawName, final, defaultLocale) || rawName
+  const description = resolveI18nMessage(String(manifest.description ?? ''), final, defaultLocale)
   const author = typeof manifest.author === 'string' ? manifest.author : ''
   const homeUrl = String(manifest.homepage_url ?? '')
-  const iconPath = findIcon(final)
+  const iconPath = findBestIconPath(final, manifest) || ''
 
   upsertDB({
     id, name, version, description, author, homeUrl,
