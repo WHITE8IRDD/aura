@@ -77,7 +77,7 @@ export default function App(): React.ReactElement {
   const [tabSearchOpen, setTabSearchOpen] = useState(false)
   const [readerActive, setReaderActive] = useState(false)
   const [splitActive, setSplitActive] = useState(false)
-  const [splitState, setSplitState] = useState<{ ratio: number; focusedPane: 'primary' | 'split'; splitUrl: string }>({ ratio: 0.5, focusedPane: 'primary', splitUrl: '' })
+  const [splitState, setSplitState] = useState<{ ratio: number; focusedPane: 'primary' | 'split'; splitUrl: string } | null>(null)
   const [splitSyncTick, setSplitSyncTick] = useState(0)
   const [bookmarksBarVisible, setBookmarksBarVisible] = useLocalStorage<boolean>(
     'aura:bookmarksBarVisible',
@@ -503,23 +503,115 @@ export default function App(): React.ReactElement {
 
   // Split view — sync state from main process
   useEffect(() => {
-    if (activeId === null) { setSplitActive(false); return }
-    window.aura.split.getState(activeId).then((state) => {
-      if (state) {
-        setSplitActive(true)
-        setSplitState({ ratio: state.ratio, focusedPane: state.focusedPane, splitUrl: state.splitUrl })
-      } else {
-        setSplitActive(false)
-      }
+    console.log('[SplitSync] Effect triggered', {
+      activeTabId: activeTab?.id,
+      activeTabUrl: activeTab?.url,
+      activeTabInternal: activeTab?.internal,
+      splitSyncTick
     })
-  }, [activeId, splitSyncTick])
 
+    if (!activeTab) {
+      console.log('[SplitSync] No active tab, clearing')
+      setSplitActive(false)
+      setSplitState(null)
+      return
+    }
+
+    if (activeTab.internal === true) {
+      console.log('[SplitSync] Tab is internal, clearing')
+      setSplitActive(false)
+      setSplitState(null)
+      return
+    }
+
+    if (activeTab.url?.startsWith('aura://')) {
+      console.log('[SplitSync] Tab url is aura://, clearing')
+      setSplitActive(false)
+      setSplitState(null)
+      return
+    }
+
+    let cancelled = false
+
+    const syncSplitState = async () => {
+      try {
+        const isSplit = await window.aura.split.isSplit(activeTab.id)
+        console.log('[SplitSync] isSplit result:', isSplit, 'for tab', activeTab.id)
+
+        if (cancelled) return
+
+        if (!isSplit) {
+          console.log('[SplitSync] Not split, clearing state')
+          setSplitActive(false)
+          setSplitState(null)
+          return
+        }
+
+        const state = await window.aura.split.getState(activeTab.id)
+        console.log('[SplitSync] getState result:', state)
+
+        if (cancelled) return
+
+        if (!state) {
+          console.log('[SplitSync] No state returned, clearing')
+          setSplitActive(false)
+          setSplitState(null)
+          return
+        }
+
+        console.log('[SplitSync] SUCCESS - setting splitActive=true')
+        setSplitActive(true)
+        setSplitState(state)
+      } catch (err) {
+        console.error('[SplitSync] Error:', err)
+        if (!cancelled) {
+          setSplitActive(false)
+          setSplitState(null)
+        }
+      }
+    }
+
+    syncSplitState()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab?.id, activeTab?.internal, activeTab?.url, splitSyncTick])
+
+  // Listen for split:changed events from main process
   useEffect(() => {
-    if (activeId === null) return
+    if (!activeTab) return
+    console.log('[SplitSync] Subscribing to onSplitChanged for tab', activeTab.id)
     return window.aura.split.onSplitChanged(() => {
+      console.log('[SplitSync] onSplitChanged fired, incrementing tick')
       setSplitSyncTick((t) => t + 1)
     })
-  }, [activeId])
+  }, [activeTab?.id])
+
+  // Polling fallback — detect split state desync every 500ms
+  useEffect(() => {
+    if (!activeTab || activeTab.internal === true) return
+
+    const interval = setInterval(async () => {
+      try {
+        const isSplit = await window.aura.split.isSplit(activeTab.id)
+
+        if (isSplit && !splitActive) {
+          console.log('[SplitSync] Detected desync! Main says split, React says no. Force re-sync.')
+          setSplitSyncTick((t) => t + 1)
+        }
+        if (!isSplit && splitActive) {
+          console.log('[SplitSync] Detected desync! Main says no split, React says split. Force re-sync.')
+          setSplitActive(false)
+          setSplitState(null)
+        }
+      } catch {
+        // Ignore errors
+      }
+    }, 500)
+
+    return () => clearInterval(interval)
+  }, [activeTab?.id, activeTab?.internal, splitActive])
 
   const renderChromePage = (): React.ReactElement | null => {
     const onClose = (): void => setChromePage(null)
@@ -636,15 +728,61 @@ export default function App(): React.ReactElement {
               : null}
         </div>
 
-        {splitActive && activeId !== null && (
-          <SplitOverlay
-            tabId={activeId}
-            primaryUrl={activeTab?.url ?? ''}
-            splitState={splitState}
-            onRatioChange={(ratio) => setSplitState((s) => ({ ...s, ratio }))}
-            onFocusChange={(pane) => setSplitState((s) => ({ ...s, focusedPane: pane }))}
-          />
-        )}
+        {(() => {
+          console.log('[SplitRender] Checking render conditions:', {
+            splitActive,
+            activeTab: !!activeTab,
+            notInternal: activeTab?.internal !== true,
+            notAuraUrl: !activeTab?.url?.startsWith('aura://'),
+            splitState: !!splitState
+          })
+          return null
+        })()}
+
+        {splitActive &&
+          activeTab !== null &&
+          activeTab !== undefined &&
+          activeTab.internal !== true &&
+          !activeTab.url?.startsWith('aura://') &&
+          splitState !== null && (
+            <SplitOverlay
+              tabId={activeTab.id}
+              primaryUrl={activeTab.url ?? ''}
+              splitState={splitState}
+              onRatioChange={(newRatio) => {
+                setSplitState((prev) =>
+                  prev ? { ...prev, ratio: newRatio } : prev
+                )
+              }}
+              onFocusChange={(pane) => {
+                setSplitState((prev) =>
+                  prev ? { ...prev, focusedPane: pane } : prev
+                )
+              }}
+              onClose={(_pane) => {
+                setTimeout(async () => {
+                  if (!activeTab) return
+                  try {
+                    const stillSplit = await window.aura.split.isSplit(activeTab.id)
+                    if (!stillSplit) {
+                      setSplitActive(false)
+                      setSplitState(null)
+                    } else {
+                      const newState = await window.aura.split.getState(activeTab.id)
+                      if (newState) setSplitState(newState)
+                      else {
+                        setSplitActive(false)
+                        setSplitState(null)
+                      }
+                    }
+                  } catch {
+                    setSplitActive(false)
+                    setSplitState(null)
+                  }
+                }, 150)
+              }}
+            />
+          )}
 
         <FindBar
           visible={findBarOpen}
