@@ -8,6 +8,7 @@ import { getAccessibilityWebPreferences, applyDefaultZoom } from './accessibilit
 import { attachContextMenu } from './contextMenu'
 import { saveTabs } from './sessions'
 import { sendRestoreToTab } from './mediaResume'
+import { injectStoreScript } from './storeIntegration'
 
 export interface TabState {
   id: number
@@ -633,6 +634,7 @@ export class TabManager {
       console.log('[aura:tabs] did-finish-load', { url: rec.url, isPrivate: this._isPrivate })
       armLoadingTimeout()
       recordVisit(rec.url, rec.title, this.isPrivate)
+      injectStoreScript(wc)
       if (!this._isPrivate) sendRestoreToTab(wc, rec.url)
     })
 
@@ -643,9 +645,10 @@ export class TabManager {
     wc.on('page-favicon-updated', (_e, favicons) => {
       rec.favicon = favicons[0] ?? null; this.emit()
     })
-    wc.on('did-navigate', syncUrl)
+    wc.on('did-navigate', () => { syncUrl(); injectStoreScript(wc) })
     wc.on('did-navigate-in-page', () => {
       syncUrl()
+      injectStoreScript(wc)
       if (!this._isPrivate) sendRestoreToTab(wc, rec.url)
     })
     wc.on('did-fail-load', (_e, errorCode, errorDescription, _validatedURL, isMainFrame) => {

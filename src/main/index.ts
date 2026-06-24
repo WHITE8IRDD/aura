@@ -107,10 +107,11 @@ import { registerPerfHudWindowIPC, togglePerfHud } from './perfHudWindow'
 import { SplitManager } from './splitManager'
 import { writeFile } from 'fs/promises'
 import {
-  installUnpacked, installCrx, enableExtension, disableExtension,
+  installUnpacked, installCrx, installFromStoreId, enableExtension, disableExtension,
   deleteExtension, listExtensions, getExtension, getIconDataUrl,
   reloadEnabledExtensions, pickFolder, pickCrx
 } from './extensionManager'
+import { applyChromeUASpoof, injectStoreScript, isChromeStoreDomain } from './storeIntegration'
 
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
@@ -212,6 +213,7 @@ const startupReady = app.whenReady().then(async () => {
   setupSessionFingerprintDefenses(session.defaultSession)
   setupPermissionPrompts(session.defaultSession)
   registerSession(session.defaultSession)
+  applyChromeUASpoof(session.defaultSession)
   initLanguages()
   setupDownloads()
   registerDownloadsSettingsIPC()
@@ -874,6 +876,58 @@ ipcMain.handle('extensions:openStore', () => {
   }
 })
 ipcMain.handle('extensions:getIcon', (_e, id: string) => getIconDataUrl(id))
+
+ipcMain.handle('extensions:installFromStoreId', async (e, extensionId: string) => {
+  const senderUrl = e.senderFrame?.url ?? ''
+  if (!isChromeStoreDomain(senderUrl)) {
+    return { success: false, error: 'Install can only be triggered from the Chrome Web Store' }
+  }
+  if (typeof extensionId !== 'string' || !/^[a-p]{32}$/.test(extensionId)) {
+    return { success: false, error: 'Invalid extension ID' }
+  }
+  return installFromStoreId(extensionId)
+})
+
+ipcMain.handle('extensions:installFromUrl', async (_e, rawUrl: string) => {
+  if (typeof rawUrl !== 'string' || rawUrl.trim().length === 0) {
+    return { success: false, id: null, error: 'Please paste a valid URL' }
+  }
+
+  const trimmed = rawUrl.trim()
+  let extensionId: string | null = null
+
+  // Direct ID check
+  if (/^[a-p]{32}$/.test(trimmed)) {
+    extensionId = trimmed
+  } else {
+    try {
+      const url = new URL(trimmed)
+      const validDomains = ['chromewebstore.google.com', 'chrome.google.com']
+      const isValidDomain = validDomains.some(d =>
+        url.hostname === d || url.hostname.endsWith('.' + d)
+      )
+      if (!isValidDomain) {
+        return { success: false, id: null, error: 'URL must be from chromewebstore.google.com or chrome.google.com' }
+      }
+      const matches = url.pathname.match(/\/([a-p]{32})(?:[\/?#]|$)/)
+      if (matches && matches[1]) {
+        extensionId = matches[1]
+      }
+    } catch {
+      return { success: false, id: null, error: 'Invalid URL format' }
+    }
+  }
+
+  if (!extensionId) {
+    return { success: false, id: null, error: 'Could not find extension ID in the URL. Make sure you copied the full URL from the extension page.' }
+  }
+
+  try {
+    return await installFromStoreId(extensionId)
+  } catch (err) {
+    return { success: false, id: null, error: err instanceof Error ? err.message : 'Installation failed' }
+  }
+})
 
 ipcMain.on('videoDl:request', async (_e, { url, filename }: { url: string; filename: string }) => {
   if (!url || url.startsWith('blob:') || url.startsWith('data:')) return

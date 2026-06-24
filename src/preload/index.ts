@@ -710,6 +710,10 @@ const api = {
     openStore: (): Promise<void> => ipcRenderer.invoke('extensions:openStore'),
     getIcon: (id: string): Promise<string | null> =>
       ipcRenderer.invoke('extensions:getIcon', id),
+    installFromStoreId: (id: string): Promise<{ success: boolean; id?: string; error?: string }> =>
+      ipcRenderer.invoke('extensions:installFromStoreId', id),
+    installFromUrl: (url: string): Promise<{ success: boolean; id?: string | null; error?: string }> =>
+      ipcRenderer.invoke('extensions:installFromUrl', url),
   },
 
   autofill: {

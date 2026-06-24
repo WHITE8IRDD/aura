@@ -25,6 +25,8 @@ export default function ExtensionsPage({ onClose }: Props): React.ReactElement {
   const [icons, setIcons] = useState<Record<string, string | null>>({})
   const [installing, setInstalling] = useState<'folder' | 'crx' | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [storeUrl, setStoreUrl] = useState('')
+  const [installingFromUrl, setInstallingFromUrl] = useState(false)
 
   const load = useCallback(async () => {
     const list = await window.aura.extensions.list()
@@ -90,6 +92,30 @@ export default function ExtensionsPage({ onClose }: Props): React.ReactElement {
     setTimeout(() => setMessage(null), 4000)
   }
 
+  const handleInstallFromUrl = async () => {
+    if (!storeUrl.trim()) {
+      setMessage('Please paste a Chrome Web Store URL')
+      return
+    }
+    setMessage(null)
+    setInstallingFromUrl(true)
+    try {
+      const result = await (window as any).aura.extensions.installFromUrl(storeUrl)
+      if (!result?.success) {
+        setMessage(result?.error || 'Failed to install extension')
+      } else {
+        setStoreUrl('')
+        setMessage(`Installed: ${result.id}`)
+        await load()
+      }
+    } catch (err: any) {
+      setMessage(err?.message || 'Failed to install extension')
+    } finally {
+      setInstallingFromUrl(false)
+    }
+    setTimeout(() => setMessage(null), 4000)
+  }
+
   return (
     <div className="data-page">
       <header className="data-header">
@@ -106,6 +132,33 @@ export default function ExtensionsPage({ onClose }: Props): React.ReactElement {
           </button>
         </div>
       </header>
+
+      <div className="ext-url-install">
+        <div className="ext-url-install-header">
+          <h3>Install from Chrome Web Store URL</h3>
+          <p>Paste any Chrome Web Store extension URL or extension ID</p>
+        </div>
+        <div className="ext-url-input-row">
+          <input
+            type="text"
+            className="ext-url-input"
+            placeholder="https://chromewebstore.google.com/detail/..."
+            value={storeUrl}
+            onChange={(e) => setStoreUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleInstallFromUrl()
+            }}
+            disabled={installingFromUrl}
+          />
+          <button
+            className="ext-url-install-btn"
+            onClick={handleInstallFromUrl}
+            disabled={installingFromUrl || !storeUrl.trim()}
+          >
+            {installingFromUrl ? 'Installing...' : 'Install'}
+          </button>
+        </div>
+      </div>
 
       {message && <div className="ext-toast">{message}</div>}
 

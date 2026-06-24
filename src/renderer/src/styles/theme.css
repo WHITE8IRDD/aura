@@ -5744,3 +5744,80 @@ body > .gcm-menu {
 }
 .ext-delete:hover { color: var(--red); background: rgba(241, 122, 139, 0.1); }
 
+.ext-url-install {
+  margin: 24px 0;
+  padding: 20px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+}
+
+.ext-url-install-header h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+}
+
+.ext-url-install-header p {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--text-secondary, rgba(255,255,255,0.6));
+}
+
+.ext-url-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.ext-url-input {
+  flex: 1;
+  height: 38px;
+  padding: 0 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  color: var(--text-primary, #fff);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.ext-url-input:focus {
+  border-color: var(--accent, #3b82f6);
+  background: rgba(255,255,255,0.08);
+}
+
+.ext-url-input::placeholder {
+  color: rgba(255,255,255,0.35);
+}
+
+.ext-url-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ext-url-install-btn {
+  height: 38px;
+  padding: 0 20px;
+  background: var(--accent, #3b82f6);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.12s ease;
+  white-space: nowrap;
+}
+
+.ext-url-install-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.ext-url-install-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

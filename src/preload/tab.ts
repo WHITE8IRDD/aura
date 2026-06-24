@@ -233,6 +233,62 @@ const zoomApi = {
 
 contextBridge.exposeInMainWorld('__aura_internal', zoomApi)
 
+// ─────────────────────────────────────────────────────────────────
+// Stage 16d: Minimal extensions bridge for Chrome Web Store injection
+// ─────────────────────────────────────────────────────────────────
+// Exposes ONLY installFromStoreId. Authorization is enforced in the
+// main process via senderFrame URL validation (cannot be forged by
+// a renderer). This bridge provides transport, not trust.
+//
+// Why renderer-side validation exists despite main process re-checking:
+//   - Fail fast: reject malformed input before IPC round-trip
+//   - Consistent contract: guarantee {success, id, error} shape
+//   - Prevent unhandled rejections if IPC channel itself fails
+//   - Defense in depth — never trust ANY single layer
+contextBridge.exposeInMainWorld('aura', {
+  extensions: {
+    installFromStoreId: async (extensionId: unknown) => {
+      // Type guard: reject non-strings before any processing
+      if (typeof extensionId !== 'string') {
+        return {
+          success: false,
+          id: null,
+          error: 'Invalid extension id: expected string'
+        }
+      }
+
+      // Trim and validate format
+      // Chrome extension IDs are exactly 32 chars, letters a-p only
+      const id = extensionId.trim()
+      if (!/^[a-p]{32}$/.test(id)) {
+        return {
+          success: false,
+          id: null,
+          error: 'Invalid extension id format'
+        }
+      }
+
+      // Bridge to main process with proper error containment
+      try {
+        return await ipcRenderer.invoke(
+          'extensions:installFromStoreId',
+          id
+        )
+      } catch (err) {
+        return {
+          success: false,
+          id: null,
+          error:
+            err instanceof Error
+              ? err.message
+              : 'IPC invocation failed'
+        }
+      }
+    }
+  }
+})
+// ─────────────────────────────────────────────────────────────────
+
 window.addEventListener('wheel', (e) => {
   if (!e.ctrlKey && !e.metaKey) return
   e.preventDefault()

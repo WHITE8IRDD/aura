@@ -1,7 +1,7 @@
-import { app, session, dialog, BrowserWindow } from 'electron'
+import { app, session, dialog, BrowserWindow, net } from 'electron'
 import { join } from 'path'
 import { readFile, mkdir, readdir, copyFile, rm, rename } from 'fs/promises'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, createWriteStream, unlinkSync, mkdirSync } from 'fs'
 import { randomUUID } from 'crypto'
 import AdmZip from 'adm-zip'
 import { getDb } from './db'
@@ -365,6 +365,92 @@ export async function pickCrx(win?: BrowserWindow | null): Promise<string | null
     filters: [{ name: 'Chrome Extension', extensions: ['crx'] }]
   })
   return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0]
+}
+
+// ─── Chrome Web Store download ─────────────────────────────
+
+const CHROME_UA_DL =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+
+export async function downloadCrxFromStore(
+  extensionId: string
+): Promise<{ success: boolean; crxPath: string | null; error: string | null }> {
+  if (!/^[a-p]{32}$/.test(extensionId)) {
+    return { success: false, crxPath: null, error: 'Invalid extension ID format' }
+  }
+
+  const url =
+    `https://clients2.google.com/service/update2/crx?response=redirect` +
+    `&os=win&arch=x64&os_arch=x86_64&nacl_arch=x86-64&prod=chromiumcrx` +
+    `&prodchannel=&prodversion=131.0.6778.86&lang=en-US` +
+    `&acceptformat=crx2,crx3&x=id%3D${extensionId}%26installsource%3Dondemand%26uc`
+
+  const extDir = extensionsDir()
+  mkdirSync(extDir, { recursive: true })
+  const tempPath = join(extDir, `_download_${extensionId}_${Date.now()}.crx`)
+
+  return new Promise((resolve) => {
+    let settled = false
+    const cleanup = () => { try { unlinkSync(tempPath) } catch {} }
+    const finish = (r: { success: boolean; crxPath: string | null; error: string | null }) => {
+      if (!settled) { settled = true; resolve(r) }
+    }
+
+    let fileStream: ReturnType<typeof createWriteStream>
+    try {
+      fileStream = createWriteStream(tempPath)
+    } catch (e: unknown) {
+      finish({ success: false, crxPath: null, error: (e as Error)?.message || 'Cannot create temp file' })
+      return
+    }
+
+    const request = net.request({ url, redirect: 'follow' })
+    request.setHeader('User-Agent', CHROME_UA_DL)
+
+    const timeout = setTimeout(() => { try { request.abort() } catch {} }, 30_000)
+
+    request.on('response', (response) => {
+      if (response.statusCode !== 200) {
+        clearTimeout(timeout)
+        fileStream.destroy()
+        cleanup()
+        finish({ success: false, crxPath: null, error: `HTTP ${response.statusCode} from CRX server` })
+        return
+      }
+      response.on('data', (chunk) => fileStream.write(chunk))
+      response.on('end', () => { clearTimeout(timeout); fileStream.end() })
+      response.on('error', (err: Error) => {
+        clearTimeout(timeout); fileStream.destroy(); cleanup()
+        finish({ success: false, crxPath: null, error: err?.message || 'Download stream error' })
+      })
+    })
+
+    fileStream.on('finish', () => {
+      clearTimeout(timeout)
+      finish({ success: true, crxPath: tempPath, error: null })
+    })
+    fileStream.on('error', (err: Error) => {
+      clearTimeout(timeout); cleanup()
+      finish({ success: false, crxPath: null, error: err?.message || 'File write error' })
+    })
+
+    request.on('error', (err: Error) => {
+      clearTimeout(timeout); fileStream.destroy(); cleanup()
+      finish({ success: false, crxPath: null, error: err?.message || 'Request error' })
+    })
+
+    request.end()
+  })
+}
+
+export async function installFromStoreId(extensionId: string): Promise<{ success: boolean; id?: string; error?: string }> {
+  const dl = await downloadCrxFromStore(extensionId)
+  if (!dl.success || !dl.crxPath) {
+    return { success: false, error: dl.error || 'Download failed' }
+  }
+  const result = await installCrx(dl.crxPath)
+  try { unlinkSync(dl.crxPath) } catch {}
+  return result
 }
 
 // ─── File helpers ────────────────────────────────────────────
