@@ -205,9 +205,13 @@ const api = {
   downloads: {
     list: (): Promise<DownloadRecord[]> => ipcRenderer.invoke('downloads:list'),
     cancel: (id: number): Promise<void> => ipcRenderer.invoke('downloads:cancel', id),
+    pause: (id: number): Promise<void> => ipcRenderer.invoke('downloads:pause', id),
+    resume: (id: number): Promise<void> => ipcRenderer.invoke('downloads:resume', id),
     open: (savePath: string): Promise<void> => ipcRenderer.invoke('downloads:open', savePath),
     reveal: (savePath: string): Promise<void> =>
       ipcRenderer.invoke('downloads:reveal', savePath),
+    copyUrl: (id: number): Promise<void> => ipcRenderer.invoke('downloads:copyUrl', id),
+    retry: (id: number): Promise<void> => ipcRenderer.invoke('downloads:retry', id),
     deleteRecord: (id: number): Promise<void> =>
       ipcRenderer.invoke('downloads:deleteRecord', id),
     clearCompleted: (): Promise<void> => ipcRenderer.invoke('downloads:clearCompleted'),
@@ -220,6 +224,11 @@ const api = {
       const listener = (): void => cb()
       ipcRenderer.on('downloads:update', listener)
       return () => ipcRenderer.removeListener('downloads:update', listener)
+    },
+    onProgress: (cb: (data: { id: number; receivedBytes: number; totalBytes: number; state: string }) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, data: { id: number; receivedBytes: number; totalBytes: number; state: string }) => cb(data)
+      ipcRenderer.on('downloads:progress', listener)
+      return () => ipcRenderer.removeListener('downloads:progress', listener)
     }
   },
 

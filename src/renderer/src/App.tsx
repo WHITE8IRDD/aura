@@ -23,8 +23,8 @@ import DownloadsPage from './pages/DownloadsPage'
 import ReadingListPage from './pages/ReadingListPage'
 import BoostsPage from './pages/BoostsPage'
 import SettingsPage from './pages/SettingsPage'
-import ExtensionsPage from './pages/ExtensionsPage'
 
+import DownloadShelf from './components/DownloadShelf'
 import { VerticalTabBar } from './components/VerticalTabBar'
 import SplitOverlay from './components/SplitOverlay'
 import { AutofillSavePrompt } from './components/AutofillSavePrompt'
@@ -45,7 +45,7 @@ const CHROME_HEIGHT_BASE = 80                  // 36 (tabs) + 44 (toolbar)
 const BOOKMARKS_BAR_HEIGHT = 30                // .bookmarks-bar height
 const CHROME_HEIGHT_VERTICAL_COMPACT = 74      // 30 (compact top) + 44 (toolbar)
 
-type ChromePage = null | 'privacy' | 'history' | 'bookmarks' | 'downloads' | 'readingList' | 'boosts' | 'settings' | 'extensions'
+type ChromePage = null | 'privacy' | 'history' | 'bookmarks' | 'downloads' | 'readingList' | 'boosts' | 'settings'
 
 export default function App(): React.ReactElement {
   useTheme()
@@ -323,13 +323,13 @@ export default function App(): React.ReactElement {
     if (action === 'downloads') return setChromePage((p) => p === 'downloads' ? null : 'downloads')
     if (action === 'readingList') return setChromePage((p) => p === 'readingList' ? null : 'readingList')
     if (action === 'boosts') return setChromePage((p) => p === 'boosts' ? null : 'boosts')
-    if (action === 'extensions') return setChromePage((p) => p === 'extensions' ? null : 'extensions')
     if (action === 'settings') return setChromePage((p) => p === 'settings' ? null : 'settings')
     if (action === 'verticalTabs') {
       window.aura.settings.set('tabsLayout', settings?.tabsLayout === 'vertical' ? 'horizontal' : 'vertical')
       return
     }
     const labels: Partial<Record<SidebarAction, string>> = {
+      extensions: 'Extensions page arrives in Stage 10',
       profile: 'Profile switcher arrives in Stage 10'
     }
     const label = labels[action]
@@ -622,7 +622,6 @@ export default function App(): React.ReactElement {
     if (chromePage === 'downloads') return <DownloadsPage onClose={onClose} />
     if (chromePage === 'readingList') return <ReadingListPage onNavigate={handleNavigate} onClose={onClose} />
     if (chromePage === 'boosts') return <BoostsPage onClose={onClose} />
-    if (chromePage === 'extensions') return <ExtensionsPage onClose={onClose} />
     if (chromePage === 'settings') return <SettingsPage onClose={onClose} />
     return null
   }
@@ -673,7 +672,10 @@ export default function App(): React.ReactElement {
             focusSignal={focusSignal}
             onOpenHistory={() => setChromePage(chromePage === 'history' ? null : 'history')}
             onOpenDownloads={() => setChromePage(chromePage === 'downloads' ? null : 'downloads')}
-            onOpenExtensions={() => setChromePage(chromePage === 'extensions' ? null : 'extensions')}
+            onOpenExtensions={() => {
+              setPanelMessage('Extensions page arrives in Stage 10')
+              setTimeout(() => setPanelMessage(null), 2500)
+            }}
             onOpenSettings={() => setChromePage(chromePage === 'settings' ? null : 'settings')}
             onOpenProfile={() => {
               setPanelMessage('Profile switcher arrives in Stage 10')
@@ -808,6 +810,7 @@ export default function App(): React.ReactElement {
           </div>
         )}
         <PermissionPrompt />
+        <DownloadShelf />
       </div>
 
       <CommandPalette

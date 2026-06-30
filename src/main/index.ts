@@ -1,6 +1,5 @@
-import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage, globalShortcut, net, protocol } from 'electron'
-import { join, extname } from 'path'
-import { existsSync } from 'fs'
+import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage, globalShortcut, clipboard } from 'electron'
+import { join } from 'path'
 
 app.name = 'Aura'
 
@@ -66,7 +65,9 @@ import {
 } from './bookmarks'
 import {
   setupDownloads, listDownloads,
-  cancelDownload, openDownloadedFile, revealDownloadedFile,
+  cancelDownload, pauseDownload, resumeDownload,
+  getDownloadRecord,
+  openDownloadedFile, revealDownloadedFile,
   deleteDownloadRecord, clearCompletedDownloads
 } from './downloads'
 import { captureTab, saveScreenshot, copyScreenshotToClipboard } from './screenshot'
@@ -107,12 +108,6 @@ import { registerImageSaverWindowIPC } from './imageSaverWindow'
 import { registerPerfHudWindowIPC, togglePerfHud } from './perfHudWindow'
 import { SplitManager } from './splitManager'
 import { writeFile } from 'fs/promises'
-import {
-  installUnpacked, installCrx, installFromStoreId, enableExtension, disableExtension,
-  deleteExtension, listExtensions, getExtension, getIconDataUrl,
-  reloadEnabledExtensions, pickFolder, pickCrx
-} from './extensionManager'
-import { applyChromeUASpoof, injectStoreScript, isChromeStoreDomain } from './storeIntegration'
 
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
@@ -214,26 +209,6 @@ const startupReady = app.whenReady().then(async () => {
   setupSessionFingerprintDefenses(session.defaultSession)
   setupPermissionPrompts(session.defaultSession)
   registerSession(session.defaultSession)
-  applyChromeUASpoof(session.defaultSession)
-  protocol.handle('app-icon', async (request) => {
-    try {
-      const requestedPath = decodeURIComponent(
-        request.url.replace('app-icon://', '')
-      )
-      if (!existsSync(requestedPath)) {
-        return new Response(null, { status: 404 })
-      }
-      const data = await require('fs').promises.readFile(requestedPath)
-      const ext = extname(requestedPath).toLowerCase()
-      const mime =
-        ext === '.svg' ? 'image/svg+xml' :
-        ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' :
-        'image/png'
-      return new Response(data, { headers: { 'content-type': mime } })
-    } catch {
-      return new Response(null, { status: 404 })
-    }
-  })
   initLanguages()
   setupDownloads()
   registerDownloadsSettingsIPC()
@@ -247,8 +222,6 @@ const startupReady = app.whenReady().then(async () => {
   cleanCorruptedEntries()
   console.log('[aura:media] running gcStaleMediaEntries')
   gcStaleMediaEntries()
-  console.log('[Aura/ext] Reloading enabled extensions…')
-  await reloadEnabledExtensions()
   console.log('[Aura] Ready')
 })
 
@@ -757,6 +730,16 @@ ipcMain.handle('downloads:open', (_e, savePath: string) => openDownloadedFile(sa
 ipcMain.handle('downloads:reveal', (_e, savePath: string) => revealDownloadedFile(savePath))
 ipcMain.handle('downloads:deleteRecord', (_e, id: number) => deleteDownloadRecord(id))
 ipcMain.handle('downloads:clearCompleted', () => clearCompletedDownloads())
+ipcMain.handle('downloads:pause', (_e, id: number) => pauseDownload(id))
+ipcMain.handle('downloads:resume', (_e, id: number) => resumeDownload(id))
+ipcMain.handle('downloads:copyUrl', (_e, id: number) => {
+  const rec = getDownloadRecord(id)
+  if (rec) clipboard.writeText(rec.url)
+})
+ipcMain.handle('downloads:retry', (e, id: number) => {
+  const rec = getDownloadRecord(id)
+  if (rec) e.sender.downloadURL(rec.url)
+})
 
 ipcMain.handle('readingList:add', (_e, url: string, title: string, excerpt?: string) =>
   addReadingItem(url, title, excerpt))
@@ -855,34 +838,6 @@ ipcMain.handle('app:relaunch', () => {
   app.exit(0)
 })
 
-function parseSearchResults(raw: string): Array<{ id: string; name: string; description: string; iconUrl: string }> {
-  const results: Array<{ id: string; name: string; description: string; iconUrl: string }> = []
-  try {
-    const outer = JSON.parse(raw)
-    if (!Array.isArray(outer) || outer.length === 0) return results
-    const wrbEntry = outer[0]
-    if (!Array.isArray(wrbEntry) || wrbEntry.length < 3) return results
-    const innerJson = wrbEntry[2]
-    if (typeof innerJson !== 'string') return results
-    const inner = JSON.parse(innerJson)
-    if (!Array.isArray(inner)) return results
-    const items = inner[1]?.[1] || inner[0]?.[1]?.[1] || inner[0]?.[0]?.[1]
-    if (!Array.isArray(items)) return results
-    for (const item of items.slice(0, 10)) {
-      try {
-        if (!Array.isArray(item) || item.length < 2) continue
-        const data = item[1]
-        if (!Array.isArray(data)) continue
-        const id = data[0]; const name = data[2]; const description = data[6] || ''; const iconUrl = data[3] || ''
-        if (typeof id === 'string' && /^[a-p]{32}$/.test(id) && typeof name === 'string') {
-          results.push({ id, name, description: typeof description === 'string' ? description : '', iconUrl: typeof iconUrl === 'string' ? iconUrl : '' })
-        }
-      } catch { continue }
-    }
-  } catch {}
-  return results
-}
-
 registerAboutIPC()
 registerDefaultBrowserIPC()
 registerResetIPC()
@@ -895,124 +850,6 @@ registerImageSaverIPC()
 registerTranslatorWindowIPC()
 registerImageSaverWindowIPC()
 registerPerfHudWindowIPC()
-
-// STAGE 16 — Chrome Extension System
-ipcMain.handle('extensions:list', () => listExtensions())
-ipcMain.handle('extensions:get', (_e, id: string) => getExtension(id))
-ipcMain.handle('extensions:installFolder', async () => {
-  const folder = await pickFolder()
-  if (!folder) return { success: false, cancelled: true }
-  return installUnpacked(folder)
-})
-ipcMain.handle('extensions:installCrx', async () => {
-  const crxPath = await pickCrx()
-  if (!crxPath) return { success: false, cancelled: true }
-  return installCrx(crxPath)
-})
-ipcMain.handle('extensions:enable', (_e, id: string) => enableExtension(id))
-ipcMain.handle('extensions:disable', (_e, id: string) => disableExtension(id))
-ipcMain.handle('extensions:delete', (_e, id: string) => deleteExtension(id))
-ipcMain.handle('extensions:openStore', () => {
-  try {
-    if (tabs) {
-      tabs.create('https://chromewebstore.google.com/category/extensions')
-      return { success: true }
-    }
-    return { success: false, error: 'No tab manager available' }
-  } catch (err) {
-    return { success: false, error: (err as Error).message }
-  }
-})
-ipcMain.handle('extensions:getIcon', (_e, id: string) => getIconDataUrl(id))
-
-ipcMain.handle('extensions:installFromStoreId', async (e, extensionId: string) => {
-  const senderUrl = e.senderFrame?.url ?? ''
-  if (!isChromeStoreDomain(senderUrl)) {
-    return { success: false, error: 'Install can only be triggered from the Chrome Web Store' }
-  }
-  if (typeof extensionId !== 'string' || !/^[a-p]{32}$/.test(extensionId)) {
-    return { success: false, error: 'Invalid extension ID' }
-  }
-  return installFromStoreId(extensionId)
-})
-
-ipcMain.handle('extensions:installFromUrl', async (_e, rawUrl: string) => {
-  if (typeof rawUrl !== 'string' || rawUrl.trim().length === 0) {
-    return { success: false, id: null, error: 'Please paste a valid URL' }
-  }
-
-  const trimmed = rawUrl.trim()
-  let extensionId: string | null = null
-
-  // Direct ID check
-  if (/^[a-p]{32}$/.test(trimmed)) {
-    extensionId = trimmed
-  } else {
-    try {
-      const url = new URL(trimmed)
-      const validDomains = ['chromewebstore.google.com', 'chrome.google.com']
-      const isValidDomain = validDomains.some(d =>
-        url.hostname === d || url.hostname.endsWith('.' + d)
-      )
-      if (!isValidDomain) {
-        return { success: false, id: null, error: 'URL must be from chromewebstore.google.com or chrome.google.com' }
-      }
-      const matches = url.pathname.match(/\/([a-p]{32})(?:[\/?#]|$)/)
-      if (matches && matches[1]) {
-        extensionId = matches[1]
-      }
-    } catch {
-      return { success: false, id: null, error: 'Invalid URL format' }
-    }
-  }
-
-  if (!extensionId) {
-    return { success: false, id: null, error: 'Could not find extension ID in the URL. Make sure you copied the full URL from the extension page.' }
-  }
-
-  try {
-    return await installFromStoreId(extensionId)
-  } catch (err) {
-    return { success: false, id: null, error: err instanceof Error ? err.message : 'Installation failed' }
-  }
-})
-
-ipcMain.handle('extensions:search', async (_e, query: string) => {
-  if (typeof query !== 'string' || query.trim().length === 0) {
-    return { success: false, results: [], error: 'Empty search query' }
-  }
-
-  const trimmed = query.trim()
-  const searchUrl = 'https://chromewebstore.google.com/_/ChromeWebStoreConsumerFeUi/data/batchexecute'
-  const innerPayload = [[null, [[3, [trimmed, [2], null, null, null, null, null, null, null, null, null, null, null, null, null, null, [10]]]]]]
-  const rpcPayload = [['zTyKYc', JSON.stringify(innerPayload), null, 'generic']]
-  const body = `f.req=${encodeURIComponent(JSON.stringify(rpcPayload))}`
-
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => { try { request.abort() } catch {}; resolve({ success: false, results: [], error: 'Search timed out' }) }, 10_000)
-    let chunks: Buffer[] = []
-    const request = net.request({ method: 'POST', url: searchUrl, redirect: 'follow' })
-    request.setHeader('Content-Type', 'application/x-www-form-urlencoded;charset=UTF-8')
-    request.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
-    request.on('response', (response) => {
-      if (response.statusCode !== 200) {
-        clearTimeout(timeout); resolve({ success: false, results: [], error: `HTTP ${response.statusCode}` }); return
-      }
-      response.on('data', (chunk) => chunks.push(chunk))
-      response.on('end', () => {
-        clearTimeout(timeout)
-        try {
-          const raw = Buffer.concat(chunks).toString('utf-8').replace(/^\)\]\}'\n?/, '')
-          const results = parseSearchResults(raw)
-          resolve({ success: true, results, error: null })
-        } catch { resolve({ success: false, results: [], error: 'Failed to parse search results' }) }
-      })
-      response.on('error', () => { clearTimeout(timeout); resolve({ success: false, results: [], error: 'Response error' }) })
-    })
-    request.on('error', (err: any) => { clearTimeout(timeout); resolve({ success: false, results: [], error: err?.message || 'Request failed' }) })
-    request.end(body)
-  })
-})
 
 ipcMain.on('videoDl:request', async (_e, { url, filename }: { url: string; filename: string }) => {
   if (!url || url.startsWith('blob:') || url.startsWith('data:')) return

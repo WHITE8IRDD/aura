@@ -92,6 +92,11 @@ export function attachDownloadHandler(
          WHERE id = ?`
       ).run(received, total, state === 'progressing' ? 'progressing' : 'interrupted', id)
       broadcast()
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('downloads:progress', { id, receivedBytes: received, totalBytes: total, state })
+        }
+      }
     })
 
     item.once('done', (_evt, state) => {
@@ -102,6 +107,11 @@ export function attachDownloadHandler(
       ).run(state, item.getReceivedBytes(), Date.now(), item.getSavePath(), id)
       activeDownloads.delete(id)
       broadcast()
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('downloads:progress', { id, receivedBytes: item.getReceivedBytes(), totalBytes: item.getTotalBytes(), state: state })
+        }
+      }
     })
   })
 }
@@ -117,9 +127,35 @@ export function listDownloads(limit = 200): DownloadRecord[] {
     .all(limit) as DownloadRecord[]
 }
 
+export function getDownloadItem(id: number): DownloadItem | undefined {
+  return activeDownloads.get(id)
+}
+
+export function pauseDownload(id: number): void {
+  const item = activeDownloads.get(id)
+  if (item && item.canResume()) item.pause()
+}
+
+export function resumeDownload(id: number): void {
+  const item = activeDownloads.get(id)
+  if (item) item.resume()
+}
+
 export function cancelDownload(id: number): void {
   const item = activeDownloads.get(id)
   if (item) item.cancel()
+}
+
+export function getDownloadRecord(id: number): DownloadRecord | null {
+  const row = getDb()
+    .prepare(
+      `SELECT id, url, filename, save_path AS savePath, mime_type AS mimeType,
+              total_bytes AS totalBytes, received_bytes AS receivedBytes,
+              state, started_at AS startedAt, completed_at AS completedAt
+       FROM downloads WHERE id = ?`
+    )
+    .get(id) as DownloadRecord | undefined
+  return row ?? null
 }
 
 export function openDownloadedFile(savePath: string): void {
