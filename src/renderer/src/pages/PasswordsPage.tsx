@@ -11,20 +11,12 @@ interface CredentialRecord {
   last_used: number | null
 }
 
-interface PasswordHealth {
-  id: number
-  origin: string
-  username: string
-  issue: 'reused' | 'weak' | 'stale'
-}
-
 const CLIPBOARD_CLEAR_MS = 20_000
 
 const PasswordsPage: React.FC = () => {
   const [unlocked, setUnlocked] = useState(false)
   const [unlocking, setUnlocking] = useState(false)
   const [credentials, setCredentials] = useState<CredentialRecord[]>([])
-  const [health, setHealth] = useState<PasswordHealth[]>([])
   const [search, setSearch] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editUsername, setEditUsername] = useState('')
@@ -34,15 +26,12 @@ const PasswordsPage: React.FC = () => {
   const [showGenerator, setShowGenerator] = useState(false)
   const [copiedId, setCopiedId] = useState<number | null>(null)
   const clipboardTimer = useRef<NodeJS.Timeout | null>(null)
-  const copiedText = useRef<string>('')
 
   const handleUnlock = useCallback(async () => {
     setUnlocking(true)
     try {
       const ok = await window.aura.passwords.unlockVault()
-      if (ok) {
-        setUnlocked(true)
-      }
+      if (ok) setUnlocked(true)
     } finally {
       setUnlocking(false)
     }
@@ -55,7 +44,6 @@ const PasswordsPage: React.FC = () => {
     } else {
       setCredentials(await window.aura.passwords.getAll())
     }
-    setHealth(await window.aura.passwords.health())
   }, [search, unlocked])
 
   useEffect(() => { load() }, [load])
@@ -87,18 +75,11 @@ const PasswordsPage: React.FC = () => {
 
   const handleCopy = async (text: string, id: number) => {
     await navigator.clipboard.writeText(text)
-    copiedText.current = text
     setCopiedId(id)
-
-    if (clipboardTimer.current) clearTimeout(clipboardTimer.current)
-    clipboardTimer.current = setTimeout(async () => {
+    setTimeout(async () => {
       setCopiedId(cur => (cur === id ? null : cur))
-      try {
-        const current = await navigator.clipboard.readText()
-        if (current === copiedText.current) {
-          await navigator.clipboard.writeText('')
-        }
-      } catch { }
+      const current = await navigator.clipboard.readText().catch(() => null)
+      if (current === text) await navigator.clipboard.writeText('')
     }, CLIPBOARD_CLEAR_MS)
   }
 
@@ -106,20 +87,11 @@ const PasswordsPage: React.FC = () => {
     setShowPasswords(prev => ({ ...prev, [id]: !prev[id] }))
   }
 
-  const getIssuesForCredential = (id: number): PasswordHealth[] =>
-    health.filter(h => h.id === id)
-
   const grouped = credentials.reduce<Record<string, CredentialRecord[]>>((acc, cred) => {
     if (!acc[cred.origin]) acc[cred.origin] = []
     acc[cred.origin].push(cred)
     return acc
   }, {})
-
-  const healthSummary = {
-    reused: health.filter(h => h.issue === 'reused').length,
-    weak: health.filter(h => h.issue === 'weak').length,
-    stale: health.filter(h => h.issue === 'stale').length,
-  }
 
   if (!unlocked) {
     return (
@@ -159,32 +131,6 @@ const PasswordsPage: React.FC = () => {
           </button>
         </div>
       </div>
-
-      {health.length > 0 && (
-        <div className="pwd-health">
-          <div className="pwd-health-title">Password Health</div>
-          <div className="pwd-health-cards">
-            {healthSummary.reused > 0 && (
-              <div className="pwd-health-card pwd-health-reused">
-                <span className="pwd-health-count">{healthSummary.reused}</span>
-                <span className="pwd-health-label">Reused</span>
-              </div>
-            )}
-            {healthSummary.weak > 0 && (
-              <div className="pwd-health-card pwd-health-weak">
-                <span className="pwd-health-count">{healthSummary.weak}</span>
-                <span className="pwd-health-label">Weak</span>
-              </div>
-            )}
-            {healthSummary.stale > 0 && (
-              <div className="pwd-health-card pwd-health-stale">
-                <span className="pwd-health-count">{healthSummary.stale}</span>
-                <span className="pwd-health-label">Outdated</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {showGenerator && (
         <div className="pwd-generator">
@@ -228,96 +174,79 @@ const PasswordsPage: React.FC = () => {
           {Object.entries(grouped).map(([origin, creds]) => (
             <div key={origin} className="pwd-group">
               <div className="pwd-group-origin">{origin}</div>
-              {creds.map(cred => {
-                const issues = getIssuesForCredential(cred.id)
-                return (
-                  <div key={cred.id} className="pwd-row">
-                    {editingId === cred.id ? (
-                      <div className="pwd-edit-form">
-                        <input
-                          className="pwd-edit-input"
-                          type="text"
-                          value={editUsername}
-                          onChange={e => setEditUsername(e.target.value)}
-                          placeholder="Username"
-                          autoComplete="off"
-                        />
-                        <input
-                          className="pwd-edit-input"
-                          type="text"
-                          value={editPassword}
-                          onChange={e => setEditPassword(e.target.value)}
-                          placeholder="Password"
-                          autoComplete="off"
-                        />
-                        <div className="pwd-edit-actions">
-                          <button className="pwd-btn pwd-btn-primary" onClick={handleSaveEdit}>
-                            Save
-                          </button>
-                          <button className="pwd-btn pwd-btn-ghost" onClick={() => setEditingId(null)}>
-                            Cancel
-                          </button>
+              {creds.map(cred => (
+                <div key={cred.id} className="pwd-row">
+                  {editingId === cred.id ? (
+                    <div className="pwd-edit-form">
+                      <input
+                        className="pwd-edit-input"
+                        type="text"
+                        value={editUsername}
+                        onChange={e => setEditUsername(e.target.value)}
+                        placeholder="Username"
+                        autoComplete="off"
+                      />
+                      <input
+                        className="pwd-edit-input"
+                        type="text"
+                        value={editPassword}
+                        onChange={e => setEditPassword(e.target.value)}
+                        placeholder="Password"
+                        autoComplete="off"
+                      />
+                      <div className="pwd-edit-actions">
+                        <button className="pwd-btn pwd-btn-primary" onClick={handleSaveEdit}>
+                          Save
+                        </button>
+                        <button className="pwd-btn pwd-btn-ghost" onClick={() => setEditingId(null)}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="pwd-row-info">
+                        <div className="pwd-row-username">{cred.username}</div>
+                        <div className="pwd-row-password">
+                          {showPasswords[cred.id]
+                            ? cred.password
+                            : '•'.repeat(Math.min(cred.password.length, 16))}
                         </div>
                       </div>
-                    ) : (
-                      <>
-                        <div className="pwd-row-info">
-                          <div className="pwd-row-username">{cred.username}</div>
-                          <div className="pwd-row-password">
-                            {showPasswords[cred.id]
-                              ? cred.password
-                              : '•'.repeat(Math.min(cred.password.length, 16))}
-                          </div>
-                          {issues.length > 0 && (
-                            <div className="pwd-row-issues">
-                              {issues.map(issue => (
-                                <span
-                                  key={issue.issue}
-                                  className={`pwd-issue-badge pwd-issue-${issue.issue}`}
-                                >
-                                  {issue.issue === 'reused' ? '⚠ Reused' :
-                                   issue.issue === 'weak'   ? '⚠ Weak' :
-                                                              '⚠ Outdated'}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="pwd-row-actions">
-                          <button
-                            className="pwd-btn-icon"
-                            onClick={() => toggleShowPassword(cred.id)}
-                            title={showPasswords[cred.id] ? 'Hide' : 'Show'}
-                          >
-                            {showPasswords[cred.id] ? '🙈' : '👁'}
-                          </button>
-                          <button
-                            className="pwd-btn-icon"
-                            onClick={() => handleCopy(cred.password, cred.id)}
-                            title="Copy password (clears in 20s)"
-                          >
-                            {copiedId === cred.id ? '✓' : '📋'}
-                          </button>
-                          <button
-                            className="pwd-btn-icon"
-                            onClick={() => handleEdit(cred)}
-                            title="Edit"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            className="pwd-btn-icon pwd-btn-danger"
-                            onClick={() => handleDelete(cred.id)}
-                            title="Delete"
-                          >
-                            🗑
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )
-              })}
+                      <div className="pwd-row-actions">
+                        <button
+                          className="pwd-btn-icon"
+                          onClick={() => toggleShowPassword(cred.id)}
+                          title={showPasswords[cred.id] ? 'Hide' : 'Show'}
+                        >
+                          {showPasswords[cred.id] ? '🙈' : '👁'}
+                        </button>
+                        <button
+                          className="pwd-btn-icon"
+                          onClick={() => handleCopy(cred.password, cred.id)}
+                          title="Copy password (clears in 20s)"
+                        >
+                          {copiedId === cred.id ? '✓' : '📋'}
+                        </button>
+                        <button
+                          className="pwd-btn-icon"
+                          onClick={() => handleEdit(cred)}
+                          title="Edit"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          className="pwd-btn-icon pwd-btn-danger"
+                          onClick={() => handleDelete(cred.id)}
+                          title="Delete"
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
             </div>
           ))}
         </div>

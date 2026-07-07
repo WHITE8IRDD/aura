@@ -427,15 +427,6 @@ const api = {
     ): Promise<{ ok: boolean; reason?: string }> =>
       ipcRenderer.invoke('passwords:fillIntoPage', tabId, credentialId),
 
-    addToBlocklist: (origin: string): Promise<void> =>
-      ipcRenderer.invoke('passwords:addToBlocklist', origin),
-
-    removeFromBlocklist: (origin: string): Promise<void> =>
-      ipcRenderer.invoke('passwords:removeFromBlocklist', origin),
-
-    health: (): Promise<PasswordHealth[]> =>
-      ipcRenderer.invoke('passwords:health'),
-
     unlockVault: (): Promise<boolean> =>
       ipcRenderer.invoke('passwords:unlockVault'),
 
@@ -746,6 +737,40 @@ const api = {
     }> => ipcRenderer.invoke('clearData:execute', options)
   },
 
+  keyboard: {
+    getLayout: (): Promise<{
+      functionRow: any[]; numberRow: any[]; qwertyRows: any[][]; bottomRow: any[]; arrowCluster: any[]
+    }> => ipcRenderer.invoke('vk:getLayout'),
+    getCategories: (): Promise<Array<{ id: string; label: string }>> =>
+      ipcRenderer.invoke('vk:getCategories'),
+    getCategory: (categoryId: string): Promise<any[]> =>
+      ipcRenderer.invoke('vk:getCategory', categoryId),
+    search: (query: string): Promise<any[]> =>
+      ipcRenderer.invoke('vk:search', query),
+    copy: (char: string): Promise<boolean> =>
+      ipcRenderer.invoke('vk:copy', char),
+    insert: (char: string): Promise<boolean> =>
+      ipcRenderer.invoke('vk:insert', char),
+    type: (char: string): Promise<boolean> =>
+      ipcRenderer.invoke('vk:type', char),
+    sendKey: (code: string): Promise<boolean> =>
+      ipcRenderer.invoke('vk:sendKey', code),
+    toggle: (): Promise<void> =>
+      ipcRenderer.invoke('vk:toggle'),
+    close: (): Promise<void> =>
+      ipcRenderer.invoke('vk:close'),
+    setAlwaysOnTop: (flag: boolean): Promise<void> =>
+      ipcRenderer.invoke('vk:setAlwaysOnTop', flag),
+    getFavorites: (): Promise<any[]> =>
+      ipcRenderer.invoke('vk:getFavorites'),
+    addFavorite: (code: string): Promise<boolean> =>
+      ipcRenderer.invoke('vk:addFavorite', code),
+    removeFavorite: (code: string): Promise<boolean> =>
+      ipcRenderer.invoke('vk:removeFavorite', code),
+    reorderFavorites: (codes: string[]): Promise<boolean> =>
+      ipcRenderer.invoke('vk:reorderFavorites', codes),
+  },
+
   reader: {
     probe: (tabId: string | number): Promise<{ readerable: boolean; reason?: string }> =>
       ipcRenderer.invoke('reader:probe', tabId),
@@ -848,10 +873,36 @@ const api = {
     acceptSave: (input: any): Promise<{ id: number; success: boolean }> =>
       ipcRenderer.invoke('autofill:promptSaveAccept', input),
 
+    fillProfile: (tabId: number, profileId: number): Promise<{ ok: boolean; reason?: string }> =>
+      ipcRenderer.invoke('autofill:fillProfile', tabId, profileId),
+
     onPromptSave: (cb: (data: any) => void): (() => void) => {
       const handler = (_e: any, data: any) => cb(data)
       ipcRenderer.on('autofill:promptSave', handler)
       return () => ipcRenderer.removeListener('autofill:promptSave', handler)
+    },
+
+    cards: {
+      list: (): Promise<Array<{
+        id: number; label: string; cardholder: string; number: string
+        expMonth: string; expYear: string; cvv: string; brand: string
+        lastFour: string; createdAt: number; updatedAt: number
+      }>> => ipcRenderer.invoke('autofill:cards:list'),
+
+      add: (input: any): Promise<{ id: number; success: boolean }> =>
+        ipcRenderer.invoke('autofill:cards:add', input),
+
+      update: (id: number, input: any): Promise<boolean> =>
+        ipcRenderer.invoke('autofill:cards:update', id, input),
+
+      delete: (id: number): Promise<boolean> =>
+        ipcRenderer.invoke('autofill:cards:delete', id),
+
+      deleteAll: (): Promise<number> =>
+        ipcRenderer.invoke('autofill:cards:deleteAll'),
+
+      fill: (tabId: number, cardId: number): Promise<{ ok: boolean; reason?: string }> =>
+        ipcRenderer.invoke('autofill:cards:fill', tabId, cardId)
     }
   }
 }

@@ -56,7 +56,8 @@ import {
   sendRestoreToTab
 } from './mediaResume'
 import { registerClearBrowsingDataIPC } from './clearBrowsingData'
-import { registerAutofillIPC, maybePromptSave } from './autofill'
+import { maybePromptSave } from './autofill'
+import { registerAutofillProfilesIPC } from './autofillProfiles'
 import { applyZoomToAllTabs } from './accessibility'
 import { getDb, closeDb } from './db'
 import {
@@ -71,21 +72,9 @@ import {
   deleteDownloadRecord, clearCompletedDownloads
 } from './downloads'
 import {
-  saveCredential,
-  getCredentialsForOrigin,
-  getAllCredentials,
-  getCredentialById,
-  deleteCredential,
-  updateCredential,
-  markCredentialUsed,
-  searchCredentials,
-  checkDuplicate,
-  generateSecurePassword,
-  addToBlocklist,
-  isBlocklisted,
-  removeFromBlocklist,
-  analyzePasswordHealth,
-  EncryptionUnavailableError
+  saveCredential, getCredentialsForOrigin, getAllCredentials, deleteCredential,
+  updateCredential, markCredentialUsed, searchCredentials, checkDuplicate,
+  generateSecurePassword, EncryptionUnavailableError
 } from './passwords'
 import { captureTab, saveScreenshot, copyScreenshotToClipboard } from './screenshot'
 import { extractArticle, probeReaderable, getReaderPayload } from './reader'
@@ -125,6 +114,8 @@ import { registerImageSaverWindowIPC } from './imageSaverWindow'
 import { registerPerfHudWindowIPC, togglePerfHud } from './perfHudWindow'
 import { SplitManager } from './splitManager'
 import { writeFile } from 'fs/promises'
+import { initFocusTracker } from './focusTracker'
+import { setupKeyboardIPC, registerKeyboardShortcut, cleanupKeyboard } from './virtualKeyboard'
 
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
@@ -305,6 +296,9 @@ async function createWindow(): Promise<void> {
   registerWindowControls(() => BrowserWindow.getFocusedWindow() ?? mainWindow)
   wireMaximizeEvents(mainWindow)
   registerShortcuts(mainWindow, tabs)
+  initFocusTracker(mainWindow)
+  setupKeyboardIPC(mainWindow)
+  registerKeyboardShortcut()
 
   globalShortcut.register('CommandOrControl+Shift+P', () => {
     const focused = BrowserWindow.getFocusedWindow()
@@ -861,7 +855,7 @@ registerResetIPC()
 registerProfileDataIPC()
 registerTabContextMenuIPC()
 registerClearBrowsingDataIPC()
-registerAutofillIPC()
+registerAutofillProfilesIPC()
 registerTranslatorIPC()
 registerImageSaverIPC()
 registerTranslatorWindowIPC()
@@ -897,9 +891,6 @@ ipcMain.on('autofill:formSubmitted', (e, captured) => {
 // ── PASSWORD MANAGER IPC HANDLERS ─────────────────────────────────────────────
 
 ipcMain.handle('passwords:save', (_e, origin: string, username: string, password: string, title: string) => {
-  if (isBlocklisted(origin)) {
-    return { ok: false, reason: 'blocklisted' }
-  }
   try {
     return { ok: true, id: saveCredential(origin, username, password, title) }
   } catch (err) {
@@ -910,107 +901,51 @@ ipcMain.handle('passwords:save', (_e, origin: string, username: string, password
   }
 })
 
-ipcMain.handle('passwords:getForOrigin', (_e, origin: string) => {
-  return getCredentialsForOrigin(origin)
-})
+ipcMain.handle('passwords:getForOrigin', (_e, origin: string) => getCredentialsForOrigin(origin))
+ipcMain.handle('passwords:getAll', () => getAllCredentials())
+ipcMain.handle('passwords:delete', (_e, id: number) => deleteCredential(id))
+ipcMain.handle('passwords:update', (_e, id: number, username: string, password: string) =>
+  updateCredential(id, username, password))
+ipcMain.handle('passwords:markUsed', (_e, id: number) => markCredentialUsed(id))
+ipcMain.handle('passwords:search', (_e, query: string) => searchCredentials(query))
+ipcMain.handle('passwords:checkDuplicate', (_e, origin: string, username: string) =>
+  checkDuplicate(origin, username))
+ipcMain.handle('passwords:generate', (_e, length?: number) => generateSecurePassword(length))
 
-ipcMain.handle('passwords:getAll', () => {
-  return getAllCredentials()
-})
-
-ipcMain.handle('passwords:delete', (_e, id: number) => {
-  deleteCredential(id)
-})
-
-ipcMain.handle('passwords:update', (_e, id: number, username: string, password: string) => {
-  updateCredential(id, username, password)
-})
-
-ipcMain.handle('passwords:markUsed', (_e, id: number) => {
-  markCredentialUsed(id)
-})
-
-ipcMain.handle('passwords:search', (_e, query: string) => {
-  return searchCredentials(query)
-})
-
-ipcMain.handle('passwords:checkDuplicate', (_e, origin: string, username: string) => {
-  return checkDuplicate(origin, username)
-})
-
-ipcMain.handle('passwords:generate', (_e, length?: number) => {
-  return generateSecurePassword(length)
-})
-
-ipcMain.handle('passwords:addToBlocklist', (_e, origin: string) => {
-  addToBlocklist(origin)
-})
-
-ipcMain.handle('passwords:removeFromBlocklist', (_e, origin: string) => {
-  removeFromBlocklist(origin)
-})
-
-ipcMain.handle('passwords:health', () => {
-  return analyzePasswordHealth()
-})
-
-ipcMain.handle('passwords:unlockVault', async () => {
-  if (
-    process.platform === 'darwin' &&
-    typeof systemPreferences.canPromptTouchID === 'function' &&
-    systemPreferences.canPromptTouchID()
-  ) {
-    try {
-      await systemPreferences.promptTouchID('reveal saved passwords')
-      return true
-    } catch {
-      return false
-    }
-  }
-  return true
-})
-
+// Fix for bug #8: re-verify the tab is active AND its live origin still
+// matches the credential's origin before injecting anything into the page.
 ipcMain.handle('passwords:fillIntoPage', async (_e, tabId: number, credentialId: number) => {
   const tabsManager = getTabsForEvent(_e)
   const record = tabsManager?.getTab(tabId)
   if (!record) return { ok: false, reason: 'no-such-tab' }
-
   if (tabsManager.getActiveId() !== tabId) {
-    return { ok: false, reason: 'tab-not-active' }
+    return { ok: false, reason: 'tab-not-active' } // refuse background fills
   }
 
-  const cred = getCredentialById(credentialId)
-  if (!cred) return { ok: false, reason: 'no-such-credential' }
+  const creds = getAllCredentials().find(c => c.id === credentialId)
+  if (!creds) return { ok: false, reason: 'no-such-credential' }
 
-  let liveOrigin: string
-  try {
-    const view = record.view
-    if (!view) return { ok: false, reason: 'no-webview' }
-    liveOrigin = new URL(view.webContents.getURL()).origin
-  } catch {
-    return { ok: false, reason: 'invalid-live-url' }
+  const view = record.view
+  if (!view) return { ok: false, reason: 'no-webview' }
+  const liveOrigin = new URL(view.webContents.getURL()).origin
+  if (liveOrigin !== creds.origin) {
+    return { ok: false, reason: 'origin-mismatch' } // refuse cross-origin fill
   }
 
-  if (liveOrigin !== cred.origin) {
-    return { ok: false, reason: 'origin-mismatch' }
-  }
-
-  await record.view.webContents.executeJavaScript(`
+  await view.webContents.executeJavaScript(`
     (function() {
       const pw = document.querySelector('input[type="password"]:not([disabled])');
       const un =
         document.querySelector('input[type="email"]:not([disabled])') ||
         document.querySelector('input[type="text"]:not([disabled])');
       function setNativeValue(el, value) {
-        const setter = Object.getOwnPropertyDescriptor(
-          window.HTMLInputElement.prototype, 'value'
-        ).set;
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
         setter.call(el, value);
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
       }
-      if (un) setNativeValue(un, ${JSON.stringify(cred.username)});
-      if (pw) setNativeValue(pw, ${JSON.stringify(cred.password)});
+      if (un) setNativeValue(un, ${JSON.stringify(creds.username)});
+      if (pw) setNativeValue(pw, ${JSON.stringify(creds.password)});
     })()
   `)
 
@@ -1018,39 +953,35 @@ ipcMain.handle('passwords:fillIntoPage', async (_e, tabId: number, credentialId:
   return { ok: true }
 })
 
+// Fix for bug #5/#6/#7: validate what's coming from the page before trusting it.
 ipcMain.on('passwords:formSubmitted', (e, data: {
-  origin: string
-  username: string
-  password: string
-  title: string
-  frameIsMain: boolean
+  origin: string; username: string; password: string; title: string; frameIsMain: boolean
 }) => {
-  if (!data.frameIsMain) return
+  if (!data.frameIsMain) return // ignore credentials captured inside iframes
   if (!data.password) return
-  if (isBlocklisted(data.origin)) return
-
   const isDuplicate = checkDuplicate(data.origin, data.username)
-  const win = BrowserWindow.fromWebContents(e.sender) ||
-    BrowserWindow.getAllWindows().find(w =>
-      w.webContents.id === (e.sender as any).hostWebContents?.id
-    )
+  const win = BrowserWindow.fromWebContents(e.sender)
   if (!win || win.isDestroyed()) return
   win.webContents.send('passwords:savePrompt', { ...data, isDuplicate })
 })
 
 ipcMain.on('passwords:pageHasLoginForm', (e, data: { origin: string }) => {
-  if (isBlocklisted(data.origin)) return
   const creds = getCredentialsForOrigin(data.origin)
   if (creds.length === 0) return
-  const win = BrowserWindow.fromWebContents(e.sender) ||
-    BrowserWindow.getAllWindows().find(w =>
-      w.webContents.id === (e.sender as any).hostWebContents?.id
-    )
+  const win = BrowserWindow.fromWebContents(e.sender)
   if (!win || win.isDestroyed()) return
-  win.webContents.send('passwords:fillAvailable', {
-    origin: data.origin,
-    count: creds.length
-  })
+  win.webContents.send('passwords:fillAvailable', { origin: data.origin, count: creds.length })
+})
+
+// Vault unlock gate — require OS-level re-auth before revealing passwords in UI.
+ipcMain.handle('passwords:unlockVault', async () => {
+  if (process.platform === 'darwin' && typeof systemPreferences.canPromptTouchID === 'function' && systemPreferences.canPromptTouchID()) {
+    try {
+      await systemPreferences.promptTouchID('reveal saved passwords')
+      return true
+    } catch { return false }
+  }
+  return true
 })
 
 app.whenReady().then(() => { void createWindow() })
@@ -1077,6 +1008,7 @@ app.on('before-quit', (event) => {
 
 app.on('will-quit', () => {
   try { forceFlushMediaResume() } catch {}
+  cleanupKeyboard()
   globalShortcut.unregisterAll()
 })
 

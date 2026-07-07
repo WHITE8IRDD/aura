@@ -35,6 +35,7 @@ import { useKeyboard } from './hooks/useKeyboard'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useResize } from './hooks/useResize'
 import type { TabState } from './types'
+import VirtualKeyboard from './components/VirtualKeyboard/VirtualKeyboard'
 
 // STAGE 8.7-hotfix: updated to match new CSS heights
 //   .chrome-top-row    = 36px (tabs row)
@@ -54,6 +55,8 @@ export default function App(): React.ReactElement {
   useTheme()
   useAccessibility()
   const { settings } = useSettings()
+  const [isKeyboardWindow] = useState(() => window.location.hash === '#/virtual-keyboard')
+  if (isKeyboardWindow) return <VirtualKeyboard />
 
   // One-time migration: copy aura:verticalTabs from localStorage to settings DB
   useEffect(() => {

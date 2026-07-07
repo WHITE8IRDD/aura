@@ -234,6 +234,25 @@ const MIGRATIONS: Migration[] = [
         installed_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
     `)
+  },
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS payment_cards (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        label           TEXT NOT NULL DEFAULT 'Card',
+        cardholder_enc  TEXT,
+        number_enc      TEXT,
+        exp_month_enc   TEXT,
+        exp_year_enc    TEXT,
+        cvv_enc         TEXT,
+        brand           TEXT NOT NULL DEFAULT '',
+        last_four       TEXT NOT NULL DEFAULT '',
+        created_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at      INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+      CREATE INDEX IF NOT EXISTS idx_payment_cards_updated
+        ON payment_cards(updated_at DESC);
+    `)
   }
 ]
 

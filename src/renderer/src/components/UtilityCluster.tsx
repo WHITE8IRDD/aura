@@ -155,6 +155,13 @@ export default function UtilityCluster({
         aria-pressed={effectiveReaderActive}>
         <IconReader size={15} filled={effectiveReaderActive} />
       </button>
+      <button className="util-btn" title="Aura Keys (Ctrl+Alt+K)" onClick={() => window.aura.keyboard.toggle()}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M6 16h.01M10 16h.01M14 16h.01M18 16h.01" />
+        </svg>
+      </button>
       <button className={`util-btn${splitActive ? ' active' : ''}`}
         title={splitActive ? 'Exit split view (Ctrl+/)' : 'Enter split view (Ctrl+/)'}
         onClick={handleToggleSplit}

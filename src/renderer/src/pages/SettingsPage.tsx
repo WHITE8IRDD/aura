@@ -13,7 +13,8 @@ import { PerformanceSection } from './settings/PerformanceSection'
 import { DefaultBrowserSection } from './settings/DefaultBrowserSection'
 import { AboutSection } from './settings/AboutSection'
 import { YouAndAuraSection } from './settings/YouAndAuraSection'
-import { AutofillSection } from './settings/AutofillSection'
+import { AutofillProfilesManager } from '../components/AutofillProfilesManager'
+import { PaymentCardsManager } from '../components/PaymentCardsManager'
 import { Button } from './settings/SettingsControls'
 import { useSettings } from '../hooks/useSettings'
 import { ChromePageHeader } from '../components/ChromePageHeader'
@@ -225,7 +226,13 @@ export default function SettingsPage({ onClose }: Props): React.ReactElement {
           {activeSection === 'home' && <HomeSection />}
           {activeSection === 'search' && <SearchSection />}
           {activeSection === 'privacy' && <PrivacySection />}
-          {activeSection === 'autofill' && <AutofillSection />}
+          {activeSection === 'autofill' && (
+            <div className="sett-section" id="sett-autofill">
+              <h2 className="sett-section-title">Autofill</h2>
+              <AutofillProfilesManager />
+              <PaymentCardsManager />
+            </div>
+          )}
           {activeSection === 'downloads' && <DownloadsSection />}
           {activeSection === 'accessibility' && <AccessibilitySection />}
           {activeSection === 'performance' && <PerformanceSection />}
