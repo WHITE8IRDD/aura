@@ -160,7 +160,15 @@ export async function clearBrowsingData(options: ClearOptions): Promise<ClearRes
     }
   }
 
-  if (options.passwords) result.cleared.passwords = 0
+  if (options.passwords) {
+    try {
+      const res = db.prepare('DELETE FROM credentials').run()
+      db.prepare('DELETE FROM password_blocklist').run()
+      result.cleared.passwords = res.changes
+    } catch (err: any) {
+      result.errors.push(`passwords: ${err.message}`)
+    }
+  }
   if (options.autofillData) result.cleared.autofillData = 0
 
   if (result.errors.length > 0) result.success = false

@@ -10,6 +10,38 @@ import type { Boost } from '../main/boosts'
 import type { SidebarPanel } from '../main/sidebar-panels'
 import type { TabGroup } from '../main/tab-groups'
 
+interface CredentialRecord {
+  id: number
+  origin: string
+  username: string
+  password: string
+  title: string
+  created_at: number
+  updated_at: number
+  last_used: number | null
+}
+
+interface SavePromptData {
+  origin: string
+  username: string
+  password: string
+  title: string
+  isDuplicate: boolean
+  frameIsMain: boolean
+}
+
+interface FillAvailableData {
+  origin: string
+  count: number
+}
+
+interface PasswordHealth {
+  id: number
+  origin: string
+  username: string
+  issue: 'reused' | 'weak' | 'stale'
+}
+
 interface PrivacyStats {
   trackersBlocked: number
   adsBlocked: number
@@ -354,6 +386,70 @@ const api = {
       ipcRenderer.on('readingList:update', l)
       return () => ipcRenderer.removeListener('readingList:update', l)
     }
+  },
+
+  passwords: {
+    save: (
+      origin: string,
+      username: string,
+      password: string,
+      title: string
+    ): Promise<{ ok: boolean; id?: number; reason?: string }> =>
+      ipcRenderer.invoke('passwords:save', origin, username, password, title),
+
+    getForOrigin: (origin: string): Promise<CredentialRecord[]> =>
+      ipcRenderer.invoke('passwords:getForOrigin', origin),
+
+    getAll: (): Promise<CredentialRecord[]> =>
+      ipcRenderer.invoke('passwords:getAll'),
+
+    delete: (id: number): Promise<void> =>
+      ipcRenderer.invoke('passwords:delete', id),
+
+    update: (id: number, username: string, password: string): Promise<void> =>
+      ipcRenderer.invoke('passwords:update', id, username, password),
+
+    markUsed: (id: number): Promise<void> =>
+      ipcRenderer.invoke('passwords:markUsed', id),
+
+    search: (query: string): Promise<CredentialRecord[]> =>
+      ipcRenderer.invoke('passwords:search', query),
+
+    checkDuplicate: (origin: string, username: string): Promise<boolean> =>
+      ipcRenderer.invoke('passwords:checkDuplicate', origin, username),
+
+    generate: (length?: number): Promise<string> =>
+      ipcRenderer.invoke('passwords:generate', length),
+
+    fillIntoPage: (
+      tabId: number,
+      credentialId: number
+    ): Promise<{ ok: boolean; reason?: string }> =>
+      ipcRenderer.invoke('passwords:fillIntoPage', tabId, credentialId),
+
+    addToBlocklist: (origin: string): Promise<void> =>
+      ipcRenderer.invoke('passwords:addToBlocklist', origin),
+
+    removeFromBlocklist: (origin: string): Promise<void> =>
+      ipcRenderer.invoke('passwords:removeFromBlocklist', origin),
+
+    health: (): Promise<PasswordHealth[]> =>
+      ipcRenderer.invoke('passwords:health'),
+
+    unlockVault: (): Promise<boolean> =>
+      ipcRenderer.invoke('passwords:unlockVault'),
+
+    onSavePrompt: (callback: (data: SavePromptData) => void): (() => void) => {
+      const handler = (_e: unknown, data: SavePromptData) => callback(data)
+      ipcRenderer.on('passwords:savePrompt', handler)
+      return () => ipcRenderer.removeListener('passwords:savePrompt', handler)
+    },
+
+    onFillAvailable: (callback: (data: FillAvailableData) => void): (() => void) => {
+      const handler = (_e: unknown, data: FillAvailableData) => callback(data)
+      ipcRenderer.on('passwords:fillAvailable', handler)
+      return () => ipcRenderer.removeListener('passwords:fillAvailable', handler)
+    },
   },
 
   boosts: {

@@ -3,6 +3,7 @@ import { app } from 'electron'
 import { join } from 'path'
 import { runMigrations } from './schema'
 import { unlinkSync } from 'fs'
+import { setupPasswordsTable } from '../passwords'
 
 let db: Database.Database | null = null
 
@@ -32,6 +33,7 @@ export function getDb(): Database.Database {
   db.pragma('wal_checkpoint(TRUNCATE)')
 
   runMigrations(db)
+  setupPasswordsTable()
 
   console.log('[Aura/db] Opened at', dbPath)
 
