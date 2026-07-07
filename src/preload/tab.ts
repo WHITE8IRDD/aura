@@ -298,3 +298,93 @@ window.addEventListener('wheel', (e) => {
 
 setupAutofillCapture()
 setupAutofillSuggestions()
+
+/* ── Stage 22: Password Manager — Secure Form Capture ── */
+
+function getOrigin(): string {
+  try { return new URL(window.location.href).origin }
+  catch { return window.location.origin }
+}
+
+function isVisible(el: HTMLElement): boolean {
+  const style = window.getComputedStyle(el)
+  return (
+    style.display !== 'none' &&
+    style.visibility !== 'hidden' &&
+    (el as HTMLInputElement).disabled !== true &&
+    el.offsetParent !== null
+  )
+}
+
+function findLoginForms(): HTMLFormElement[] {
+  return Array.from(document.querySelectorAll('form')).filter(form => {
+    const pw = form.querySelector('input[type="password"]') as HTMLInputElement | null
+    return !!pw && isVisible(pw)
+  })
+}
+
+function getFormData(form: HTMLFormElement): { username: string; password: string } | null {
+  const pw = form.querySelector('input[type="password"]') as HTMLInputElement | null
+  if (!pw || !pw.value || !isVisible(pw)) return null
+
+  const un =
+    (form.querySelector('input[type="email"]') as HTMLInputElement | null) ||
+    (form.querySelector('input[type="text"]') as HTMLInputElement | null) ||
+    (form.querySelector(
+      'input:not([type="password"]):not([type="hidden"]):not([type="submit"])'
+    ) as HTMLInputElement | null)
+
+  return { username: un?.value ?? '', password: pw.value }
+}
+
+let lastSent = 0
+function sendCapture(data: { username: string; password: string }): void {
+  const now = Date.now()
+  if (now - lastSent < 1000) return
+  lastSent = now
+
+  ipcRenderer.send('passwords:formSubmitted', {
+    origin: getOrigin(),
+    username: data.username,
+    password: data.password,
+    title: document.title,
+    frameIsMain: window === window.top,
+  })
+}
+
+function attachFormListeners(): void {
+  findLoginForms().forEach(form => {
+    if ((form as any).__auraWatched) return
+    ;(form as any).__auraWatched = true
+
+    form.addEventListener('submit', () => {
+      const data = getFormData(form)
+      if (data) sendCapture(data)
+    })
+  })
+}
+
+function checkAndNotifyFillAvailable(): void {
+  if (findLoginForms().length > 0 && window === window.top) {
+    ipcRenderer.send('passwords:pageHasLoginForm', { origin: getOrigin() })
+  }
+}
+
+function initPasswords(): void {
+  attachFormListeners()
+  checkAndNotifyFillAvailable()
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initPasswords)
+} else {
+  initPasswords()
+}
+
+let lastHref = window.location.href
+new MutationObserver(() => {
+  if (window.location.href !== lastHref) {
+    lastHref = window.location.href
+    setTimeout(initPasswords, 500)
+  }
+}).observe(document.body, { childList: true, subtree: true })

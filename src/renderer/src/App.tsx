@@ -23,7 +23,10 @@ import DownloadsPage from './pages/DownloadsPage'
 import ReadingListPage from './pages/ReadingListPage'
 import BoostsPage from './pages/BoostsPage'
 import SettingsPage from './pages/SettingsPage'
+import PasswordsPage from './pages/PasswordsPage'
 
+import PasswordSavePrompt from './components/PasswordSavePrompt'
+import PasswordFillDropdown from './components/PasswordFillDropdown'
 import DownloadShelf from './components/DownloadShelf'
 import { VerticalTabBar } from './components/VerticalTabBar'
 import SplitOverlay from './components/SplitOverlay'
@@ -45,7 +48,7 @@ const CHROME_HEIGHT_BASE = 80                  // 36 (tabs) + 44 (toolbar)
 const BOOKMARKS_BAR_HEIGHT = 30                // .bookmarks-bar height
 const CHROME_HEIGHT_VERTICAL_COMPACT = 74      // 30 (compact top) + 44 (toolbar)
 
-type ChromePage = null | 'privacy' | 'history' | 'bookmarks' | 'downloads' | 'readingList' | 'boosts' | 'settings'
+type ChromePage = null | 'privacy' | 'history' | 'bookmarks' | 'downloads' | 'readingList' | 'boosts' | 'settings' | 'passwords'
 
 export default function App(): React.ReactElement {
   useTheme()
@@ -623,6 +626,7 @@ export default function App(): React.ReactElement {
     if (chromePage === 'readingList') return <ReadingListPage onNavigate={handleNavigate} onClose={onClose} />
     if (chromePage === 'boosts') return <BoostsPage onClose={onClose} />
     if (chromePage === 'settings') return <SettingsPage onClose={onClose} />
+    if (chromePage === 'passwords') return <PasswordsPage />
     return null
   }
 
@@ -810,6 +814,8 @@ export default function App(): React.ReactElement {
           </div>
         )}
         <PermissionPrompt />
+        <PasswordSavePrompt />
+        <PasswordFillDropdown activeTabId={activeId} />
         <DownloadShelf />
       </div>
 
