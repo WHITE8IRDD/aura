@@ -1,3 +1,47 @@
+// ── Chrome Compatibility — Remove Electron traces before page scripts run ─────
+try {
+  Object.defineProperty(navigator, 'webdriver', {
+    get: () => undefined,
+    configurable: true
+  })
+} catch { /* silent */ }
+
+try {
+  const platform = navigator.platform.startsWith('Win') ? 'Windows' : navigator.platform.startsWith('Mac') ? 'macOS' : 'Linux'
+  Object.defineProperty(navigator, 'userAgentData', {
+    get: () => ({
+      brands: [
+        { brand: 'Google Chrome', version: '126' },
+        { brand: 'Chromium', version: '126' },
+        { brand: 'Not_A Brand', version: '24' },
+      ],
+      mobile: false,
+      platform,
+      getHighEntropyValues: () => Promise.resolve({
+        brands: [
+          { brand: 'Google Chrome', version: '126.0.0.0' },
+          { brand: 'Chromium', version: '126.0.0.0' },
+          { brand: 'Not_A Brand', version: '24.0.0.0' },
+        ],
+        mobile: false,
+        platform,
+        architecture: 'x86',
+        bitness: '64',
+        model: '',
+        platformVersion: platform === 'Windows' ? '15.0.0' : '10_15_7',
+        fullVersionList: [
+          { brand: 'Google Chrome', version: '126.0.0.0' },
+          { brand: 'Chromium', version: '126.0.0.0' },
+          { brand: 'Not_A Brand', version: '24.0.0.0' },
+        ],
+        uaFullVersion: '126.0.0.0',
+        wow64: false,
+      }),
+    }),
+    configurable: true,
+  })
+} catch { /* silent */ }
+
 import { contextBridge, ipcRenderer } from 'electron'
 import { setupAutofillCapture, setupAutofillSuggestions } from './autofillFormWatcher'
 import './pageTranslator'

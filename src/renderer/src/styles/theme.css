@@ -6865,3 +6865,118 @@ body > .gcm-menu {
 
 @keyframes ak-fade { from { opacity: 0; } to { opacity: 1; } }
 
+/* ─── GOOGLE ACCOUNT BUTTON ─── */
+.google-account-container { position: relative; display: inline-flex; }
+
+.google-signin-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--bg-elev); border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); color: var(--text-primary);
+  cursor: pointer; font-size: 13px; font-weight: 500; padding: 8px 14px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.google-signin-btn:hover { background: var(--bg-elev-2); border-color: var(--border-secondary); }
+
+.google-signin-pending {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--bg-elev); border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); padding: 8px 14px;
+  font-size: 13px; color: var(--text-secondary);
+}
+.google-signin-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid var(--border-secondary); border-top-color: var(--accent);
+  border-radius: 50%; animation: google-spin 0.8s linear infinite;
+}
+@keyframes google-spin { to { transform: rotate(360deg); } }
+
+.google-signin-cancel {
+  background: none; border: none; color: var(--danger);
+  cursor: pointer; font-size: 12px; font-weight: 500; padding: 2px 6px;
+}
+.google-signin-cancel:hover { text-decoration: underline; }
+
+.google-account-btn {
+  background: none; border: none; cursor: pointer;
+  padding: 0; border-radius: 50%; transition: transform 0.1s;
+}
+.google-account-btn:hover { transform: scale(1.05); }
+
+.google-account-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid var(--border-secondary); object-fit: cover; display: block;
+}
+.google-account-avatar-fallback {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent); color: #fff; font-weight: 600; font-size: 14px;
+}
+
+.google-account-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; min-width: 280px;
+  background: var(--bg-elev-3); border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg); box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  z-index: 9500; padding: 12px; animation: google-menu-in 0.18s ease;
+}
+@keyframes google-menu-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.google-account-menu-header {
+  display: flex; align-items: center; gap: 12px;
+  padding-bottom: 12px; border-bottom: 1px solid var(--border-primary);
+}
+.google-account-menu-avatar { width: 40px; height: 40px; border-radius: 50%; }
+.google-account-menu-info { flex: 1; min-width: 0; }
+.google-account-menu-name {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.google-account-menu-email {
+  font-size: 12px; color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.google-account-list {
+  padding: 10px 0; border-bottom: 1px solid var(--border-primary);
+}
+.google-account-list-label {
+  font-size: 10px; font-weight: 600; color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin-bottom: 6px; padding: 0 4px;
+}
+.google-account-list-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 4px; border-radius: var(--radius-sm);
+}
+.google-account-list-item:hover { background: var(--bg-elev); }
+.google-account-mini-avatar { width: 24px; height: 24px; border-radius: 50%; }
+.google-account-mini-email {
+  flex: 1; font-size: 12px; color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.google-account-mini-signout {
+  background: none; border: none; color: var(--text-tertiary);
+  cursor: pointer; font-size: 12px; padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+.google-account-mini-signout:hover {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.google-account-menu-actions {
+  display: flex; flex-direction: column; gap: 4px; padding-top: 10px;
+}
+.google-account-menu-btn {
+  background: none; border: none; border-radius: var(--radius-sm);
+  color: var(--text-primary); cursor: pointer; font-size: 13px;
+  padding: 8px 10px; text-align: left; transition: background 0.12s;
+}
+.google-account-menu-btn:hover { background: var(--bg-elev); }
+.google-account-menu-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.google-account-menu-btn-danger { color: var(--danger); }
+.google-account-menu-btn-danger:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+

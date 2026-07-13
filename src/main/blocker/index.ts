@@ -102,6 +102,8 @@ export async function initBlocker(): Promise<ElectronBlocker> {
   return engine
 }
 
+let blockerGlobalsInitialized = false
+
 export function installBlocker(targetSession: Session): void {
   if (!engine) {
     console.warn('[Aura/blocker] initBlocker() must complete before install')
@@ -111,42 +113,48 @@ export function installBlocker(targetSession: Session): void {
   engine.enableBlockingInSession(targetSession)
   installedSessions.add(targetSession)
 
-  engine.on('request-blocked', (request) => {
-    try {
-      const fromHost = request.sourceHostname ?? new URL(request.url).hostname
-      const cleanHost = fromHost.replace(/^www\./, '')
-      if (disabledHosts.has(cleanHost)) return
-      if (NEVER_BLOCK_HOSTS.has(fromHost) || NEVER_BLOCK_HOSTS.has(cleanHost)) return
-    } catch {}
+  if (!blockerGlobalsInitialized) {
+    blockerGlobalsInitialized = true
 
-    const category = categorize(request.url)
-    if (!categoryBlockedBySettings(category)) return
+    engine.on('request-blocked', (request) => {
+      try {
+        const fromHost = request.sourceHostname ?? new URL(request.url).hostname
+        const cleanHost = fromHost.replace(/^www\./, '')
+        if (disabledHosts.has(cleanHost)) return
+        if (NEVER_BLOCK_HOSTS.has(fromHost) || NEVER_BLOCK_HOSTS.has(cleanHost)) return
+      } catch {}
 
-    stats.bandwidthSavedBytes += 30_000
-    stats[category] += 1
-  })
+      const category = categorize(request.url)
+      if (!categoryBlockedBySettings(category)) return
 
-  const whitelistLines: string[] = []
-  for (const host of NEVER_BLOCK_HOSTS) {
-    whitelistLines.push(`@@||${host}^$document`)
-    whitelistLines.push(`${host}#@#+js()`)
-  }
-  try {
-    engine.updateFromDiff({ added: whitelistLines })
-    engine.lists.set('aura-whitelist', whitelistLines.join('\n'))
-    console.log(`[Aura/blocker] Applied ${whitelistLines.length} whitelist rules`)
-  } catch (err) {
-    console.warn('[Aura/blocker] Failed to apply whitelist rules:', err)
-  }
+      stats.bandwidthSavedBytes += 30_000
+      stats[category] += 1
+    })
 
-  const origGetCosmetics = engine.getCosmeticsFilters.bind(engine)
-  engine.getCosmeticsFilters = (opts) => {
-    const hostname = opts.hostname || ''
-    const cleanHost = hostname.replace(/^www\./, '')
-    if (NEVER_BLOCK_HOSTS.has(hostname) || NEVER_BLOCK_HOSTS.has(cleanHost) || disabledHosts.has(cleanHost)) {
-      return { active: false, extended: [], scripts: [], styles: '' }
+    const whitelistLines: string[] = []
+    for (const host of NEVER_BLOCK_HOSTS) {
+      whitelistLines.push(`@@||${host}^$document,subdocument`)
+      whitelistLines.push(`@@||${host}^$xhr`)
+      whitelistLines.push(`@@||${host}^$fetch`)
+      whitelistLines.push(`${host}#@#+js()`)
     }
-    return origGetCosmetics(opts)
+    try {
+      engine.updateFromDiff({ added: whitelistLines })
+      engine.lists.set('aura-whitelist', whitelistLines.join('\n'))
+      console.log(`[Aura/blocker] Applied ${whitelistLines.length} whitelist rules`)
+    } catch (err) {
+      console.warn('[Aura/blocker] Failed to apply whitelist rules:', err)
+    }
+
+    const origGetCosmetics = engine.getCosmeticsFilters.bind(engine)
+    engine.getCosmeticsFilters = (opts) => {
+      const hostname = opts.hostname || ''
+      const cleanHost = hostname.replace(/^www\./, '')
+      if (NEVER_BLOCK_HOSTS.has(hostname) || NEVER_BLOCK_HOSTS.has(cleanHost) || disabledHosts.has(cleanHost)) {
+        return { active: false, extended: [], scripts: [], styles: '' }
+      }
+      return origGetCosmetics(opts)
+    }
   }
 
   console.log('[Aura/blocker] Installed on session')

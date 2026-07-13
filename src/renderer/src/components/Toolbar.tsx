@@ -6,6 +6,7 @@ import ZoomIndicator from './ZoomIndicator'
 import UtilityCluster from './UtilityCluster'
 import ReaderButton from './ReaderButton'
 import SearchEnginePicker from './SearchEnginePicker'
+import GoogleAccountButton from './GoogleAccountButton'
 import { showNativeInputMenu } from '../lib/buildInputMenu'
 import { showToolbarMenu } from '../lib/showToolbarMenu'
 import { useSettings } from '../hooks/useSettings'
@@ -436,6 +437,7 @@ export default function Toolbar(props: Props): React.ReactElement {
             </svg>
           )}
         </button>
+        <GoogleAccountButton />
       </div>
 
       {bookmarkDialogOpen && isWebPage && (

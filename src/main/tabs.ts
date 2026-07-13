@@ -1,4 +1,4 @@
-import { BrowserWindow, WebContentsView } from 'electron'
+import { BrowserWindow, WebContentsView, session } from 'electron'
 import { join } from 'path'
 import { isInternal, normalizeInput } from './url'
 import { recordVisit, updateTitle } from './history'
@@ -80,6 +80,19 @@ function hostnameOf(url: string): string | null {
 
 function clampZoom(factor: number): number {
   return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(factor * 100) / 100))
+}
+
+export const TAB_CHROME_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+  '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+
+let tabSession: Electron.Session | null = null
+
+export function getTabSession(): Electron.Session {
+  if (tabSession) return tabSession
+  tabSession = session.fromPartition('persist:tabs')
+  tabSession.setUserAgent(TAB_CHROME_UA)
+  return tabSession
 }
 
 export class TabManager {
@@ -552,6 +565,7 @@ export class TabManager {
   }
 
   private attachView(rec: TabRecord, url: string): void {
+    const ses = this._isPrivate ? undefined : getTabSession()
     const view = new WebContentsView({
       webPreferences: {
         preload: join(__dirname, '../preload/tab.js'),
@@ -562,6 +576,7 @@ export class TabManager {
         plugins: true,
         webgl: true,
         experimentalFeatures: true,
+        session: ses,
         additionalArguments: this._isPrivate ? ['--aura-private-tab'] : [],
         ...getAccessibilityWebPreferences()
       }
@@ -570,6 +585,10 @@ export class TabManager {
       'additionalArguments=', this._isPrivate ? ['--aura-private-tab'] : [])
     rec.view = view
     if (rec.muted) view.webContents.setAudioMuted(true)
+
+    if (!this._isPrivate) {
+      view.webContents.setUserAgent(TAB_CHROME_UA)
+    }
 
     applyDefaultZoom(view.webContents)
 

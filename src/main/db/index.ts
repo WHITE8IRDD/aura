@@ -4,6 +4,7 @@ import { join } from 'path'
 import { runMigrations } from './schema'
 import { unlinkSync } from 'fs'
 import { setupPasswordsTable } from '../passwords'
+import { setupGoogleAuthTable } from '../googleAuth'
 
 let db: Database.Database | null = null
 
@@ -34,6 +35,7 @@ export function getDb(): Database.Database {
 
   runMigrations(db)
   setupPasswordsTable()
+  setupGoogleAuthTable()
 
   console.log('[Aura/db] Opened at', dbPath)
 

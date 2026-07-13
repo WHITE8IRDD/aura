@@ -42,6 +42,15 @@ interface PasswordHealth {
   issue: 'reused' | 'weak' | 'stale'
 }
 
+interface GoogleAccount {
+  id: string
+  email: string
+  name: string
+  picture: string
+  signed_in_at: number
+  last_refreshed: number
+}
+
 interface PrivacyStats {
   trackersBlocked: number
   adsBlocked: number
@@ -904,6 +913,25 @@ const api = {
       fill: (tabId: number, cardId: number): Promise<{ ok: boolean; reason?: string }> =>
         ipcRenderer.invoke('autofill:cards:fill', tabId, cardId)
     }
+  },
+
+  google: {
+    signIn: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('google:signIn'),
+    cancelSignIn: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('google:cancelSignIn'),
+    listAccounts: (): Promise<GoogleAccount[]> => ipcRenderer.invoke('google:listAccounts'),
+    getAccount: (id: string): Promise<GoogleAccount | null> => ipcRenderer.invoke('google:getAccount', id),
+    signOut: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('google:signOut', id),
+    refresh: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('google:refresh', id),
+    onSignedIn: (callback: (account: GoogleAccount) => void): (() => void) => {
+      const handler = (_e: unknown, account: GoogleAccount) => callback(account)
+      ipcRenderer.on('google:signed-in', handler)
+      return () => ipcRenderer.removeListener('google:signed-in', handler)
+    },
+    onSignedOut: (callback: (id: string) => void): (() => void) => {
+      const handler = (_e: unknown, id: string) => callback(id)
+      ipcRenderer.on('google:signed-out', handler)
+      return () => ipcRenderer.removeListener('google:signed-out', handler)
+    },
   }
 }
 

@@ -4,6 +4,7 @@ import { TabManager } from './tabs'
 import { wireMaximizeEvents } from './window-controls'
 import { registerShortcuts } from './shortcuts'
 import { setupNinjaSession } from './session-setup'
+import { applyGoogleCompatibility } from './googleCompat'
 
 export class NinjaWindowManager {
   private ninjaWindowIds = new Set<number>()
@@ -30,6 +31,7 @@ export class NinjaWindowManager {
     const partition = `ninja-${Date.now()}-${id}`
     const privateSession = session.fromPartition(partition, { cache: false })
     await setupNinjaSession(privateSession)
+    applyGoogleCompatibility(privateSession)
 
     const win = new BrowserWindow({
       width: 1440,

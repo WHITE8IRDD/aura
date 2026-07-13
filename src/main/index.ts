@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage, globalShortcut, clipboard, systemPreferences } from 'electron'
-import { join } from 'path'
+import path, { join } from 'path'
 
 app.name = 'Aura'
 
@@ -17,7 +17,7 @@ dialog.showErrorBox = (title: string, content: string) => {
   console.error(`[suppressed error dialog] ${title}: ${content}`
 )}
 
-import { TabManager } from './tabs'
+import { TabManager, getTabSession } from './tabs'
 import { registerInputContextMenuIPC } from './inputContextMenu'
 import { registerMediaHubMenuIPC } from './mediaHubMenu'
 import { registerMediaHubWindowIPC } from './mediaHubWindow'
@@ -116,7 +116,17 @@ import { SplitManager } from './splitManager'
 import { writeFile } from 'fs/promises'
 import { initFocusTracker } from './focusTracker'
 import { setupKeyboardIPC, registerKeyboardShortcut, cleanupKeyboard } from './virtualKeyboard'
-
+import { buildCleanUA, applyGoogleCompatibility, injectWebdriverBypass } from './googleCompat'
+import {
+  startGoogleSignIn,
+  handleOAuthCallback,
+  listGoogleAccounts,
+  getGoogleAccount,
+  signOutGoogleAccount,
+  cancelPendingAuth,
+  refreshGoogleToken,
+  setOAuthTabOpener
+} from './googleAuth'
 
 // STAGE 10A-FIX: apply startup flags that must run before app.whenReady()
 applyStartupFlags()
@@ -169,6 +179,16 @@ process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true'
 
 app.setName('Aura')
 
+// ─── Custom protocol (aura://) ────────────────────────────────
+const PROTOCOL = 'aura'
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])])
+  }
+} else {
+  app.setAsDefaultProtocolClient(PROTOCOL)
+}
+
 // ─── Single-instance lock ─────────────────────────────────────
 // Prevents zombie processes from holding ports/cache directories.
 const gotLock = app.requestSingleInstanceLock()
@@ -206,7 +226,8 @@ const readerCache = new Map<string | number, ReaderArticle>()
 const readerProbeCache = new Map<string | number, boolean>()
 
 const startupReady = app.whenReady().then(async () => {
-  console.log('[Aura] Opening database…')
+  app.userAgentFallback = buildCleanUA()
+  console.log('[Aura] Opening database\u2026')
   getDb()
   applyHardwareAccelLater()
   applyForceDarkFlag()
@@ -217,6 +238,18 @@ const startupReady = app.whenReady().then(async () => {
   setupSessionFingerprintDefenses(session.defaultSession)
   setupPermissionPrompts(session.defaultSession)
   registerSession(session.defaultSession)
+  applyGoogleCompatibility(session.defaultSession)
+  // Set up persistent tab session with all fixes
+  {
+    const tabSes = getTabSession()
+    installBlocker(tabSes)
+    setupHttpsOnly(tabSes)
+    setupSessionFingerprintDefenses(tabSes)
+    setupPermissionPrompts(tabSes)
+    registerSession(tabSes)
+    applyGoogleCompatibility(tabSes)
+  }
+  app.on('session-created', (sess) => { applyGoogleCompatibility(sess) })
   initLanguages()
   setupDownloads()
   registerDownloadsSettingsIPC()
@@ -267,6 +300,13 @@ async function createWindow(): Promise<void> {
 
   tabs = new TabManager(mainWindow, CHROME_HEIGHT, false)
   tabs.setSidebarWidth(SIDEBAR_WIDTH_DEFAULT)
+
+  // Wire OAuth to open in an Aura tab so Google session cookies
+  // are set in the Aura webview (enables YouTube SSO detection)
+  setOAuthTabOpener(
+    (url: string) => tabs!.create(url),
+    (tabId: number) => tabs!.navigate(tabId, 'https://www.youtube.com')
+  )
 
   // STAGE 10C.4 — Split View
   splitManager = new SplitManager(mainWindow)
@@ -984,6 +1024,18 @@ ipcMain.handle('passwords:unlockVault', async () => {
   return true
 })
 
+// ── Google OAuth IPC ──────────────────────────────────────────────────────────
+ipcMain.handle('google:signIn', () => { startGoogleSignIn(); return { ok: true } })
+ipcMain.handle('google:cancelSignIn', () => { cancelPendingAuth(); return { ok: true } })
+ipcMain.handle('google:listAccounts', () => listGoogleAccounts())
+ipcMain.handle('google:getAccount', (_e, id: string) => getGoogleAccount(id))
+ipcMain.handle('google:signOut', async (_e, id: string) => {
+  await signOutGoogleAccount(id); return { ok: true }
+})
+ipcMain.handle('google:refresh', async (_e, id: string) => {
+  const ok = await refreshGoogleToken(id); return { ok }
+})
+
 app.whenReady().then(() => { void createWindow() })
 
 function forceShutdownMediaFlush() {
@@ -1031,6 +1083,7 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) void createWindow()
 })
 app.on('web-contents-created', (_e, contents) => {
+  injectWebdriverBypass(contents)
   contents.on('will-navigate', (event, url) => {
     if (url.startsWith('javascript:') || url.startsWith('data:text/html')) {
       event.preventDefault()

@@ -1,6 +1,6 @@
 import { WebContentsView, BrowserWindow } from 'electron'
 import { join } from 'path'
-import { TabManager } from './tabs'
+import { TabManager, getTabSession, TAB_CHROME_UA } from './tabs'
 import { isInternal, normalizeInput } from './url'
 import { getAccessibilityWebPreferences, applyDefaultZoom } from './accessibility'
 import { attachContextMenu } from './contextMenu'
@@ -44,11 +44,13 @@ export class SplitManager {
         plugins: true,
         webgl: true,
         experimentalFeatures: true,
+        session: getTabSession(),
         ...getAccessibilityWebPreferences()
       }
     })
 
     applyDefaultZoom(view.webContents)
+    view.webContents.setUserAgent(TAB_CHROME_UA)
     attachContextMenu(view.webContents, this.win, tm)
 
     const state: SplitState = {
