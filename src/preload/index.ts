@@ -71,7 +71,7 @@ const api = {
     reload: (id: number): Promise<void> => ipcRenderer.invoke('tabs:reload', id),
     getState: (): Promise<{ tabs: TabState[]; activeId: number | null }> =>
       ipcRenderer.invoke('tabs:getState'),
-    reorder: (fromId: number, toIndex: number): Promise<void> =>
+    reorder: (fromId: number | number[] | string[], toIndex?: number): Promise<void> =>
       ipcRenderer.invoke('tabs:reorder', fromId, toIndex),
     pin: (id: number): Promise<void> => ipcRenderer.invoke('tabs:pin', id),
     unpin: (id: number): Promise<void> => ipcRenderer.invoke('tabs:unpin', id),
@@ -101,6 +101,8 @@ const api = {
       ipcRenderer.invoke('tabs:readerExtract', id),
     screenshot: (id: number, action: 'save' | 'copy'): Promise<string | null> =>
       ipcRenderer.invoke('tabs:screenshot', id, action),
+    showContextMenu: (tabId: string): Promise<void> =>
+      ipcRenderer.invoke('tabs:show-context-menu', tabId),
     onUpdate: (cb: (tabs: TabState[], activeId: number | null) => void): (() => void) => {
       const listener = (
         _e: Electron.IpcRendererEvent,
@@ -586,6 +588,13 @@ const api = {
       ipcRenderer.on('translator:requestOpenFloating', handler)
       return () => ipcRenderer.removeListener('translator:requestOpenFloating', handler)
     }
+  },
+
+  translation: {
+    translatePage: (config?: { targetLang?: string; provider?: string }) =>
+      ipcRenderer.invoke('translation:translate-page', config || {}),
+    revert: () =>
+      ipcRenderer.invoke('translation:revert'),
   },
 
   imageSaver: {

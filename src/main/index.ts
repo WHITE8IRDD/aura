@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage, globalShortcut, clipboard, systemPreferences } from 'electron'
+import { app, BrowserWindow, ipcMain, session, shell, dialog, nativeImage, globalShortcut, clipboard, systemPreferences, Menu, MenuItem } from 'electron'
 import { join } from 'path'
 
 app.name = 'Aura'
@@ -131,46 +131,16 @@ import { writeFile } from 'fs/promises'
 applyStartupFlags()
 
 // ============================================================
-// STAGE 8.5 — PERFORMANCE HARDENING
-// Enable hardware video decode + GPU acceleration BEFORE app.ready
+// SAFE GPU & PERFORMANCE FLAGS (Windows-compatible)
+// Removed VaapiVideoDecoder/Encoder (Linux-only, crashes Windows GPU)
+// Removed enable-hardware-overlays (black frames on transparent windows)
+// Removed enable-zero-copy (unstable on integrated GPUs)
+// Removed ignore-gpu-blocklist, disable-gpu-driver-bug-workarounds
 // ============================================================
 
-app.commandLine.appendSwitch('enable-features', [
-  'VaapiVideoDecoder',
-  'VaapiVideoEncoder',
-  'PlatformHEVCDecoderSupport',
-  'CanvasOopRasterization',
-  'AcceleratedVideoDecodeLinuxGL',
-  'UseSkiaRenderer',
-  'UseChromeOSDirectVideoDecoder',
-  'WebContentsForceDark',
-  'Vulkan',
-  'Vp9kSVCHWDecoding',
-  'UseMultiPlaneFormatForSoftwareVideo'
-].join(','))
-
 app.commandLine.appendSwitch('enable-gpu-rasterization')
-app.commandLine.appendSwitch('enable-zero-copy')
 app.commandLine.appendSwitch('enable-accelerated-video-decode')
-app.commandLine.appendSwitch('enable-accelerated-mjpeg-decode')
-app.commandLine.appendSwitch('enable-accelerated-2d-canvas')
-
-app.commandLine.appendSwitch('disable-renderer-backgrounding')
-app.commandLine.appendSwitch('disable-background-timer-throttling')
-app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
-
-app.commandLine.appendSwitch('shared-array-buffer-allowed-for-electron')
-
-app.commandLine.appendSwitch('ignore-gpu-blocklist')
-
-if (process.platform === 'win32') {
-  app.commandLine.appendSwitch('use-angle', 'd3d11')
-  app.commandLine.appendSwitch('enable-features', 'D3D11VideoDecoder')
-}
-
-if (process.platform === 'darwin') {
-  app.commandLine.appendSwitch('enable-features', 'VideoToolboxVp9Decoding')
-}
+app.commandLine.appendSwitch('enable-quic')
 
 setupAntiFingerprintFlags()
 
@@ -226,6 +196,15 @@ const startupReady = app.whenReady().then(async () => {
   setupSessionFingerprintDefenses(session.defaultSession)
   setupPermissionPrompts(session.defaultSession)
   registerSession(session.defaultSession)
+
+  // Video stream priority optimization
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['*://*.googlevideo.com/*', '*://*.youtube.com/*'] },
+    (details, callback) => {
+      details.requestHeaders['Priority'] = 'u=0, i'
+      callback({ requestHeaders: details.requestHeaders })
+    }
+  )
   initLanguages()
   setupDownloads()
   registerDownloadsSettingsIPC()
@@ -251,24 +230,32 @@ async function createWindow(): Promise<void> {
     height: 900,
     minWidth: 880,
     minHeight: 560,
-    backgroundColor: '#0a0a0f',
+    backgroundColor: '#0f1015',
     show: false,
     title: 'Aura',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 14 } : undefined,
     frame: process.platform === 'darwin',
     ...(process.platform === 'win32' && { thickFrame: true }),
+    transparent: false,
     icon: resolveIcon('icon-256.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: true,
+      sandbox: false,
+      webSecurity: false,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      backgroundThrottling: false,
+      autoplayPolicy: 'no-user-gesture-required'
     }
   })
 
   mainWindow.on('page-title-updated', (e) => e.preventDefault())
   mainWindow.once('ready-to-show', () => mainWindow?.show())
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.error(`[Aura Main] Failed to load renderer: ${errorCode} - ${errorDescription}`)
+  })
 
   mainWindow.webContents.on('context-menu', (event, _params) => {
     event.preventDefault()
@@ -451,8 +438,21 @@ ipcMain.handle('tabs:getState', (e) => {
     return { tabs: [], activeId: null }
   }
 })
-ipcMain.handle('tabs:reorder', (e, fromId: number, toIndex: number) =>
-  getTabsForEvent(e)?.reorder(fromId, toIndex))
+ipcMain.handle('tabs:reorder', (e, fromId: number | number[], toIndex?: number) => {
+  const tm = getTabsForEvent(e)
+  if (!tm) return false
+  // New contract: full ordered id array from TabBar drag-drop
+  if (Array.isArray(fromId)) {
+    tm.setOrder(fromId.map((id) => Number(id)))
+    return true
+  }
+  // Legacy contract: single move (fromId, toIndex), used by VerticalTabBar
+  if (typeof toIndex === 'number') {
+    tm.reorder(Number(fromId), toIndex)
+    return true
+  }
+  return false
+})
 ipcMain.handle('tabs:pin', (e, id: number) => getTabsForEvent(e)?.pin(id))
 ipcMain.handle('tabs:unpin', (e, id: number) => getTabsForEvent(e)?.unpin(id))
 ipcMain.handle('tabs:mute', (e, id: number) => getTabsForEvent(e)?.toggleMute(id))
@@ -469,6 +469,48 @@ ipcMain.handle('tabs:find', (e, id: number, query: string, forward: boolean) =>
 ipcMain.handle('tabs:findNext', (e, id: number, forward: boolean) =>
   getTabsForEvent(e)?.findNext(id, forward))
 ipcMain.handle('tabs:stopFind', (e, id: number) => getTabsForEvent(e)?.stopFindInPage(id))
+
+ipcMain.handle('tabs:show-context-menu', async (event, tabId: string) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow()
+  if (!win || !tabs) return
+  const tab = tabs.getTab(Number(tabId))
+  if (!tab) return
+
+  const menu = new Menu()
+  menu.append(
+    new MenuItem({
+      label: tab.pinned ? 'Unpin Tab' : 'Pin Tab',
+      click: () => {
+        if (tab.pinned) tabs?.unpin?.(tab.id)
+        else tabs?.pin?.(tab.id)
+      }
+    })
+  )
+  menu.append(new MenuItem({ type: 'separator' }))
+  menu.append(
+    new MenuItem({
+      label: 'Duplicate Tab',
+      click: () => {
+        const url = tab.view?.webContents.getURL()
+        if (url) tabs?.duplicate?.(tab.id)
+      }
+    })
+  )
+  menu.append(
+    new MenuItem({
+      label: tab.muted ? 'Unmute Tab' : 'Mute Tab',
+      click: () => { tabs?.toggleMute?.(tab.id) }
+    })
+  )
+  menu.append(new MenuItem({ type: 'separator' }))
+  menu.append(
+    new MenuItem({
+      label: 'Close Tab',
+      click: () => { tabs?.close?.(tab.id) }
+    })
+  )
+  menu.popup({ window: win })
+})
 
 ipcMain.handle('tabs:setZoom', (e, id: number, factor: number) =>
   getTabsForEvent(e)?.setZoom(id, factor))
@@ -668,6 +710,104 @@ ipcMain.handle('reader:getCurrent', async (_e, tabId: string | number) => {
 ipcMain.handle('reader:isActive', (_e, tabId: string | number) => {
   const article = readerCache.get(tabId)
   return !!article
+})
+
+// ---- Translation IPC ----
+ipcMain.handle('translation:translate-page', async (e, config?: { targetLang?: string; provider?: string }) => {
+  const win = BrowserWindow.fromWebContents(e.sender) || BrowserWindow.getFocusedWindow()
+  if (!win) return { success: false, nodeCount: 0, error: 'No window' }
+  const tm = getTabsForEvent(e)
+  if (!tm) return { success: false, nodeCount: 0, error: 'No tab manager' }
+  const activeId = tm.getActiveId()
+  if (activeId === null) return { success: false, nodeCount: 0, error: 'No active tab' }
+  const tab = tm.getTab?.(activeId)
+  if (!tab?.view?.webContents || tab.view.webContents.isDestroyed()) {
+    return { success: false, nodeCount: 0, error: 'No active tab webContents' }
+  }
+  const targetLang = config?.targetLang || 'en'
+  const provider = config?.provider || 'google'
+  try {
+    const result = await tab.view.webContents.executeJavaScript(`
+      (async () => {
+        try {
+          const target = ${JSON.stringify(targetLang)};
+          const SENTINEL = '|||AURA|||';
+          const SKIP = new Set(['SCRIPT','STYLE','NOSCRIPT','CODE','PRE','TEXTAREA','INPUT','SVG','CANVAS','VIDEO','AUDIO','KBD','SAMP','IFRAME']);
+          const nodes = [];
+          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+            acceptNode(n) {
+              if (!n.textContent || !n.textContent.trim()) return NodeFilter.FILTER_REJECT;
+              const p = n.parentElement;
+              if (!p || SKIP.has(p.tagName)) return NodeFilter.FILTER_REJECT;
+              if (p.closest('[translate="no"], .notranslate, .aura-translated')) return NodeFilter.FILTER_REJECT;
+              if (!/\\S/u.test(n.textContent)) return NodeFilter.FILTER_REJECT;
+              return NodeFilter.FILTER_ACCEPT;
+            }
+          });
+          let node;
+          while (node = walker.nextNode()) {
+            const t = node.textContent.trim();
+            if (t.length >= 1 && t.length < 5000) nodes.push(node);
+          }
+          if (nodes.length === 0) return { success: true, nodeCount: 0 };
+          if (!window.__auraOrigMap) window.__auraOrigMap = new Map();
+          nodes.forEach(n => window.__auraOrigMap.set(n, n.textContent));
+          const batchSize = 40;
+          let translated = 0;
+          for (let i = 0; i < nodes.length; i += batchSize) {
+            const batch = nodes.slice(i, i + batchSize);
+            const joined = batch.map(n => n.textContent.trim()).join(SENTINEL);
+            const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=' + target + '&dt=t&q=' + encodeURIComponent(joined);
+            const res = await fetch(url);
+            if (!res.ok) continue;
+            const data = await res.json();
+            const text = (data && data[0]) ? data[0].map(s => s[0]).join('') : null;
+            if (!text) continue;
+            const parts = text.split(SENTINEL);
+            batch.forEach((n, idx) => {
+              if (parts[idx] && parts[idx].trim()) {
+                n.textContent = parts[idx].trim();
+                if (n.parentElement) n.parentElement.classList.add('aura-translated');
+                translated++;
+              }
+            });
+          }
+          return { success: true, nodeCount: translated };
+        } catch (err) {
+          return { success: false, nodeCount: 0, error: String(err) };
+        }
+      })()
+    `)
+    return result || { success: false, nodeCount: 0, error: 'No result' }
+  } catch (err) {
+    return { success: false, nodeCount: 0, error: String(err) }
+  }
+})
+
+ipcMain.handle('translation:revert', async (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender) || BrowserWindow.getFocusedWindow()
+  if (!win) return
+  const tm = getTabsForEvent(e)
+  if (!tm) return
+  const activeId = tm.getActiveId()
+  if (activeId === null) return
+  const tab = tm.getTab?.(activeId)
+  if (!tab?.view?.webContents || tab.view.webContents.isDestroyed()) return
+  try {
+    await tab.view.webContents.executeJavaScript(`
+      (function() {
+        if (window.__auraOrigMap) {
+          for (const [node, orig] of window.__auraOrigMap) {
+            if (node.parentNode) {
+              node.textContent = orig;
+              if (node.parentElement) node.parentElement.classList.remove('aura-translated');
+            }
+          }
+          window.__auraOrigMap.clear();
+        }
+      })()
+    `)
+  } catch {}
 })
 
 ipcMain.handle('layout:setSidebarWidth', (e, width: number) =>

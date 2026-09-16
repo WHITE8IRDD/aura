@@ -388,6 +388,19 @@ export class TabManager {
     this.normalizeOrder(); this.emit()
   }
 
+  setOrder(orderedIds: number[]): void {
+    const known = new Set(this.order)
+    const next: number[] = []
+    for (const id of orderedIds) {
+      if (known.has(id) && !next.includes(id)) next.push(id)
+    }
+    for (const id of this.order) {
+      if (!next.includes(id)) next.push(id)
+    }
+    this.order = next
+    this.normalizeOrder(); this.emit()
+  }
+
   findInPage(id: number, query: string, forward = true): void {
     const wc = this.records.get(id)?.view?.webContents; if (!wc) return
     if (!query) {
@@ -559,6 +572,7 @@ export class TabManager {
         contextIsolation: true,
         nodeIntegration: false,
         backgroundThrottling: false,
+        autoplayPolicy: 'no-user-gesture-required' as const,
         plugins: true,
         webgl: true,
         experimentalFeatures: true,

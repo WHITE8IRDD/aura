@@ -2,6 +2,14 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { setupAutofillCapture, setupAutofillSuggestions } from './autofillFormWatcher'
 import './pageTranslator'
 import './videoDownloadDetector'
+import { initYouTubeFastPlayback, isYouTubePage as isYTPage1 } from './youtube-fast-playback'
+import { initYouTubeMaxQuality, isYouTubePage as isYTPage2 } from './youtube-max-quality'
+
+/* ── YouTube Performance + Quality ── */
+if (isYTPage1()) {
+  initYouTubeFastPlayback()
+  initYouTubeMaxQuality()
+}
 
 /* ── Video timestamp tracking + resume ── */
 
@@ -160,11 +168,65 @@ if (!isPrivateTab) {
         video.currentTime = targetTime
         reseekUntilStable(video, targetTime)
 
+        // Show resume overlay
+        showResumeOverlay(video, targetTime)
+
         return
       } catch {
         await sleep(500)
       }
     }
+  }
+
+  function showResumeOverlay(video: HTMLVideoElement, targetTime: number): void {
+    const formatTime = (s: number): string => {
+      const h = Math.floor(s / 3600)
+      const m = Math.floor((s % 3600) / 60)
+      const sec = Math.floor(s % 60)
+      if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0')
+      return m + ':' + String(sec).padStart(2, '0')
+    }
+
+    const overlay = document.createElement('div')
+    overlay.id = 'aura-resume-overlay'
+    overlay.style.cssText =
+      'position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;' +
+      'background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:99999;cursor:pointer;transition:opacity 0.3s ease;border-radius:8px'
+
+    overlay.innerHTML =
+      '<div style="background:rgba(20,22,30,0.85);backdrop-filter:blur(16px);border-radius:14px;padding:14px 24px;' +
+      'display:flex;flex-direction:column;align-items:center;gap:6px;border:1px solid rgba(255,255,255,0.1);' +
+      'box-shadow:0 8px 32px rgba(0,0,0,0.4);font-family:system-ui">' +
+      '<div style="font-size:24px;color:#fff">▶</div>' +
+      '<div style="color:#e4e4e7;font-size:13px;font-weight:600">Resume at ' + formatTime(targetTime) + '</div>' +
+      '<div style="color:#71717a;font-size:11px">Click to continue playing</div>' +
+      '</div>'
+
+    overlay.addEventListener('click', () => {
+      overlay.style.opacity = '0'
+      setTimeout(() => overlay.remove(), 300)
+      if (Math.abs(video.currentTime - targetTime) > 2.5) {
+        video.currentTime = targetTime
+      }
+      video.play().catch(() => {
+        setTimeout(() => video.play().catch(() => {}), 100)
+      })
+    })
+
+    const container = video.closest('.html5-video-player') ||
+                      video.closest('.video-container') ||
+                      video.parentElement
+    if (container) {
+      ;(container as HTMLElement).style.position = 'relative'
+      container.appendChild(overlay)
+    }
+
+    setTimeout(() => {
+      if (overlay.parentNode) {
+        overlay.style.opacity = '0'
+        setTimeout(() => overlay.remove(), 300)
+      }
+    }, 30000)
   }
 
   function observeVideos() {

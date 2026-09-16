@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   IconHistory, IconDownload, IconExtension, IconSettings,
   IconUser, IconSidebar, IconSplit, IconReader
@@ -127,18 +127,57 @@ export default function UtilityCluster({
     }
   }, [activeTab?.id, translatedTabId])
 
-  const handleTranslatePage = useCallback(() => {
-    if (!activeTab || activeTab.url.startsWith('aura://')) return
-    if (pageTranslated && translatedTabId === activeTab.id) {
-      window.aura.tabs.sendMessage(activeTab.id, 'pageTranslator:revert')
-      setPageTranslated(false)
-      setTranslatedTabId(null)
-    } else {
-      window.aura.tabs.sendMessage(activeTab.id, 'pageTranslator:translate', 'en')
-      setPageTranslated(true)
-      setTranslatedTabId(activeTab.id)
+  // === TRANSLATE BUTTON STATE ===
+  type TranslateStatus = 'idle' | 'translating' | 'done' | 'error'
+  const [translateStatus, setTranslateStatus] = useState<TranslateStatus>('idle')
+  const translateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleTranslateClick = useCallback(async () => {
+    // If already translated, click again to REVERT
+    if (translateStatus === 'done') {
+      setTranslateStatus('translating')
+      try {
+        await window.aura.translation.revert()
+      } catch {}
+      setTranslateStatus('idle')
+      return
     }
-  }, [activeTab, pageTranslated, translatedTabId])
+
+    // If currently translating, do nothing
+    if (translateStatus === 'translating') return
+
+    // Start translation
+    setTranslateStatus('translating')
+
+    try {
+      const result = await window.aura.translation.translatePage({
+        targetLang: navigator.language.split('-')[0] || 'en',
+        provider: 'google',
+        fallbackProviders: ['deepl', 'libretranslate'],
+      })
+
+      if (result.success && result.nodeCount > 0) {
+        setTranslateStatus('done')
+      } else if (result.success && result.nodeCount === 0) {
+        // No translatable content found
+        setTranslateStatus('idle')
+      } else {
+        setTranslateStatus('error')
+        translateTimerRef.current = setTimeout(() => setTranslateStatus('idle'), 3000)
+      }
+    } catch {
+      setTranslateStatus('error')
+      translateTimerRef.current = setTimeout(() => setTranslateStatus('idle'), 3000)
+    }
+  }, [translateStatus])
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (translateTimerRef.current) clearTimeout(translateTimerRef.current)
+    }
+  }, [])
+
   return (
     <div className="utility-cluster">
       {/* Group A — Global tools */}
@@ -179,11 +218,64 @@ export default function UtilityCluster({
           <path d="M15 15h6" />
         </svg>
       </button>
-      <button className={`util-btn${pageTranslated ? ' translator-active' : ''}`}
-        title={pageTranslated ? 'Show original' : 'Translate page'}
-        onClick={handleTranslatePage}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+
+      {/* TRANSLATE BUTTON — gold glow when translating, no popup */}
+      <button
+        onClick={handleTranslateClick}
+        className={`toolbar-btn translate-btn ${translateStatus}`}
+        title={
+          translateStatus === 'idle' ? 'Translate page' :
+          translateStatus === 'translating' ? 'Translating...' :
+          translateStatus === 'done' ? 'Revert translation' :
+          'Translation failed'
+        }
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          border: 'none',
+          background: translateStatus === 'done'
+            ? 'rgba(255, 200, 50, 0.15)'
+            : translateStatus === 'error'
+              ? 'rgba(239, 68, 68, 0.12)'
+              : 'transparent',
+          cursor: translateStatus === 'translating' ? 'wait' : 'pointer',
+          transition: 'background 0.3s ease, box-shadow 0.3s ease',
+          padding: 0,
+          outline: 'none',
+          // === SHINING GOLD GLOW when translating ===
+          boxShadow: translateStatus === 'translating'
+            ? '0 0 8px 2px rgba(255, 200, 50, 0.5), 0 0 20px 4px rgba(255, 180, 0, 0.25), inset 0 0 6px rgba(255, 200, 50, 0.15)'
+            : translateStatus === 'done'
+              ? '0 0 6px 1px rgba(255, 200, 50, 0.3), 0 0 12px 2px rgba(255, 180, 0, 0.12)'
+              : 'none',
+        }}
+      >
+        {/* Translate icon — use existing SVG but color it based on state */}
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={
+            translateStatus === 'translating' ? '#ffc832' :
+            translateStatus === 'done' ? '#fbbf24' :
+            translateStatus === 'error' ? '#f87171' :
+            'var(--aura-text-muted, #71717a)'
+          }
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{
+            transition: 'stroke 0.3s ease',
+            // Pulsing animation when translating
+            animation: translateStatus === 'translating' ? 'aura-gold-pulse 1.5s ease-in-out infinite' : 'none',
+          }}
+        >
           <path d="M5 8l6 6" />
           <path d="M4 14l6-6 2-2" />
           <path d="M12 4l-4 8 2 2" />
@@ -193,6 +285,33 @@ export default function UtilityCluster({
           <path d="M19 8l-3 4" />
           <path d="M17 16l3-4" />
         </svg>
+
+        {/* Gold shimmer overlay when translating */}
+        {translateStatus === 'translating' && (
+          <div style={{
+            position: 'absolute',
+            inset: -2,
+            borderRadius: 10,
+            background: 'linear-gradient(135deg, transparent 30%, rgba(255, 200, 50, 0.15) 50%, transparent 70%)',
+            backgroundSize: '200% 200%',
+            animation: 'aura-gold-shimmer 1.5s ease-in-out infinite',
+            pointerEvents: 'none',
+          }} />
+        )}
+
+        {/* Small dot indicator when translation is active */}
+        {translateStatus === 'done' && (
+          <div style={{
+            position: 'absolute',
+            top: 4,
+            right: 4,
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: '#fbbf24',
+            boxShadow: '0 0 4px rgba(251, 191, 36, 0.6)',
+          }} />
+        )}
       </button>
 
       <div className="toolbar-group-separator" />
