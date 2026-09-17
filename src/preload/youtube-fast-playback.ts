@@ -1,90 +1,78 @@
-/**
- * YouTube Super Fast Playback Engine
- * Minimizes buffering and load-to-play time.
- * Integrates with existing media resume — does NOT duplicate it.
- */
-
-const YOUTUBE_HOSTS = ['www.youtube.com', 'youtube.com', 'm.youtube.com', 'music.youtube.com']
+const YOUTUBE_HOSTS = ['www.youtube.com', 'youtube.com', 'm.youtube.com', 'music.youtube.com'];
 
 export function isYouTubePage(): boolean {
-  return YOUTUBE_HOSTS.includes(window.location.hostname)
+  return YOUTUBE_HOSTS.includes(window.location.hostname);
 }
 
 export function initYouTubeFastPlayback(): void {
-  if (!isYouTubePage()) return
+  if (!isYouTubePage()) return;
 
-  const script = document.createElement('script')
+  const script = document.createElement('script');
   script.textContent = `
     (function() {
       'use strict';
 
-      function preconnect() {
-        var hosts = ['https://i.ytimg.com', 'https://yt3.ggpht.com', 'https://fonts.googleapis.com'];
-        hosts.forEach(function(h) {
-          var l = document.createElement('link');
+      // 1. Preconnect to fast video servers
+      try {
+        ['https://i.ytimg.com', 'https://yt3.ggpht.com'].forEach(h => {
+          const l = document.createElement('link');
           l.rel = 'dns-prefetch'; l.href = h;
-          document.head.appendChild(l);
+          (document.head || document.documentElement).appendChild(l);
+        });
+      } catch(e) {}
+
+      // 2. High-speed Silent Video Ad Skipper (Safe DOM-level, no fetch corruption)
+      function skipVideoAds() {
+        try {
+          const video = document.querySelector('video');
+          const player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+          if (!video || !player) return;
+
+          const isAd = player.classList.contains('ad-showing') || 
+                       player.classList.contains('ad-interrupting') ||
+                       document.querySelector('.ytp-ad-text') ||
+                       document.querySelector('.ytp-ad-skip-button-container');
+
+          if (isAd) {
+            video.muted = true;
+            video.playbackRate = 16.0;
+            if (isFinite(video.duration) && video.duration > 0) {
+              video.currentTime = video.duration - 0.05;
+            }
+            const skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button');
+            if (skipBtn) (skipBtn as HTMLElement).click();
+          }
+
+          // Auto-close anti-adblock warning modal if shown
+          const dismissBtn = document.querySelector('ytd-enforcement-message-view-model #dismiss-button, tp-yt-paper-dialog #dismiss-button');
+          if (dismissBtn) {
+            (dismissBtn as HTMLElement).click();
+            if (video && video.paused) video.play();
+          }
+        } catch(e) {}
+      }
+
+      // 3. Remove cosmetic ad banners
+      function removeAdOverlays() {
+        const selectors = [
+          '#masthead-ad',
+          '.ytp-ad-overlay-container',
+          'ytd-ad-slot-renderer',
+          'ytd-in-feed-ad-layout-renderer',
+          'ytd-banner-promo-renderer'
+        ];
+        selectors.forEach(sel => {
+          document.querySelectorAll(sel).forEach(el => {
+            (el as HTMLElement).style.display = 'none';
+          });
         });
       }
 
-      function injectCSS() {
-        var s = document.createElement('style');
-        s.id = 'aura-yt-perf';
-        s.textContent =
-          '.html5-video-player, .html5-video-container, video {' +
-          'will-change: transform; transform: translateZ(0);' +
-          '}' +
-          '.ytp-spinner { transition: opacity 0.1s !important; }';
-        document.head.appendChild(s);
-      }
-
-      function removeBlockers() {
-        ['#masthead-ad', '.ytp-ad-overlay-container', '.ytp-endscreen-content',
-         '.ytp-autonav-endscreen-countdown-overlay'].forEach(function(sel) {
-          var el = document.querySelector(sel);
-          if (el) el.style.display = 'none';
-        });
-      }
-
-      function optimizeVideos() {
-        document.querySelectorAll('video').forEach(function(v) {
-          v.preload = 'auto';
-          v.playsInline = true;
-        });
-      }
-
-      function optimizePlayer() {
-        var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
-        if (p && typeof p.unloadModule === 'function') {
-          try { p.unloadModule('annotations_module'); } catch(e) {}
-        }
-      }
-
-      function init() {
-        preconnect();
-        injectCSS();
-        setTimeout(removeBlockers, 800);
-        setTimeout(optimizeVideos, 1500);
-        var checks = 0;
-        var iv = setInterval(function() {
-          if (++checks > 200) return clearInterval(iv);
-          var p = document.querySelector('#movie_player');
-          if (p) { clearInterval(iv); optimizePlayer(); }
-        }, 50);
-      }
-
-      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-      else init();
-
-      var lastUrl = location.href;
-      new MutationObserver(function() {
-        if (location.href !== lastUrl) {
-          lastUrl = location.href;
-          setTimeout(function() { removeBlockers(); optimizeVideos(); optimizePlayer(); }, 800);
-        }
-      }).observe(document.body, { childList: true, subtree: true });
+      setInterval(skipVideoAds, 100);
+      setInterval(removeAdOverlays, 1000);
     })();
   `;
-  ;(document.head || document.documentElement).appendChild(script)
-  script.remove()
+
+  (document.head || document.documentElement).appendChild(script);
+  script.remove();
 }

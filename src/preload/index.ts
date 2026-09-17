@@ -42,6 +42,23 @@ interface PasswordHealth {
   issue: 'reused' | 'weak' | 'stale'
 }
 
+interface SiteShieldSettings {
+  domain: string
+  level: 'off' | 'standard' | 'aggressive' | 'custom'
+  blockAds: boolean
+  blockTrackers: boolean
+  blockSocial: boolean
+  blockFingerprinters: boolean
+  blockAnnoyances: boolean
+  blockedCount: number
+}
+
+interface PageBlockedStats {
+  ads: number
+  trackers: number
+  total: number
+}
+
 interface PrivacyStats {
   trackersBlocked: number
   adsBlocked: number
@@ -75,6 +92,7 @@ const api = {
       ipcRenderer.invoke('tabs:reorder', fromId, toIndex),
     pin: (id: number): Promise<void> => ipcRenderer.invoke('tabs:pin', id),
     unpin: (id: number): Promise<void> => ipcRenderer.invoke('tabs:unpin', id),
+    togglePin: (id: number): Promise<boolean> => ipcRenderer.invoke('tabs:toggle-pin', id),
     mute: (id: number): Promise<void> => ipcRenderer.invoke('tabs:mute', id),
     duplicate: (id: number): Promise<number | null> => ipcRenderer.invoke('tabs:duplicate', id),
     unload: (id: number): Promise<void> => ipcRenderer.invoke('tabs:unload', id),
@@ -103,6 +121,7 @@ const api = {
       ipcRenderer.invoke('tabs:screenshot', id, action),
     showContextMenu: (tabId: string): Promise<void> =>
       ipcRenderer.invoke('tabs:show-context-menu', tabId),
+    reloadActive: (): Promise<void> => ipcRenderer.invoke('tabs:reload-active'),
     onUpdate: (cb: (tabs: TabState[], activeId: number | null) => void): (() => void) => {
       const listener = (
         _e: Electron.IpcRendererEvent,
@@ -195,7 +214,15 @@ const api = {
     toggle: (hostname: string): Promise<boolean> =>
       ipcRenderer.invoke('shields:toggle', hostname),
     isEnabled: (hostname: string): Promise<boolean> =>
-      ipcRenderer.invoke('shields:isEnabled', hostname)
+      ipcRenderer.invoke('shields:isEnabled', hostname),
+    getSettings: (domain: string): Promise<SiteShieldSettings | null> =>
+      ipcRenderer.invoke('shields:get-settings', domain),
+    setLevel: (domain: string, level: string): Promise<SiteShieldSettings> =>
+      ipcRenderer.invoke('shields:set-level', domain, level),
+    getPageStats: (): Promise<PageBlockedStats> =>
+      ipcRenderer.invoke('shields:get-page-stats'),
+    openPopover: (bounds: { x: number; y: number; width: number; height: number }, domain: string): Promise<void> =>
+      ipcRenderer.invoke('shields:open-popover', bounds, domain),
   },
 
   // STAGE 6
@@ -595,6 +622,11 @@ const api = {
       ipcRenderer.invoke('translation:translate-page', config || {}),
     revert: () =>
       ipcRenderer.invoke('translation:revert'),
+  },
+
+  auth: {
+    clearGoogleData: (): Promise<boolean> =>
+      ipcRenderer.invoke('auth:clear-google-data'),
   },
 
   imageSaver: {

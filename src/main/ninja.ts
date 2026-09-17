@@ -58,7 +58,9 @@ export class NinjaWindowManager {
 
     this.ninjaWindowIds.add(win.id)
 
-    const tabs = new TabManager(win, this.chromeHeight, privateSession, true)
+    // Pass isPrivate=true AND the isolated session (arg order matters:
+    // constructor is (win, chromeHeight, isPrivate, session)).
+    const tabs = new TabManager(win, this.chromeHeight, true, privateSession)
     this.managers.set(win.id, tabs)
     tabs.setSidebarWidth(this.sidebarWidth)
 

@@ -21,6 +21,7 @@ import { TabManager } from './tabs'
 import { registerInputContextMenuIPC } from './inputContextMenu'
 import { registerMediaHubMenuIPC } from './mediaHubMenu'
 import { registerMediaHubWindowIPC } from './mediaHubWindow'
+import { registerShieldsWindowIPC } from './shieldsWindow'
 import { registerToolbarContextMenuIPC } from './toolbarContextMenu'
 import { registerWindowControls, wireMaximizeEvents } from './window-controls'
 import { registerShortcuts } from './shortcuts'
@@ -40,8 +41,14 @@ import {
   installBlocker,
   initBlocker,
   setSiteShields,
-  areShieldsEnabledFor
+  areShieldsEnabledFor,
+  getTabBlockedStats
 } from './blocker'
+import {
+  getSiteShields,
+  setSiteShieldsLevel,
+  initShieldsDatabase
+} from './blocker/shields-store'
 import { setupHttpsOnly, allowInsecureHost } from './security/https-only'
 import { setupAntiFingerprintFlags, setupSessionFingerprintDefenses } from './security/fingerprint'
 import { setupPermissionPrompts, respondToPermission } from './security/permissions'
@@ -186,7 +193,8 @@ const readerProbeCache = new Map<string | number, boolean>()
 
 const startupReady = app.whenReady().then(async () => {
   console.log('[Aura] Opening database…')
-  getDb()
+  const db = getDb()
+  initShieldsDatabase(db)
   applyHardwareAccelLater()
   applyForceDarkFlag()
   console.log('[Aura/settings] Loaded settings')
@@ -213,6 +221,7 @@ const startupReady = app.whenReady().then(async () => {
   registerMediaControllerIPC()
   registerMediaHubMenuIPC()
   registerMediaHubWindowIPC()
+  registerShieldsWindowIPC()
   console.log('[aura:media] registering media resume IPC handlers')
   registerMediaResumeHandlers()
   cleanCorruptedEntries()
@@ -453,8 +462,41 @@ ipcMain.handle('tabs:reorder', (e, fromId: number | number[], toIndex?: number) 
   }
   return false
 })
-ipcMain.handle('tabs:pin', (e, id: number) => getTabsForEvent(e)?.pin(id))
-ipcMain.handle('tabs:unpin', (e, id: number) => getTabsForEvent(e)?.unpin(id))
+ipcMain.handle('tabs:pin', (e, id: number) => {
+  const tm = getTabsForEvent(e)
+  if (!tm) return
+  tm.pin(id)
+  const win = BrowserWindow.fromWebContents(e.sender) || BrowserWindow.getFocusedWindow()
+  if (win) {
+    const state = tm.getState()
+    win.webContents.send('tabs:update', state.tabs, state.activeId)
+  }
+})
+ipcMain.handle('tabs:unpin', (e, id: number) => {
+  const tm = getTabsForEvent(e)
+  if (!tm) return
+  tm.unpin(id)
+  const win = BrowserWindow.fromWebContents(e.sender) || BrowserWindow.getFocusedWindow()
+  if (win) {
+    const state = tm.getState()
+    win.webContents.send('tabs:update', state.tabs, state.activeId)
+  }
+})
+ipcMain.handle('tabs:toggle-pin', (e, id: number) => {
+  const tm = getTabsForEvent(e)
+  if (!tm) return false
+  const tab = tm.getTab(id)
+  if (!tab) return false
+  if (tab.pinned) tm.unpin(id)
+  else tm.pin(id)
+  // Explicitly broadcast updated tabs to renderer as separate arguments
+  const win = BrowserWindow.fromWebContents(e.sender) || BrowserWindow.getFocusedWindow()
+  if (win) {
+    const state = tm.getState()
+    win.webContents.send('tabs:update', state.tabs, state.activeId)
+  }
+  return !tab.pinned
+})
 ipcMain.handle('tabs:mute', (e, id: number) => getTabsForEvent(e)?.toggleMute(id))
 ipcMain.handle('tabs:duplicate', (e, id: number) => getTabsForEvent(e)?.duplicate(id))
 ipcMain.handle('tabs:unload', (e, id: number) => getTabsForEvent(e)?.unload(id))
@@ -472,8 +514,10 @@ ipcMain.handle('tabs:stopFind', (e, id: number) => getTabsForEvent(e)?.stopFindI
 
 ipcMain.handle('tabs:show-context-menu', async (event, tabId: string) => {
   const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow()
-  if (!win || !tabs) return
-  const tab = tabs.getTab(Number(tabId))
+  if (!win) return
+  const tm = getTabsForEvent(event)
+  if (!tm) return
+  const tab = tm.getTab(Number(tabId))
   if (!tab) return
 
   const menu = new Menu()
@@ -481,8 +525,11 @@ ipcMain.handle('tabs:show-context-menu', async (event, tabId: string) => {
     new MenuItem({
       label: tab.pinned ? 'Unpin Tab' : 'Pin Tab',
       click: () => {
-        if (tab.pinned) tabs?.unpin?.(tab.id)
-        else tabs?.pin?.(tab.id)
+        if (tab.pinned) tm.unpin(tab.id)
+        else tm.pin(tab.id)
+        // Explicitly broadcast updated tabs to renderer as separate arguments
+        const state = tm.getState()
+        win.webContents.send('tabs:update', state.tabs, state.activeId)
       }
     })
   )
@@ -490,23 +537,20 @@ ipcMain.handle('tabs:show-context-menu', async (event, tabId: string) => {
   menu.append(
     new MenuItem({
       label: 'Duplicate Tab',
-      click: () => {
-        const url = tab.view?.webContents.getURL()
-        if (url) tabs?.duplicate?.(tab.id)
-      }
+      click: () => { tm.duplicate(tab.id) }
     })
   )
   menu.append(
     new MenuItem({
       label: tab.muted ? 'Unmute Tab' : 'Mute Tab',
-      click: () => { tabs?.toggleMute?.(tab.id) }
+      click: () => { tm.toggleMute(tab.id) }
     })
   )
   menu.append(new MenuItem({ type: 'separator' }))
   menu.append(
     new MenuItem({
       label: 'Close Tab',
-      click: () => { tabs?.close?.(tab.id) }
+      click: () => { tm.close(tab.id) }
     })
   )
   menu.popup({ window: win })
@@ -750,7 +794,7 @@ ipcMain.handle('translation:translate-page', async (e, config?: { targetLang?: s
             if (t.length >= 1 && t.length < 5000) nodes.push(node);
           }
           if (nodes.length === 0) return { success: true, nodeCount: 0 };
-          if (!window.__auraOrigMap) window.__auraOrigMap = new Map();
+          if (!window.__auraOrigMap) { try { Object.defineProperty(window, '__auraOrigMap', { value: new Map(), writable: true, configurable: true }); } catch (e) { window.__auraOrigMap = new Map(); } }
           nodes.forEach(n => window.__auraOrigMap.set(n, n.textContent));
           const batchSize = 40;
           let translated = 0;
@@ -810,6 +854,21 @@ ipcMain.handle('translation:revert', async (e) => {
   } catch {}
 })
 
+// One-shot reset for Google's flagged-session memory: clears accounts.google.com
+// cookies + localStorage so login is re-evaluated with the spoofed headers.
+ipcMain.handle('auth:clear-google-data', async () => {
+  try {
+    await session.defaultSession.clearStorageData({
+      origin: 'https://accounts.google.com',
+      storages: ['cookies', 'localstorage'],
+    })
+    return true
+  } catch (err) {
+    console.error('[auth] clear-google-data failed:', err)
+    return false
+  }
+})
+
 ipcMain.handle('layout:setSidebarWidth', (e, width: number) =>
   getTabsForEvent(e)?.setSidebarWidth(width))
 ipcMain.handle('layout:setChromeHeight', (e, height: number) =>
@@ -857,6 +916,29 @@ ipcMain.handle('shields:toggle', (_e, hostname: string) => {
   return setSiteShields(hostname, !wasEnabled)
 })
 ipcMain.handle('shields:isEnabled', (_e, hostname: string) => areShieldsEnabledFor(hostname))
+ipcMain.handle('shields:get-settings', (_e, domain: string) => getSiteShields(domain))
+ipcMain.handle('shields:set-level', (_e, domain: string, level: any) => setSiteShieldsLevel(domain, level))
+ipcMain.handle('shields:get-page-stats', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow()
+  if (!win) return { ads: 0, trackers: 0, total: 0 }
+  const tabs = getTabsForEvent(event)
+  if (!tabs) return { ads: 0, trackers: 0, total: 0 }
+  const activeId = tabs.getActiveId()
+  if (!activeId) return { ads: 0, trackers: 0, total: 0 }
+  const tab = tabs.getTab(activeId)
+  if (!tab || tab.id === undefined) return { ads: 0, trackers: 0, total: 0 }
+  return getTabBlockedStats(tab.id)
+})
+ipcMain.handle('tabs:reload-active', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow()
+  if (!win) return
+  const tabs = getTabsForEvent(event)
+  if (!tabs) return
+  const activeId = tabs.getActiveId()
+  if (!activeId) return
+  const tab = tabs.getTab(activeId)
+  if (tab?.view?.webContents) tab.view.webContents.reload()
+})
 
 ipcMain.handle('history:all', (_e, limit?: number) => allHistory(limit ?? 500))
 ipcMain.handle('history:search', (_e, q: string) => searchHistory(q, 50))

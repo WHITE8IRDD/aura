@@ -1,4 +1,4 @@
-import { BrowserWindow, WebContentsView } from 'electron'
+import { BrowserWindow, WebContentsView, session, type Session } from 'electron'
 import { join } from 'path'
 import { isInternal, normalizeInput } from './url'
 import { recordVisit, updateTitle } from './history'
@@ -8,7 +8,7 @@ import { getAccessibilityWebPreferences, applyDefaultZoom } from './accessibilit
 import { attachContextMenu } from './contextMenu'
 import { saveTabs } from './sessions'
 import { sendRestoreToTab } from './mediaResume'
-import { injectStoreScript } from './storeIntegration'
+import { CHROME_UA, injectStoreScript } from './storeIntegration'
 
 export interface TabState {
   id: number
@@ -106,6 +106,7 @@ export class TabManager {
   private chromeHeight: number
   private sidebarWidth: number = 0
   private _isPrivate: boolean
+  private _session: Session
   private emitTimer: NodeJS.Timeout | null = null
   private viewHidden = false
   private closedStack: ClosedTab[] = []
@@ -117,10 +118,14 @@ export class TabManager {
   constructor(
     private win: BrowserWindow,
     chromeHeight: number,
-    isPrivate: boolean = false
+    isPrivate: boolean = false,
+    ses?: Session
   ) {
     this.chromeHeight = chromeHeight
     this._isPrivate = isPrivate
+    // Views without an explicit session inherit the default (persistent)
+    // session. Ninja passes its isolated in-memory session here.
+    this._session = ses ?? session.defaultSession
     TabManager.instances.set(win.id, this)
     win.on('resize', () => this.layout())
     win.on('enter-full-screen', () => this.layout())
@@ -568,6 +573,7 @@ export class TabManager {
     const view = new WebContentsView({
       webPreferences: {
         preload: join(__dirname, '../preload/tab.js'),
+        session: this._session,
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
@@ -583,6 +589,10 @@ export class TabManager {
     console.log('[aura:tabs] creating WebContentsView, isPrivate=', this._isPrivate,
       'additionalArguments=', this._isPrivate ? ['--aura-private-tab'] : [])
     rec.view = view
+    // Belt-and-braces UA spoof per view (session-level spoof is primary);
+    // keeps Google/YouTube login from flagging Electron. Views use the
+    // persistent default session, so cookies and logins survive restarts.
+    try { view.webContents.setUserAgent(CHROME_UA) } catch {}
     if (rec.muted) view.webContents.setAudioMuted(true)
 
     applyDefaultZoom(view.webContents)

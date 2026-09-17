@@ -22,9 +22,15 @@ export default function TabBar(props: any): React.ReactElement {
     }
   }, [props.tabs, orderOverride])
 
-  // 3. Compute display tabs: apply orderOverride to props.tabs if active
+  // 3. SAFE ARRAY DEFENSE: Ensure rawTabs is ALWAYS a valid Array regardless of what props or IPC events send
+  const rawTabs = props.tabs || []
+  const safeTabs = Array.isArray(rawTabs)
+    ? rawTabs
+    : (Array.isArray((rawTabs as any)?.tabs) ? (rawTabs as any).tabs : [])
+
+  // 5. Compute display tabs: apply orderOverride to safeTabs if active
   const displayTabs = useMemo(() => {
-    const base = props.tabs || []
+    const base = safeTabs || []
     if (!orderOverride) return base
 
     const map = new Map(base.map((t: any) => [t.id, t]))
@@ -42,11 +48,11 @@ export default function TabBar(props: any): React.ReactElement {
       ordered.push(tab)
     }
     return ordered
-  }, [props.tabs, orderOverride])
+  }, [safeTabs, orderOverride])
 
-  // 4. Derive pinned and unpinned tabs from displayTabs
-  const pinnedTabs = useMemo(() => displayTabs.filter((t: any) => t.pinned), [displayTabs])
-  const unpinnedTabs = useMemo(() => displayTabs.filter((t: any) => !t.pinned), [displayTabs])
+  // 6. Derive pinned and unpinned tabs from displayTabs (use safe array defense)
+  const pinnedTabs = useMemo(() => displayTabs.filter((t: any) => t && t.pinned), [displayTabs])
+  const unpinnedTabs = useMemo(() => displayTabs.filter((t: any) => t && !t.pinned), [displayTabs])
 
   // 3. Simple, 60fps drag tracking ref
   const dragRef = useRef<{
@@ -188,11 +194,11 @@ export default function TabBar(props: any): React.ReactElement {
   const getTransform = useCallback((tabId: string, indexInGroup: number, isPinned: boolean): React.CSSProperties => {
     const d = dragRef.current
     if (!d.active || !d.tabId) {
-      return { transform: 'translateX(0px)', transition: 'transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94)' }
+      return { transform: 'translateX(0px)', transition: 'transform 0.2s cubic-bezier(0.2, 0, 0, 1), background 0.2s ease' }
     }
 
     if (d.isPinned !== isPinned) {
-      return { transform: 'translateX(0px)', transition: 'transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94)' }
+      return { transform: 'translateX(0px)', transition: 'transform 0.2s cubic-bezier(0.2, 0, 0, 1), background 0.2s ease' }
     }
 
     const deltaX = d.currentX - d.startX
@@ -210,34 +216,40 @@ export default function TabBar(props: any): React.ReactElement {
 
     const shift = Math.round(deltaX / d.width)
     if (shift === 0) {
-      return { transform: 'translateX(0px)', transition: 'transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94)' }
+      return { transform: 'translateX(0px)', transition: 'transform 0.2s cubic-bezier(0.2, 0, 0, 1), background 0.2s ease' }
     }
 
     const from = d.originIndex
     if (shift > 0 && indexInGroup > from && indexInGroup <= from + shift) {
       return {
         transform: 'translateX(-' + d.width + 'px)',
-        transition: 'transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+        transition: 'transform 0.2s cubic-bezier(0.2, 0, 0, 1), background 0.2s ease',
       }
     }
     if (shift < 0 && indexInGroup < from && indexInGroup >= from + shift) {
       return {
         transform: 'translateX(' + d.width + 'px)',
-        transition: 'transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+        transition: 'transform 0.2s cubic-bezier(0.2, 0, 0, 1), background 0.2s ease',
       }
     }
 
-    return { transform: 'translateX(0px)', transition: 'transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94)' }
+    return { transform: 'translateX(0px)', transition: 'transform 0.2s cubic-bezier(0.2, 0, 0, 1), background 0.2s ease' }
   }, [])
 
   // === CONTEXT MENU HANDLER ===
-  const handleContextMenu = useCallback((e: React.MouseEvent, tabId?: string) => {
+  const handleContextMenu = useCallback((e: React.MouseEvent, tabOrId: any) => {
     e.preventDefault()
     e.stopPropagation()
-    const targetId = tabId || dragRef.current.tabId
-    if (!targetId) return
+
+    // Safely extract tabId string from either a string ID or tab object { id: string }
+    const tabId = typeof tabOrId === 'string'
+      ? tabOrId
+      : (tabOrId?.id || tabOrId?.tabId || '')
+
+    if (!tabId) return
+
     if (typeof (window as any).aura?.tabs?.showContextMenu === 'function') {
-      ;(window as any).aura.tabs.showContextMenu(targetId)
+      ;(window as any).aura.tabs.showContextMenu(tabId)
     }
   }, [])
 
@@ -309,6 +321,7 @@ export default function TabBar(props: any): React.ReactElement {
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                   touchAction: 'none',
+                  willChange: 'transform',
                   WebkitAppRegion: 'no-drag' as any,
                   background: tab.id === activeTabId
                     ? 'var(--aura-tab-active-bg, rgba(255,255,255,0.1))'

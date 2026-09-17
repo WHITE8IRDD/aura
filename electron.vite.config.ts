@@ -41,6 +41,7 @@ export default defineConfig({
           mediaHubPopover: resolve(__dirname, 'src/renderer/mediaHubPopover.html'),
           translatorPopover: resolve(__dirname, 'src/renderer/translatorPopover.html'),
           imageSaverPopover: resolve(__dirname, 'src/renderer/imageSaverPopover.html'),
+          shieldsPopover: resolve(__dirname, 'src/renderer/shieldsPopover.html'),
           'perf-hud': resolve(__dirname, 'src/renderer/perf-hud/index.html')
         }
       }

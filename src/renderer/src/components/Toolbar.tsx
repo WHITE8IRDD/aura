@@ -114,6 +114,7 @@ export default function Toolbar(props: Props): React.ReactElement {
   const [bookmarkAnchor, setBookmarkAnchor] = useState<DOMRect | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const bookmarkBtnRef = useRef<HTMLButtonElement>(null)
+  const shieldBtnRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!focused) setValue(url === 'aura://newtab' ? '' : url)
@@ -218,13 +219,15 @@ export default function Toolbar(props: Props): React.ReactElement {
     if (item) void window.aura.suggest.preconnect(item.url)
   }, [])
 
-  const handleShieldClick = useCallback(async (e: React.MouseEvent) => {
+  const handleShieldClick = useCallback(async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation()
     if (!hostname || !isWebPage) return
-    const newState = await window.aura.shields.toggle(hostname)
-    setShieldsEnabled(newState)
-    setTimeout(() => onReload(), 100)
-  }, [hostname, isWebPage, onReload])
+    const rect = e.currentTarget.getBoundingClientRect()
+    await window.aura.shields.openPopover(
+      { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      hostname
+    )
+  }, [hostname, isWebPage])
 
   const handleBookmarkClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
@@ -355,12 +358,13 @@ export default function Toolbar(props: Props): React.ReactElement {
 
             {isWebPage && (
               <button
+                ref={shieldBtnRef}
                 type="button"
                 className={`ab-shield urlbar-icon-btn${shieldsEnabled ? ' active' : ' off'}`}
                 title={
                   shieldsEnabled
-                    ? `Aura Shields ON for ${hostname}\nClick to disable`
-                    : `Aura Shields OFF for ${hostname}\nClick to re-enable`
+                    ? `Aura Shields ON for ${hostname}\nClick to open Shields`
+                    : `Aura Shields OFF for ${hostname}\nClick to open Shields`
                 }
                 onClick={handleShieldClick}
                 tabIndex={-1}
