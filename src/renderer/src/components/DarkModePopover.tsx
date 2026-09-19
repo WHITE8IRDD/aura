@@ -29,6 +29,8 @@ export default function DarkModePopover(): JSX.Element {
   const [host] = useState(hostnameFromHash)
   const [rule, setRule] = useState<DarkSiteRule | 'default'>('default')
   const [busy, setBusy] = useState(false)
+  const [errText, setErrText] = useState('')
+  const [bridgeOk] = useState(() => !!window.auraFeatures?.darkMode)
 
   useEffect(() => {
     document.documentElement.style.background = 'transparent'
@@ -42,7 +44,10 @@ export default function DarkModePopover(): JSX.Element {
       if (!alive) return
       const r = (res as DarkGet).rule
       setRule(r === null ? 'default' : r)
-    }).catch((err) => console.error('[Aura/DarkMode] get failed:', err))
+    }).catch((err) => {
+      console.error('[Aura/DarkMode] get failed:', err)
+      if (alive) setErrText('Could not load this site\u2019s setting.')
+    })
     return () => { alive = false }
   }, [host])
 
@@ -50,13 +55,21 @@ export default function DarkModePopover(): JSX.Element {
     if (!host || busy) return
     const prev = rule
     setRule(value) // instant visual feedback; rolled back if the save fails
+    setErrText('')
     setBusy(true)
     try {
-      await window.auraFeatures?.darkMode.setSite(host, value === 'default' ? null : value)
+      const save = window.auraFeatures?.darkMode.setSite(host, value === 'default' ? null : value)
+      // An invoke with no registered handler never settles: time out so the
+      // buttons can't wedge in a stuck-busy state.
+      await Promise.race([
+        save,
+        new Promise((_, reject) => window.setTimeout(() => reject(new Error('save timed out')), 5000)),
+      ])
       window.close()
     } catch (err) {
       console.error('[Aura/DarkMode] setSite failed:', err)
       setRule(prev)
+      setErrText('Could not save. Restart Aura and try again.')
       setBusy(false)
     }
   }, [host, busy, rule])
@@ -94,6 +107,9 @@ export default function DarkModePopover(): JSX.Element {
           </button>
         ))}
       </div>
+      {(!bridgeOk || errText) && (
+        <p className="dm-err">{!bridgeOk ? 'Controls unavailable — restart Aura.' : errText}</p>
+      )}
     </div>
   )
 }
@@ -121,4 +137,5 @@ const CSS = `
 .dm-opt-label{font-size:12.5px;font-weight:650}
 .dm-opt-desc{font-size:11px;color:var(--text-secondary,rgba(238,240,247,.65));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dm-check{color:var(--accent,#a5b4fc);font-weight:700}
+.dm-err{margin:0;font-size:11px;color:var(--danger,#f87171)}
 `
