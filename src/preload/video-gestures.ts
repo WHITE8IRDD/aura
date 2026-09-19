@@ -67,6 +67,9 @@ function clamp01(v: number): number {
 const attachedVideos = new WeakSet<HTMLVideoElement>()
 const introChips = new WeakMap<HTMLVideoElement, HTMLElement>()
 const chipShownFor = new WeakSet<HTMLVideoElement>()
+// Players that rebuild the <video> element (e.g. on fullscreen toggles or
+// server switches) must not resurrect the chip: one appearance per document.
+let introChipShownThisDocument = false
 
 function dismissChip(video: HTMLVideoElement): void {
   const chip = introChips.get(video)
@@ -78,11 +81,12 @@ function dismissChip(video: HTMLVideoElement): void {
 
 function maybeShowIntroChip(video: HTMLVideoElement, cfg: Cfg): void {
   try {
-    if (chipShownFor.has(video) || introChips.has(video)) return
+    if (introChipShownThisDocument || chipShownFor.has(video) || introChips.has(video)) return
     const dur = video.duration
     if (!Number.isFinite(dur) || dur < 480) return
     if (video.currentTime > 10) return
     chipShownFor.add(video)
+    introChipShownThisDocument = true
     const chip = document.createElement('button')
     chip.setAttribute(HUD_ATTR, 'gestures-intro')
     chip.type = 'button'
