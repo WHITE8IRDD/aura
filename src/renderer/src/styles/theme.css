@@ -7114,7 +7114,8 @@ body > .gcm-menu {
 :root[data-theme='light'] .toolbar-brand-mark,
 :root[data-theme='light'] .about-hero-logo,
 :root[data-theme='light'] .ntp-hero-mark-img,
-:root[data-theme='light'] .tab-favicon-aura { filter: invert(1); }
+:root[data-theme='light'] .tab-favicon-aura,
+:root[data-theme='light'] .logo-mark { filter: invert(1); }
 
 /* ========================================================================
    DEVTOOLS QUICK-TOGGLE (animated emerald pulse when open)
