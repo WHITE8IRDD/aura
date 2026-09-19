@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { TabState, Suggestion, Bookmark } from '../types'
-import type { ExtensionItem } from '../../shared/aura-features'
+import type { ExtensionItem } from '../../../shared/aura-features'
 import Suggestions from './Suggestions'
 import BookmarkDialog from './BookmarkDialog'
 import ZoomIndicator from './ZoomIndicator'
@@ -256,6 +256,8 @@ export default function Toolbar(props: Props): React.ReactElement {
 
   const [devToolsActive, setDevToolsActive] = useState(false)
   const [extensions, setExtensions] = useState<ExtensionItem[]>([])
+  const [pulseIds, setPulseIds] = useState<Set<string>>(new Set())
+  const prevExtIds = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     let alive = true
@@ -272,10 +274,33 @@ export default function Toolbar(props: Props): React.ReactElement {
 
   useEffect(() => {
     let alive = true
-    window.auraFeatures?.extensions.list().then((list) => {
-      if (alive) setExtensions((list ?? []) as ExtensionItem[])
-    }).catch(() => {})
-    return () => { alive = false }
+    let pulseTimer = 0
+    const refresh = async (): Promise<void> => {
+      try {
+        const list = (await window.auraFeatures?.extensions.list()) as ExtensionItem[] | undefined
+        if (!alive || !list) return
+        const items = list ?? []
+        const prev = prevExtIds.current
+        const added = items.filter((e) => e.enabled === 1 && e.popupPath && !prev.has(e.id)).map((e) => e.id)
+        prevExtIds.current = new Set(items.map((e) => e.id))
+        setExtensions(items)
+        if (added.length > 0) {
+          setPulseIds(new Set(added))
+          window.clearTimeout(pulseTimer)
+          pulseTimer = window.setTimeout(() => { if (alive) setPulseIds(new Set()) }, 3000)
+        }
+      } catch { /* extensions unavailable */ }
+    }
+    void refresh()
+    let off: (() => void) | undefined
+    try {
+      off = window.auraFeatures?.extensions.onChanged(() => { void refresh() })
+    } catch { /* no bridge */ }
+    return () => {
+      alive = false
+      window.clearTimeout(pulseTimer)
+      try { off?.() } catch { /* already torn down */ }
+    }
   }, [])
 
   const handleExtensionClick = useCallback((extId: string, e: React.MouseEvent<HTMLButtonElement>) => {
@@ -447,6 +472,7 @@ export default function Toolbar(props: Props): React.ReactElement {
                 key={ext.id}
                 onClick={(e) => handleExtensionClick(ext.id, e)}
                 title={ext.name}
+                className={pulseIds.has(ext.id) ? 'ext-cluster-btn pulse' : 'ext-cluster-btn'}
                 style={{
                   width: '28px',
                   height: '28px',

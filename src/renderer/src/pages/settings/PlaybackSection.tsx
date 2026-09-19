@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Button, Select, Slider, Toggle } from './SettingsControls'
-import type { GestureSettings } from '../../../shared/aura-features'
+import type { GestureSettings } from '../../../../shared/aura-features'
 
 export const PlaybackSection: React.FC = () => {
   const [gestures, setGestures] = useState<GestureSettings | null>(null)

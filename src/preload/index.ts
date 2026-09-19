@@ -977,6 +977,18 @@ const auraFeaturesApi: AuraFeaturesApi = {
     list: () => ipcRenderer.invoke('extensions:list'),
     openPopup: (extId: string, anchorX: number, anchorY: number): Promise<boolean> =>
       ipcRenderer.invoke('extensions:open-popup', extId, anchorX, anchorY),
+    installUnpacked: () => ipcRenderer.invoke('extensions:installFolder'),
+    installCrx: () => ipcRenderer.invoke('extensions:installCrx'),
+    installStoreUrl: (input: string) => ipcRenderer.invoke('extensions:install-store-url', input),
+    installPath: (path: string) => ipcRenderer.invoke('extensions:install-path', path),
+    setEnabled: (id: string, enabled: boolean) =>
+      ipcRenderer.invoke(enabled ? 'extensions:enable' : 'extensions:disable', id),
+    uninstall: (id: string) => ipcRenderer.invoke('extensions:delete', id),
+    onChanged: (cb: () => void) => {
+      const h = (): void => cb()
+      ipcRenderer.on('extensions:changed', h)
+      return () => { ipcRenderer.removeListener('extensions:changed', h) }
+    },
   },
 }
 

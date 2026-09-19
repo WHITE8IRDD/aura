@@ -1,380 +1,309 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ChromePageHeader } from '../components/ChromePageHeader'
-import { IconExtension, IconClose } from '../components/Icons'
-import { EXTENSIONS_CATALOG, type CatalogEntry, getCatalogIconSrc } from '../data/extensionsCatalog'
-
-interface ExtRecord {
-  id: string
-  name: string
-  version: string
-  description: string
-  author: string
-  homeUrl: string
-  iconPath: string
-  sourceType: string
-  sourcePath: string
-  enabled: number
-  installed_at: number
-}
-
-function toAppIconUrl(iconPath: string | null): string | null {
-  if (!iconPath) return null
-  return `app-icon://${encodeURIComponent(iconPath)}`
-}
+import type { ExtensionItem } from '../../../shared/aura-features'
 
 interface Props {
   onClose: () => void
 }
 
+interface InstallResult {
+  success: boolean
+  id?: string
+  error?: string
+}
+
+const STORE_SUGGESTIONS = [
+  { label: 'Bitwarden', url: 'https://chromewebstore.google.com/detail/bitwarden/cjpalhdlnbpafiamejdnhcphjbkeiagm' },
+  { label: 'Dark Reader', url: 'https://chromewebstore.google.com/detail/dark-reader/eimfamddlgamimgfonpumjcpkolpddjj' },
+  { label: 'Stylus', url: 'https://chromewebstore.google.com/detail/stylus/clngdbkpkpeebahjckkjfobkbiopenh' },
+]
+
+const STORE_URL_RE = /chromewebstore\.google\.com|chrome\.google\.com\/webstore|[a-p]{32}/i
+
+function PuzzleArt(): React.ReactElement {
+  return (
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 7V5a2 2 0 0 0-4 0v2H7a2 2 0 0 0-2 2v3h2a2 2 0 1 1 0 4H5v3a2 2 0 0 0 2 2h3v-2a2 2 0 1 1 4 0v2h3a2 2 0 0 0 2-2v-3h-2a2 2 0 1 1 0-4h2V9a2 2 0 0 0-2-2h-3z" />
+    </svg>
+  )
+}
+
 export default function ExtensionsPage({ onClose }: Props): React.ReactElement {
-  const [extensions, setExtensions] = useState<ExtRecord[]>([])
-  const [icons, setIcons] = useState<Record<string, string | null>>({})
-  const [installing, setInstalling] = useState<'folder' | 'crx' | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [storeUrl, setStoreUrl] = useState('')
-  const [installingId, setInstallingId] = useState<string | null>(null)
-  const [searchResults, setSearchResults] = useState<CatalogEntry[]>([])
-  const [showDropdown, setShowDropdown] = useState(false)
+  const [items, setItems] = useState<ExtensionItem[]>([])
+  const [icons, setIcons] = useState<Record<string, string>>({})
+  const [query, setQuery] = useState('')
+  const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const [detailsId, setDetailsId] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const toastTimer = useRef(0)
 
-  const load = useCallback(async () => {
-    const list = await window.aura.extensions.list()
-    setExtensions(list)
-    const iconMap: Record<string, string | null> = {}
-    for (const ext of list) {
-      iconMap[ext.id] = null
-      window.aura.extensions.getIcon(ext.id).then(dataUrl => {
-        setIcons(prev => ({ ...prev, [ext.id]: dataUrl }))
-      })
-    }
+  const showToast = useCallback((msg: string) => {
+    setToast(msg)
+    window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToast(null), 2500)
   }, [])
 
-  useEffect(() => { load() }, [load])
-
-  useEffect(() => {
-    const input = storeUrl.trim()
-    const isId = /^[a-p]{32}$/.test(input)
-    const isUrl = input.startsWith('http') || input.includes('chromewebstore')
-
-    if (!input || isId || isUrl) {
-      setSearchResults([])
-      setShowDropdown(false)
-      return
-    }
-
-    const q = input.toLowerCase()
-    const results = EXTENSIONS_CATALOG
-      .filter(e =>
-        e.name.toLowerCase().includes(q) ||
-        e.description.toLowerCase().includes(q) ||
-        e.category.toLowerCase().includes(q)
-      )
-      .sort((a, b) => {
-        const aStart = a.name.toLowerCase().startsWith(q) ? 0 : 1
-        const bStart = b.name.toLowerCase().startsWith(q) ? 0 : 1
-        return aStart - bStart
-      })
-      .slice(0, 7)
-
-    setSearchResults(results)
-    setShowDropdown(results.length > 0)
-  }, [storeUrl])
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(e.target as Node)
-      ) {
-        setShowDropdown(false)
+  const refresh = useCallback(async () => {
+    try {
+      const list = (await window.auraFeatures?.extensions.list()) ?? []
+      setItems(list)
+      for (const ext of list) {
+        try {
+          const dataUrl = await window.aura.extensions.getIcon(ext.id)
+          if (dataUrl) {
+            setIcons((prev) => (prev[ext.id] ? prev : { ...prev, [ext.id]: dataUrl }))
+          }
+        } catch { /* icon optional */ }
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load extensions')
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const handleInstallFolder = async () => {
-    setInstalling('folder')
-    const result = await window.aura.extensions.installFolder()
-    setInstalling(null)
-    if (result.cancelled) return
-    if (result.success) {
-      setMessage(`Installed: ${result.id}`)
-      await load()
-    } else {
-      setMessage(`Error: ${result.error}`)
+  useEffect(() => {
+    void refresh()
+    let off: (() => void) | undefined
+    try {
+      off = window.auraFeatures?.extensions.onChanged(() => { void refresh() })
+    } catch { /* no bridge */ }
+    return () => {
+      window.clearTimeout(toastTimer.current)
+      try { off?.() } catch { /* torn down */ }
     }
-    setTimeout(() => setMessage(null), 4000)
-  }
+  }, [refresh])
 
-  const handleInstallCrx = async () => {
-    setInstalling('crx')
-    const result = await window.aura.extensions.installCrx()
-    setInstalling(null)
-    if (result.cancelled) return
-    if (result.success) {
-      setMessage(`Installed: ${result.id}`)
-      await load()
-    } else {
-      setMessage(`Error: ${result.error}`)
-    }
-    setTimeout(() => setMessage(null), 4000)
-  }
-
-  const handleToggle = async (ext: ExtRecord) => {
-    if (ext.enabled) {
-      const r = await window.aura.extensions.disable(ext.id)
-      if (!r.success) setMessage(`Error: ${r.error}`)
-    } else {
-      const r = await window.aura.extensions.enable(ext.id)
-      if (!r.success) setMessage(`Error: ${r.error}`)
-    }
-    await load()
-  }
-
-  const handleDelete = async (ext: ExtRecord) => {
-    const r = await window.aura.extensions.delete(ext.id)
-    if (r.success) {
-      setMessage(`Deleted: ${ext.name}`)
-      await load()
-    } else {
-      setMessage(`Error: ${r.error}`)
-    }
-    setTimeout(() => setMessage(null), 4000)
-  }
-
-  const handleInstallEntry = async (entry: CatalogEntry) => {
-    setShowDropdown(false)
-    setInstallingId(entry.id)
+  const runInstall = useCallback(async (kind: string, fn: () => Promise<InstallResult>) => {
+    setBusy(kind)
     setError(null)
     try {
-      const result = await (window as any).aura.extensions.installFromUrl(entry.id)
-      if (!result?.success) {
-        setError(result?.error || `Failed to install ${entry.name}`)
+      const r = await fn()
+      if (!r?.success) {
+        setError(r?.error || 'Install failed')
       } else {
-        setStoreUrl('')
+        showToast(`Installed ${r.id ?? 'extension'}`)
+        await refresh()
       }
-    } catch (err: any) {
-      setError(err?.message || `Failed to install ${entry.name}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Install failed')
     } finally {
-      setInstallingId(null)
+      setBusy(null)
     }
-  }
+  }, [refresh, showToast])
 
-  const handleSmartInstall = async () => {
-    const input = storeUrl.trim()
-    if (!input) { setError('Enter an extension name, URL, or ID'); return }
-    setError(null)
+  const installFromQuery = useCallback(() => {
+    const q = query.trim()
+    if (!q) {
+      setError('Paste a Chrome Web Store URL or 32-character extension ID.')
+      return
+    }
+    if (!STORE_URL_RE.test(q)) {
+      setError('Paste a full Chrome Web Store URL or 32-character extension ID.')
+      return
+    }
+    void runInstall('query', async () => {
+      const r = (await window.auraFeatures?.extensions.installStoreUrl(q)) as InstallResult | undefined
+      if (!r?.success) return r ?? { success: false, error: 'Install failed' }
+      setQuery('')
+      return r
+    })
+  }, [query, runInstall])
 
-    const isId = /^[a-p]{32}$/.test(input)
-    const isUrl = input.startsWith('http') || input.includes('chromewebstore')
-
-    if (isId || isUrl) {
-      setInstallingId('url')
-      try {
-        const result = await (window as any).aura.extensions.installFromUrl(input)
-        if (!result?.success) {
-          setError(result?.error || 'Installation failed')
-        } else {
-          setStoreUrl('')
-          setShowDropdown(false)
-        }
-      } catch (err: any) {
-        setError(err?.message || 'Installation failed')
-      } finally {
-        setInstallingId(null)
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const files = [...e.dataTransfer.files]
+    const crxFiles = files.filter((f) => /\.crx$/i.test(f.name) || /\.crx$/i.test((f as File & { path?: string }).path ?? ''))
+    if (crxFiles.length === 0) {
+      setError('Drop .crx files here — or use Load Unpacked for extension folders.')
+      return
+    }
+    void (async () => {
+      for (const f of crxFiles) {
+        const p = (f as File & { path?: string }).path
+        if (!p) continue
+        await runInstall(`drop:${f.name}`, async () => {
+          const r = (await window.auraFeatures?.extensions.installPath(p)) as InstallResult | undefined
+          return r ?? { success: false, error: 'Install failed' }
+        })
       }
-    } else if (searchResults.length > 0) {
-      handleInstallEntry(searchResults[0])
-    } else {
-      setError('No match found — try pasting the extension URL or ID')
-    }
-  }
+    })()
+  }, [runInstall])
+
+  const handleToggle = useCallback((ext: ExtensionItem) => {
+    void (async () => {
+      try {
+        await window.auraFeatures?.extensions.setEnabled(ext.id, !(ext.enabled === 1))
+        await refresh()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Toggle failed')
+      }
+    })()
+  }, [refresh])
+
+  const handleUninstall = useCallback((ext: ExtensionItem) => {
+    if (!window.confirm(`Remove "${ext.name}" and delete its files?`)) return
+    void (async () => {
+      try {
+        const r = (await window.auraFeatures?.extensions.uninstall(ext.id)) as InstallResult | undefined
+        if (!r?.success) setError(r?.error || 'Uninstall failed')
+        else {
+          showToast(`Removed ${ext.name}`)
+          await refresh()
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Uninstall failed')
+      }
+    })()
+  }, [refresh, showToast])
 
   return (
-    <div className="data-page">
+    <div
+      className="data-page"
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+    >
       <header className="data-header">
         <ChromePageHeader title="Extensions" onBack={onClose} />
         <div className="data-header-actions">
-          <button className="data-btn" onClick={handleInstallFolder} disabled={installing !== null}>
-            {installing === 'folder' ? 'Loading…' : 'Load Unpacked'}
+          <button
+            className="data-btn"
+            onClick={() => void runInstall('folder', async () =>
+              (await window.auraFeatures?.extensions.installUnpacked()) as InstallResult)}
+            disabled={busy !== null}
+          >
+            {busy === 'folder' ? 'Loading…' : 'Load Unpacked'}
           </button>
-          <button className="data-btn primary" onClick={handleInstallCrx} disabled={installing !== null}>
-            {installing === 'crx' ? 'Installing…' : 'Install CRX'}
+          <button
+            className="data-btn"
+            onClick={() => void runInstall('crx', async () =>
+              (await window.auraFeatures?.extensions.installCrx()) as InstallResult)}
+            disabled={busy !== null}
+          >
+            {busy === 'crx' ? 'Installing…' : 'Install CRX'}
           </button>
-          <button className="data-btn" onClick={() => window.aura.extensions.openStore()}>
-            Chrome Web Store
+          <button
+            className="data-btn"
+            onClick={() => { void window.aura.extensions.openStore() }}
+          >
+            Web Store
           </button>
         </div>
       </header>
 
-      <div className="ext-install-card">
-        <div className="ext-install-card-header">
-          <div className="ext-install-card-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-          </div>
+      {toast && <div className="extp-toast" role="status">{toast}</div>}
+
+      <div className={`extp-install-card${dragOver ? ' drag-over' : ''}`}>
+        <div className="extp-install-head">
+          <span className="extp-install-icon" aria-hidden="true">🔍</span>
           <div>
-            <h3 className="ext-install-title">Add Extension</h3>
-            <p className="ext-install-subtitle">Search by name, or paste a Chrome Web Store URL</p>
+            <div className="extp-install-title">Add Extension</div>
+            <div className="extp-install-sub">Paste a Chrome Web Store URL or extension ID</div>
           </div>
         </div>
+        <div className="extp-install-row">
+          <input
+            type="text"
+            className="extp-install-input"
+            placeholder="https://chromewebstore.google.com/detail/…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') installFromQuery() }}
+            disabled={busy !== null}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button
+            className="extp-install-btn"
+            onClick={installFromQuery}
+            disabled={busy !== null || !query.trim()}
+          >
+            {busy === 'query' ? 'Installing…' : 'Install Extension'}
+          </button>
+        </div>
+        <div className="extp-helper">Works with any chromewebstore.google.com link — no need for the Store&apos;s Add button.</div>
+        {error && <div className="extp-error" role="alert">{error}</div>}
+      </div>
 
-        <div className="ext-search-wrap" style={{ position: 'relative' }}>
-          <div className="ext-search-row">
-            <div className="ext-search-input-wrap">
-              <svg className="ext-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-              </svg>
-              <input
-                ref={inputRef}
-                type="text"
-                className="ext-search-input"
-                placeholder="uBlock, Dark Reader, Bitwarden…"
-                value={storeUrl}
-                onChange={(e) => setStoreUrl(e.target.value)}
-                onFocus={() => { if (searchResults.length > 0) setShowDropdown(true) }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    if (showDropdown && searchResults.length > 0) handleInstallEntry(searchResults[0])
-                    else handleSmartInstall()
-                  }
-                  if (e.key === 'Escape') setShowDropdown(false)
-                }}
-                disabled={installingId !== null}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              {storeUrl && (
-                <button
-                  className="ext-search-clear"
-                  onClick={() => { setStoreUrl(''); setShowDropdown(false); inputRef.current?.focus() }}
-                  tabIndex={-1}
-                  aria-label="Clear"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <path d="M18 6 6 18M6 6l12 12"/>
-                  </svg>
-                </button>
-              )}
-            </div>
-            <button
-              className={`ext-install-btn${installingId ? ' ext-install-btn--loading' : ''}`}
-              onClick={handleSmartInstall}
-              disabled={installingId !== null || !storeUrl.trim()}
-            >
-              {installingId === 'url' ? (
-                <span className="ext-btn-spinner" />
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 5v14M5 12l7 7 7-7"/>
-                </svg>
-              )}
-              <span>{installingId === 'url' ? 'Installing' : 'Install'}</span>
-            </button>
+      <div className="extp-tip">
+        Chrome Web Store&apos;s Add button is blocked for custom browsers. Copy the extension page URL and paste it above to install.
+      </div>
+
+      <div className="extp-conflict">
+        Aura already includes the built-in Shields adblocker — installing another adblocker (uBlock, AdBlock) may duplicate filtering.
+        Prefer Aura Shields for ads; use extensions for password managers, dark themes, user scripts, etc.
+      </div>
+
+      <h3 className="extp-section-title">INSTALLED ({items.length})</h3>
+      {items.length === 0 ? (
+        <div className="extp-empty">
+          <div className="extp-empty-icon"><PuzzleArt /></div>
+          <div className="extp-empty-title">No extensions yet</div>
+          <p className="extp-empty-sub">
+            Load an unpacked folder, install a .crx file, drop one anywhere on this page,
+            or paste a Chrome Web Store link above.
+          </p>
+          <div className="extp-chips">
+            {STORE_SUGGESTIONS.map((s) => (
+              <button key={s.label} className="extp-chip" onClick={() => setQuery(s.url)}>
+                {s.label}
+              </button>
+            ))}
           </div>
-
-          {showDropdown && searchResults.length > 0 && (
-            <div ref={dropdownRef} className="ext-dropdown">
-              {searchResults.map((entry, i) => (
-                <button
-                  key={entry.id}
-                  className="ext-dropdown-item"
-                  style={{ animationDelay: `${i * 0.03}s` }}
-                  onClick={() => handleInstallEntry(entry)}
-                  disabled={installingId === entry.id}
-                >
-                  <div className="ext-autocomplete-icon">
-                    {installingId === entry.id ? (
-                      <span className="ext-btn-spinner ext-btn-spinner--sm" />
+        </div>
+      ) : (
+        <div className="extp-grid">
+          {items.map((ext) => {
+            const icon = icons[ext.id]
+            const expanded = detailsId === ext.id
+            return (
+              <div key={ext.id} className="extp-card">
+                <div className="extp-card-top">
+                  <div className="extp-card-icon" aria-hidden="true">
+                    {icon ? (
+                      <img src={icon} alt="" width={40} height={40} />
                     ) : (
-                      <img src={getCatalogIconSrc(entry)} alt="" width={28} height={28} />
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                      </svg>
                     )}
                   </div>
-                  <div className="ext-dropdown-text">
-                    <span className="ext-dropdown-name">{entry.name}</span>
-                    <span className="ext-dropdown-desc">{entry.description}</span>
+                  <div className="extp-card-head">
+                    <div className="extp-card-name">{ext.name}</div>
+                    <div className="extp-card-ver">v{ext.version}</div>
                   </div>
-                  <span className="ext-dropdown-badge">{entry.category}</span>
-                </button>
-              ))}
-            </div>
-          )}
+                  <label className="extp-toggle" title={ext.enabled === 1 ? 'Disable' : 'Enable'}>
+                    <input
+                      type="checkbox"
+                      checked={ext.enabled === 1}
+                      onChange={() => handleToggle(ext)}
+                    />
+                    <span className="extp-toggle-track"><span className="extp-toggle-knob" /></span>
+                  </label>
+                </div>
+                <div className="extp-card-actions">
+                  <button className="extp-link" onClick={() => setDetailsId(expanded ? null : ext.id)}>
+                    {expanded ? 'Hide details' : 'Details'}
+                  </button>
+                  <button className="extp-delete" onClick={() => handleUninstall(ext)} title={`Remove ${ext.name}`}>
+                    🗑
+                  </button>
+                </div>
+                {expanded && (
+                  <dl className="extp-details">
+                    {ext.description && (<><dt>Description</dt><dd>{ext.description}</dd></>)}
+                    {ext.author && (<><dt>Author</dt><dd>{ext.author}</dd></>)}
+                    <dt>Extension ID</dt><dd className="extp-mono">{ext.id}</dd>
+                    <dt>Source</dt><dd>{ext.sourceType} · {ext.sourcePath}</dd>
+                  </dl>
+                )}
+              </div>
+            )
+          })}
         </div>
-
-        {error && (
-          <div className="ext-error-row">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
-            </svg>
-            <span>{error}</span>
-          </div>
-        )}
-      </div>
-
-      {message && <div className="ext-toast">{message}</div>}
-
-      <div className="data-list">
-        {extensions.length === 0 ? (
-          <div className="data-empty">
-            <div className="ext-empty-icon">
-              <IconExtension size={40} />
-            </div>
-            <p>No extensions installed.</p>
-            <p className="ext-empty-sub">
-              Load an unpacked extension from a folder, install a <code>.crx</code> file, or browse the Chrome Web Store.
-            </p>
-          </div>
-        ) : (
-          extensions.map((ext) => (
-            <div key={ext.id} className="ext-card">
-              <div className="ext-card-icon">
-                {ext.icon_path ? (
-                  <img
-                    src={toAppIconUrl(ext.icon_path)!}
-                    alt=""
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = 'none'
-                      e.currentTarget.nextElementSibling?.classList.remove('hidden')
-                    }}
-                  />
-                ) : null}
-                <div className={`ext-card-icon-fallback ${ext.icon_path ? 'hidden' : ''}`}>
-                  {ext.name?.[0]?.toUpperCase() || '?'}
-                </div>
-              </div>
-              <div className="ext-info">
-                <div className="ext-name">{ext.name}</div>
-                <div className="ext-meta">
-                  <span className="ext-version">{ext.version}</span>
-                  <span className="ext-sep">&middot;</span>
-                  <span className={`ext-source-badge ext-source-${ext.sourceType}`}>{ext.sourceType}</span>
-                </div>
-                {ext.description && <div className="ext-desc">{ext.description}</div>}
-                {ext.author && <div className="ext-author">by {ext.author}</div>}
-              </div>
-              <div className="ext-actions">
-                <label className="ext-toggle">
-                  <input
-                    type="checkbox"
-                    checked={ext.enabled === 1}
-                    onChange={() => handleToggle(ext)}
-                  />
-                  <span />
-                </label>
-                <button className="ext-delete" onClick={() => handleDelete(ext)} title="Remove extension">
-                  <IconClose size={14} />
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+      )}
     </div>
   )
 }

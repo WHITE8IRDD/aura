@@ -7156,3 +7156,218 @@ body > .gcm-menu {
   background: rgba(16, 185, 129, 0.15);
 }
 
+/* Extension toolbar cluster: pulse newly installed icons */
+@keyframes ext-cluster-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(99, 102, 241, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+}
+
+.ext-cluster-btn.pulse {
+  animation: ext-cluster-pulse 1s ease-out 3;
+  border-radius: 6px;
+}
+
+/* ========================================================================
+   EXTENSIONS PAGE (glass cards, install bar, empty state)
+   ======================================================================== */
+.extp-toast {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  background: var(--bg-elevated, rgba(28, 28, 32, 0.92));
+  border: 1px solid var(--success, #10b981);
+  color: var(--text-primary, #eef0f7);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-popover, 0 20px 60px rgba(0, 0, 0, 0.5));
+}
+.extp-install-card {
+  background: var(--hover-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.08));
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: border-color 0.15s ease;
+}
+.extp-install-card.drag-over {
+  border-color: var(--accent, #6366f1);
+  border-style: dashed;
+}
+.extp-install-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.extp-install-icon { font-size: 22px; }
+.extp-install-title { font-size: 15px; font-weight: 700; color: var(--text-primary, #fff); }
+.extp-install-sub { font-size: 12px; color: var(--text-secondary, #a1a1aa); margin-top: 2px; }
+.extp-install-row { display: flex; gap: 10px; }
+.extp-install-input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-primary, #fff);
+  background: var(--address-bar-bg, rgba(0, 0, 0, 0.3));
+  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
+  border-radius: 10px;
+  outline: none;
+  font-family: inherit;
+}
+.extp-install-input:focus { border-color: var(--accent, #6366f1); box-shadow: 0 0 0 3px var(--accent-soft, rgba(99, 102, 241, 0.12)); }
+.extp-install-input::placeholder { color: var(--text-tertiary, #71717a); }
+.extp-install-btn {
+  flex: none;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent, #6366f1), var(--accent-hover, #818cf8));
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.12s ease, opacity 0.15s ease;
+}
+.extp-install-btn:hover:not(:disabled) { transform: translateY(-1px); }
+.extp-install-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.extp-helper { margin-top: 10px; font-size: 11.5px; color: var(--text-tertiary, #71717a); }
+.extp-error {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 10px;
+  padding: 9px 12px;
+}
+.extp-tip, .extp-conflict {
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+.extp-tip {
+  color: var(--text-secondary, #a1a1aa);
+  background: var(--accent-soft, rgba(99, 102, 241, 0.1));
+  border: 1px solid var(--accent, rgba(99, 102, 241, 0.25));
+}
+.extp-conflict {
+  color: var(--text-secondary, #a1a1aa);
+  background: rgba(245, 158, 11, 0.07);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+}
+.extp-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary, #71717a);
+  margin: 4px 0 12px;
+}
+.extp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text-tertiary, #71717a);
+}
+.extp-empty-icon { opacity: 0.5; margin-bottom: 16px; color: var(--text-secondary, #a1a1aa); }
+.extp-empty-title { font-size: 17px; font-weight: 700; color: var(--text-primary, #fff); margin-bottom: 8px; }
+.extp-empty-sub { font-size: 13px; max-width: 420px; line-height: 1.6; margin: 0 0 18px; }
+.extp-chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.extp-chip {
+  padding: 7px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--selected-text, #a5b4fc);
+  background: var(--selected-bg, rgba(99, 102, 241, 0.16));
+  border: 1px solid var(--accent, rgba(99, 102, 241, 0.3));
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.extp-chip:hover { transform: translateY(-1px); }
+.extp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+.extp-card {
+  background: var(--hover-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  padding: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.12s ease, border-color 0.15s ease;
+}
+.extp-card:hover { transform: translateY(-1px); border-color: rgba(255, 255, 255, 0.16); }
+.extp-card-top { display: flex; align-items: center; gap: 12px; }
+.extp-card-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--active-bg, rgba(255, 255, 255, 0.07));
+  color: var(--text-secondary, #a1a1aa);
+  overflow: hidden;
+}
+.extp-card-icon img { width: 40px; height: 40px; object-fit: contain; }
+.extp-card-head { flex: 1; min-width: 0; }
+.extp-card-name { font-size: 14px; font-weight: 650; color: var(--text-primary, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.extp-card-ver { font-size: 11.5px; color: var(--text-tertiary, #71717a); margin-top: 2px; }
+.extp-toggle { position: relative; flex: none; cursor: pointer; }
+.extp-toggle input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.extp-toggle-track {
+  display: block;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--active-bg, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.12));
+  position: relative;
+  transition: background 0.15s ease;
+}
+.extp-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-secondary, #a1a1aa);
+  transition: left 0.15s ease, background 0.15s ease;
+}
+.extp-toggle input:checked + .extp-toggle-track { background: var(--accent, #6366f1); border-color: var(--accent, #6366f1); }
+.extp-toggle input:checked + .extp-toggle-track .extp-toggle-knob { left: 18px; background: #fff; }
+.extp-card-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.extp-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--selected-text, #a5b4fc);
+  cursor: pointer;
+  font-family: inherit;
+}
+.extp-link:hover { text-decoration: underline; }
+.extp-delete {
+  background: none;
+  border: none;
+  font-size: 15px;
+  cursor: pointer;
+  opacity: 0.65;
+  padding: 2px 4px;
+}
+.extp-delete:hover { opacity: 1; }
+.extp-details { margin: 10px 0 0; font-size: 12px; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; }
+.extp-details dt { color: var(--text-tertiary, #71717a); font-weight: 600; }
+.extp-details dd { margin: 0; color: var(--text-secondary, #d4d4d8); word-break: break-word; }
+.extp-mono { font-family: monospace; font-size: 11px; }
+

@@ -110,5 +110,12 @@ export interface AuraFeaturesApi {
   extensions: {
     list(): Promise<ExtensionItem[]>
     openPopup(extId: string, anchorX: number, anchorY: number): Promise<boolean>
+    installUnpacked(): Promise<{ success: boolean; id?: string; error?: string }>
+    installCrx(): Promise<{ success: boolean; id?: string; error?: string }>
+    installStoreUrl(input: string): Promise<{ success: boolean; id?: string; error?: string }>
+    installPath(path: string): Promise<{ success: boolean; id?: string; error?: string }>
+    setEnabled(id: string, enabled: boolean): Promise<{ success: boolean; error?: string }>
+    uninstall(id: string): Promise<{ success: boolean; error?: string }>
+    onChanged(cb: () => void): () => void
   }
 }

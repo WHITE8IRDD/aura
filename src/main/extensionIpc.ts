@@ -32,6 +32,15 @@ function parentFor(e: Electron.IpcMainInvokeEvent): BrowserWindow | null {
   return BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow()
 }
 
+function emitChanged(): void {
+  for (const m of TabManager.getAll()) {
+    try {
+      const w = m.getWindow()
+      if (w && !w.isDestroyed()) w.webContents.send('extensions:changed')
+    } catch { /* window gone */ }
+  }
+}
+
 /** Wire every extensions:* channel. Call once after app is ready. */
 export function registerExtensionIpc(getMainWindow: () => BrowserWindow | null): void {
   ipcMain.handle('extensions:list', () => listExtensions().map(toItem))
@@ -46,18 +55,51 @@ export function registerExtensionIpc(getMainWindow: () => BrowserWindow | null):
   ipcMain.handle('extensions:installFolder', async (e) => {
     const folder = await pickFolder(parentFor(e))
     if (!folder) return { success: false, error: 'No folder selected' }
-    return installUnpacked(folder)
+    const r = await installUnpacked(folder)
+    if (r.success) emitChanged()
+    return r
   })
 
   ipcMain.handle('extensions:installCrx', async (e) => {
     const file = await pickCrx(parentFor(e))
     if (!file) return { success: false, error: 'No file selected' }
-    return installCrx(file)
+    const r = await installCrx(file)
+    if (r.success) emitChanged()
+    return r
   })
 
-  ipcMain.handle('extensions:enable', (_e, id: string) => enableExtension(String(id ?? '')))
-  ipcMain.handle('extensions:disable', (_e, id: string) => disableExtension(String(id ?? '')))
-  ipcMain.handle('extensions:delete', (_e, id: string) => deleteExtension(String(id ?? '')))
+  ipcMain.handle('extensions:install-path', async (_e, targetPath: string) => {
+    const p = String(targetPath ?? '')
+    if (!p) return { success: false, error: 'No path provided' }
+    const r = /\.crx$/i.test(p) ? await installCrx(p) : await installUnpacked(p)
+    if (r.success) emitChanged()
+    return r
+  })
+
+  ipcMain.handle('extensions:install-store-url', async (_e, input: string) => {
+    const q = String(input ?? '').trim()
+    const m = q.match(/([a-p]{32})/i)
+    if (!m) return { success: false, error: 'Could not parse extension ID from URL' }
+    const r = await installFromStoreId(m[1].toLowerCase())
+    if (r.success) emitChanged()
+    return r
+  })
+
+  ipcMain.handle('extensions:enable', async (_e, id: string) => {
+    const r = await enableExtension(String(id ?? ''))
+    if (r.success) emitChanged()
+    return r
+  })
+  ipcMain.handle('extensions:disable', async (_e, id: string) => {
+    const r = await disableExtension(String(id ?? ''))
+    if (r.success) emitChanged()
+    return r
+  })
+  ipcMain.handle('extensions:delete', async (_e, id: string) => {
+    const r = await deleteExtension(String(id ?? ''))
+    if (r.success) emitChanged()
+    return r
+  })
 
   ipcMain.handle('extensions:installFromStoreId', (_e, id: string) => {
     if (!/^[a-p]{32}$/.test(String(id ?? ''))) return { success: false, error: 'Invalid extension ID format' }
