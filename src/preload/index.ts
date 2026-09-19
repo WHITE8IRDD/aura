@@ -217,14 +217,27 @@ const api = {
       ipcRenderer.invoke('shields:isEnabled', hostname),
     getSettings: (domain: string): Promise<SiteShieldSettings | null> =>
       ipcRenderer.invoke('shields:get-settings', domain),
-    setLevel: (domain: string, level: string): Promise<SiteShieldSettings> =>
-      ipcRenderer.invoke('shields:set-level', domain, level),
     getPageStats: (): Promise<PageBlockedStats> =>
       ipcRenderer.invoke('shields:get-page-stats'),
     reportDomBlocked: (count: number): Promise<void> =>
       ipcRenderer.invoke('shields:report-dom-blocked', count),
-    openPopover: (bounds: { x: number; y: number; width: number; height: number }, domain: string): Promise<void> =>
-      ipcRenderer.invoke('shields:open-popover', bounds, domain),
+    getState: (tabId?: string | number | null) =>
+      ipcRenderer.invoke('shields:get-state', tabId),
+    setLevel: (tabId: string | number | null, level: 'off' | 'standard' | 'aggressive') =>
+      ipcRenderer.invoke('shields:set-level', tabId, level),
+    openPopover: (tabId: string | number | null, anchor: { x: number; y: number; width: number; height: number }) =>
+      ipcRenderer.invoke('shields:open-popover', tabId, anchor),
+    closePopover: () => ipcRenderer.invoke('shields:close-popover'),
+    onTarget: (cb: (t: { tabId: string | number | null; domain: string }) => void) => {
+      const h = (_e: unknown, t: { tabId: string | number | null; domain: string }): void => cb(t)
+      ipcRenderer.on('shields:popover-target', h)
+      return () => { ipcRenderer.removeListener('shields:popover-target', h) }
+    },
+    onHide: (cb: () => void) => {
+      const h = (): void => cb()
+      ipcRenderer.on('shields:popover-hide', h)
+      return () => { ipcRenderer.removeListener('shields:popover-hide', h) }
+    },
   },
 
   keyboard: {

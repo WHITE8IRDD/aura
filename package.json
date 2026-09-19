@@ -22,6 +22,7 @@
     "electron-rebuild": "^3.2.9",
     "electron-vite": "^2.3.0",
     "png-to-ico": "^3.0.1",
+    "tsx": "^4.23.13",
     "typescript": "^5.5.3",
     "vite": "^5.3.4"
   },
@@ -51,7 +52,7 @@
     "better-sqlite3": "11.7.0"
   },
   "dependencies": {
-    "@cliqz/adblocker-electron": "^1.34.0",
+    "@ghostery/adblocker-electron": "^2.18.2",
     "@mozilla/readability": "^0.6.0",
     "adm-zip": "^0.5.17",
     "better-sqlite3": "11.7.0",
@@ -59,6 +60,7 @@
     "framer-motion": "^12.40.0",
     "linkedom": "^0.18.12",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "tldts": "^7.4.13"
   }
 }

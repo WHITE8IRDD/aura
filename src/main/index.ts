@@ -21,7 +21,8 @@ import { TabManager } from './tabs'
 import { registerInputContextMenuIPC } from './inputContextMenu'
 import { registerMediaHubMenuIPC } from './mediaHubMenu'
 import { registerMediaHubWindowIPC } from './mediaHubWindow'
-import { registerShieldsWindowIPC } from './shieldsWindow'
+import { registerShieldsIpc } from './blocker/ipc'
+import { prewarmShieldsPopover } from './blocker/shields-popover'
 import { registerToolbarContextMenuIPC } from './toolbarContextMenu'
 import { registerWindowControls, wireMaximizeEvents } from './window-controls'
 import { registerShortcuts } from './shortcuts'
@@ -37,26 +38,14 @@ import { preconnect } from './preconnect'
 import { getPrivacyStats } from './privacy-stats'
 import { NinjaWindowManager } from './ninja'
 import {
-  setupDefaultSessionBlocking,
-  installBlocker,
-  initBlocker,
-  setSiteShields,
-  areShieldsEnabledFor,
-  registerNetworkAdBlocker,
-  initAdBlockEngine,
-  incrementWcBlockedCount,
-  getWcBlockedStats
+  initEngine,
+  installBlockerOnSession,
 } from './blocker'
-import { applyPopupInterceptor } from './blocker/popup-interceptor'
-import { applyCosmeticHiding } from './blocker/cosmetics'
 import {
-  getSiteShields,
-  setSiteShieldsLevel,
   initShieldsDatabase,
-  incrementSiteBlockedCount,
-  cleanDomain
+  flushBlockedCounts,
 } from './blocker/shields-store'
-import { setupHttpsOnly, allowInsecureHost } from './security/https-only'
+import { allowInsecureHost } from './blocker'
 import { setupAntiFingerprintFlags, setupSessionFingerprintDefenses } from './security/fingerprint'
 import { setupPermissionPrompts, respondToPermission } from './security/permissions'
 import { isPhishingDomain } from './blocker/phishing'
@@ -212,11 +201,7 @@ const startupReady = app.whenReady().then(async () => {
   applyForceDarkFlag()
   console.log('[Aura/settings] Loaded settings')
   console.log('[Aura] Pre-initializing blocker engine…')
-  await initAdBlockEngine()
-  await setupDefaultSessionBlocking()
-  // Register network ad blocker (uBlock Origin grade)
-  registerNetworkAdBlocker(session.defaultSession)
-  setupHttpsOnly(session.defaultSession)
+  void initEngine()
   setupSessionFingerprintDefenses(session.defaultSession)
   setupPermissionPrompts(session.defaultSession)
   registerSession(session.defaultSession)
@@ -237,7 +222,20 @@ const startupReady = app.whenReady().then(async () => {
   registerMediaControllerIPC()
   registerMediaHubMenuIPC()
   registerMediaHubWindowIPC()
-  registerShieldsWindowIPC()
+  registerShieldsIpc({
+    getMainWindow: () => mainWindow,
+    getTabWebContents: (tabId) => {
+      if (!tabs) return null
+      if (tabId == null) {
+        const activeId = tabs.getActiveId()
+        if (!activeId) return null
+        const tab = tabs.getTab(activeId)
+        return tab?.view?.webContents ?? null
+      }
+      const tab = tabs.getTab(Number(tabId))
+      return tab?.view?.webContents ?? null
+    },
+  })
   initFocusTracker()
   setupKeyboardIPC()
   registerKeyboardShortcut()
@@ -280,6 +278,12 @@ async function createWindow(): Promise<void> {
 
   mainWindow.on('page-title-updated', (e) => e.preventDefault())
   mainWindow.once('ready-to-show', () => mainWindow?.show())
+  prewarmShieldsPopover(mainWindow, {
+    preload: join(__dirname, '../preload/index.js'),
+    contextIsolation: true,
+    sandbox: false,
+    nodeIntegration: false,
+  })
 
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
     console.error(`[Aura Main] Failed to load renderer: ${errorCode} - ${errorDescription}`)
@@ -930,43 +934,6 @@ ipcMain.handle('ninja:isPrivate', (e) => {
   return false
 })
 
-ipcMain.handle('shields:toggle', (_e, hostname: string) => {
-  const wasEnabled = areShieldsEnabledFor(hostname)
-  return setSiteShields(hostname, !wasEnabled)
-})
-ipcMain.handle('shields:isEnabled', (_e, hostname: string) => areShieldsEnabledFor(hostname))
-ipcMain.handle('shields:get-settings', (_e, domain: string) => getSiteShields(domain))
-ipcMain.handle('shields:set-level', (_e, domain: string, level: any) => setSiteShieldsLevel(domain, level))
-// 1. Report DOM blocks from preloads/scriptlets via IPC
-ipcMain.handle('shields:report-dom-blocked', (event, count: number) => {
-  if (!count || count <= 0) return
-  const wcId = event.sender.id // Exact WebContents ID of the sender
-  incrementWcBlockedCount(wcId, count)
-
-  try {
-    const url = event.sender.getURL()
-    if (url) {
-      const domain = cleanDomain(new URL(url).hostname)
-      incrementSiteBlockedCount(domain, count)
-    }
-  } catch {}
-})
-ipcMain.handle('shields:get-page-stats', (event) => {
-  let tm = getTabsForEvent(event)
-  if (!tm && mainWindow && !mainWindow.isDestroyed() && tabs) {
-    // Sender is the floating Shields popover (its own BrowserWindow), which
-    // has no TabManager — resolve the MAIN window's active tab instead.
-    tm = tabs
-  }
-  if (!tm) return { ads: 0, trackers: 0, total: 0 }
-  const activeId = tm.getActiveId()
-  if (!activeId) return { ads: 0, trackers: 0, total: 0 }
-  const tab = tm.getTab(activeId)
-  const wcId = tab?.view?.webContents?.id
-  if (wcId === undefined || wcId === null) return { ads: 0, trackers: 0, total: 0 }
-  // Query stats by WebContents ID (activeTab.webContents.id)
-  return getWcBlockedStats(wcId)
-})
 ipcMain.handle('tabs:reload-active', (event) => {
   let tm = getTabsForEvent(event)
   if (!tm && mainWindow && !mainWindow.isDestroyed() && tabs) {
@@ -1334,6 +1301,7 @@ function forceShutdownMediaFlush() {
 
 app.on('before-quit', (event) => {
   try { forceShutdownMediaFlush() } catch {}
+  try { flushBlockedCounts() } catch {}
   maybeClearOnQuit()
 })
 
@@ -1368,20 +1336,10 @@ app.on('web-contents-created', (_e, contents) => {
     }
   })
 
-  // AUTOMATICALLY HOOK EVERY TAB/WINDOW: network blocking (deduped per
-  // session), popup + navigation hijack guards (deduped per WebContents),
-  // and cosmetic CSS on every load. Guarantees coverage even for views
-  // created outside TabManager (split panes, popovers, ninja windows).
+  // AUTOMATICALLY HOOK EVERY SESSION: install the single onBeforeRequest
+  // handler. This covers tabs, split panes, ninja windows, etc.
+  // Popup/cosmetic guards are handled per-tab via registerTabWebContents.
   try {
-    registerNetworkAdBlocker(contents.session)
+    installBlockerOnSession(contents.session)
   } catch {}
-  try {
-    applyPopupInterceptor(contents)
-  } catch {}
-  contents.on('dom-ready', () => {
-    applyCosmeticHiding(contents)
-  })
-  contents.on('did-finish-load', () => {
-    applyCosmeticHiding(contents)
-  })
 })

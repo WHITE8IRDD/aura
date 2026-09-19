@@ -6,19 +6,17 @@ import { getZoomForHost, setZoomForHost } from './zoom'
 import { getGroupForTab, removeTabFromAnyGroup } from './tab-groups'
 import { getAccessibilityWebPreferences, applyDefaultZoom } from './accessibility'
 import { attachContextMenu } from './contextMenu'
-import { applyPopupInterceptor, shouldBlockPopup } from './blocker/popup-interceptor'
-import { applyCosmeticHiding } from './blocker/cosmetics'
+import { registerTabWebContents } from './blocker'
 import { saveTabs } from './sessions'
 import { sendRestoreToTab } from './mediaResume'
 import { CHROME_UA, injectStoreScript } from './storeIntegration'
 
 /**
- * Navigation guards for EVERY tab WebContents. Thin wrapper over the
- * consolidated guards in popup-interceptor.ts (single registration point —
- * Electron keeps only the LAST setWindowOpenHandler per WebContents).
+ * Navigation guards for EVERY tab WebContents. The new blocker's
+ * registerTabWebContents handles popup, navigation, and cosmetic guards.
  */
 export function setupTabNavigationGuards(wc: WebContents): void {
-  applyPopupInterceptor(wc)
+  // No-op — the blocker's registerTabWebContents handles everything.
 }
 
 export interface TabState {
@@ -606,10 +604,16 @@ export class TabManager {
     try { view.webContents.setUserAgent(CHROME_UA) } catch {}
     if (rec.muted) view.webContents.setAudioMuted(true)
 
-    // Popup + same-tab navigation guards live in popup-interceptor.ts
-    // (single registration point — Electron keeps only the LAST
-    // setWindowOpenHandler, so all policy must flow through it).
-    setupTabNavigationGuards(view.webContents)
+    // Register with the new blocker: installs single onBeforeRequest handler,
+    // popup/navigation guards, and cosmetic injection.
+    const self = this
+    registerTabWebContents(view.webContents, {
+      onAllowedPopup: (details) => {
+        // The blocker denied ad popups; allowed popups go to a new Aura tab.
+        self.create(details.url)
+        return { action: 'deny' as const }
+      },
+    })
 
     applyDefaultZoom(view.webContents)
 
@@ -631,12 +635,6 @@ export class TabManager {
       this.win.contentView.addChildView(view)
       view.webContents.loadURL(url)
     }
-
-    // Apply cosmetic hiding after load and on navigation
-    const applyCosmetics = () => applyCosmeticHiding(view.webContents);
-    view.webContents.on('did-finish-load', applyCosmetics);
-    view.webContents.on('did-navigate-in-page', applyCosmetics);
-    applyCosmetics(); // Apply immediately for already loaded pages
   }
 
   private destroyView(rec: TabRecord): void {
@@ -722,18 +720,6 @@ export class TabManager {
 
     wc.on('leave-html-full-screen', () => {
       this.exitFullscreenLayout()
-    })
-
-    wc.setWindowOpenHandler(({ url, disposition }) => {
-      // Consult the shared popup policy FIRST — hijacked opens must die here
-      // instead of being converted into new tabs.
-      try {
-        if (shouldBlockPopup(wc.getURL() || '', url, disposition)) {
-          return { action: 'deny' }
-        }
-      } catch {}
-      this.create(url)
-      return { action: 'deny' }
     })
   }
 

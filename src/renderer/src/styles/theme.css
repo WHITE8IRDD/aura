@@ -6752,16 +6752,16 @@ body > .gcm-menu {
   width: 100vw;
   height: 100vh;
   box-sizing: border-box;
-  background: rgba(18, 20, 28, 0.88);
+  background: var(--bg-elevated, rgba(18, 20, 28, 0.88));
   backdrop-filter: blur(28px) saturate(1.4);
   -webkit-backdrop-filter: blur(28px) saturate(1.4);
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.12));
+  box-shadow: var(--shadow-popover, 0 20px 60px rgba(0, 0, 0, 0.55)), inset 0 1px 0 var(--border-subtle, rgba(255, 255, 255, 0.05));
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  color: var(--aura-text, #e4e4e7);
+  color: var(--text-primary, #e4e4e7);
   font-family: system-ui, -apple-system, sans-serif;
   user-select: none;
   -webkit-user-select: none;
@@ -6773,8 +6773,8 @@ body > .gcm-menu {
   align-items: center;
   justify-content: space-between;
   padding: 0 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  background: var(--hover-bg, rgba(255, 255, 255, 0.02));
 }
 
 .ak-drag-handle {
@@ -6794,6 +6794,7 @@ body > .gcm-menu {
 .ak-segmented {
   display: flex;
   background: rgba(0, 0, 0, 0.35);
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
   padding: 3px;
   border-radius: 8px;
   gap: 2px;
@@ -6808,21 +6809,22 @@ body > .gcm-menu {
   font-weight: 600;
   cursor: pointer;
   background: transparent;
-  color: var(--aura-text-muted, #71717a);
+  color: var(--text-tertiary, #71717a);
   transition: all 0.15s ease;
 }
 
 .ak-segment.active {
-  background: #0a84ff;
+  background: var(--accent, #0a84ff);
   color: #ffffff;
 }
 
 .ak-flash {
   font-size: 11px;
-  color: #30d158;
+  color: var(--success, #30d158);
   font-weight: 600;
   padding: 2px 8px;
   background: rgba(48, 209, 88, 0.12);
+  background: color-mix(in srgb, var(--success, #30d158) 14%, transparent);
   border-radius: 6px;
 }
 
@@ -6833,9 +6835,9 @@ body > .gcm-menu {
 }
 
 .ak-action-btn {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--hover-bg, rgba(255, 255, 255, 0.06));
   border: none;
-  color: #a1a1aa;
+  color: var(--text-secondary, #a1a1aa);
   width: 26px;
   height: 26px;
   border-radius: 6px;
@@ -6848,8 +6850,8 @@ body > .gcm-menu {
 }
 
 .ak-action-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background: var(--active-bg, rgba(255, 255, 255, 0.12));
+  color: var(--text-primary, #fff);
 }
 
 .ak-action-btn.pinned {
@@ -6858,7 +6860,7 @@ body > .gcm-menu {
 }
 
 .ak-action-btn.close:hover {
-  background: #ef4444;
+  background: var(--danger, #ef4444);
   color: #fff;
 }
 
@@ -6885,10 +6887,10 @@ body > .gcm-menu {
 }
 
 .ak-key {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--hover-bg, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
   border-radius: 6px;
-  color: #e4e4e7;
+  color: var(--text-primary, #e4e4e7);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -6899,19 +6901,20 @@ body > .gcm-menu {
 }
 
 .ak-key:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--active-bg, rgba(255, 255, 255, 0.12));
 }
 
 .ak-key:active {
   transform: scale(0.95);
-  background: #0a84ff;
+  background: var(--accent, #0a84ff);
   color: #fff;
 }
 
 .ak-key.active {
   background: rgba(10, 132, 255, 0.3);
-  border-color: #0a84ff;
-  color: #60a5fa;
+  background: color-mix(in srgb, var(--accent, #0a84ff) 30%, transparent);
+  border-color: var(--accent, #0a84ff);
+  color: var(--selected-text, #60a5fa);
 }
 
 .ak-arrow-group {
@@ -6945,16 +6948,16 @@ body > .gcm-menu {
   position: absolute;
   left: 8px;
   font-size: 12px;
-  color: #71717a;
+  color: var(--text-tertiary, #71717a);
 }
 
 .vk-search-input {
   width: 100%;
   padding: 6px 26px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--address-bar-bg, rgba(0, 0, 0, 0.3));
+  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
   border-radius: 8px;
-  color: #fff;
+  color: var(--text-primary, #fff);
   font-size: 12px;
   outline: none;
 }
@@ -6964,7 +6967,7 @@ body > .gcm-menu {
   right: 6px;
   background: none;
   border: none;
-  color: #71717a;
+  color: var(--text-tertiary, #71717a);
   cursor: pointer;
 }
 
@@ -6980,19 +6983,19 @@ body > .gcm-menu {
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--hover-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
   border-radius: 6px;
-  color: #a1a1aa;
+  color: var(--text-secondary, #a1a1aa);
   font-size: 11px;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .vk-cat-tab.active {
-  background: rgba(10, 132, 255, 0.2);
-  border-color: #0a84ff;
-  color: #60a5fa;
+  background: var(--selected-bg, rgba(10, 132, 255, 0.2));
+  border-color: var(--accent, #0a84ff);
+  color: var(--selected-text, #60a5fa);
 }
 
 .vk-favorites-bar {
@@ -7000,7 +7003,7 @@ body > .gcm-menu {
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--hover-bg, rgba(0, 0, 0, 0.2));
   border-radius: 6px;
 }
 
@@ -7022,7 +7025,7 @@ body > .gcm-menu {
   background: rgba(255, 214, 10, 0.1);
   border: 1px solid rgba(255, 214, 10, 0.2);
   border-radius: 4px;
-  color: #fff;
+  color: var(--text-primary, #fff);
   font-size: 13px;
   cursor: pointer;
 }
@@ -7039,8 +7042,8 @@ body > .gcm-menu {
 .vk-grid-cell {
   position: relative;
   aspect-ratio: 1;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--hover-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -7051,7 +7054,7 @@ body > .gcm-menu {
 }
 
 .vk-grid-cell:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--active-bg, rgba(255, 255, 255, 0.12));
   transform: scale(1.05);
 }
 
@@ -7062,7 +7065,7 @@ body > .gcm-menu {
   background: none;
   border: none;
   font-size: 9px;
-  color: #71717a;
+  color: var(--text-tertiary, #71717a);
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s;
@@ -7083,19 +7086,19 @@ body > .gcm-menu {
   align-items: center;
   gap: 10px;
   font-size: 11px;
-  color: #a1a1aa;
+  color: var(--text-secondary, #a1a1aa);
   padding: 0 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
 }
 
 .vk-detail-char {
   font-size: 14px;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-primary, #fff);
 }
 
 .vk-detail-code {
-  color: #60a5fa;
+  color: var(--selected-text, #60a5fa);
   font-family: monospace;
 }
 

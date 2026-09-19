@@ -4,55 +4,15 @@ import './pageTranslator'
 import './videoDownloadDetector'
 import { initYouTubeFastPlayback, isYouTubePage as isYTPage1 } from './youtube-fast-playback'
 import { initYouTubeMaxQuality, isYouTubePage as isYTPage2 } from './youtube-max-quality'
-import { injectStealthAdBlockScriptlet, nukeStreamingAds } from './stealth-adblock'
+import { initShieldsScriptlets } from './shields-scriptlets'
+
+initShieldsScriptlets()
 
 /* ── YouTube Performance + Quality ── */
 if (isYTPage1()) {
   initYouTubeFastPlayback()
   initYouTubeMaxQuality()
 }
-
-/* ── Stealth AdBlock (uBlock Origin + Privacy Badger grade) ── */
-// Page-world window.open trap (best-effort: page CSP may refuse it).
-// Wrapped so a hostile page can NEVER kill this preload.
-try {
-  injectStealthAdBlockScriptlet()
-} catch {}
-
-// Isolated-world DOM nuker: runs HERE (not page world), so page CSP and
-// Trusted Types cannot stop it. Reports removals straight over IPC.
-try {
-  const runNuke = (): void => {
-    try {
-      const removed = nukeStreamingAds()
-      if (removed > 0) {
-        ipcRenderer.invoke('shields:report-dom-blocked', removed).catch(() => {})
-      }
-    } catch {}
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', runNuke)
-  } else {
-    runNuke()
-  }
-  setInterval(runNuke, 300)
-} catch {}
-
-// Listen for aura-dom-blocked from scriptlet and send to main process via IPC.
-// The isolated preload has direct ipcRenderer access (primary path); the
-// context-bridge aura.shields path is tried first for API consistency.
-window.addEventListener('aura-dom-blocked', (e: any) => {
-  try {
-    const count = e?.detail?.count
-    if (typeof count !== 'number' || count <= 0) return
-    const w = window as any
-    if (w.aura?.shields?.reportDomBlocked) {
-      w.aura.shields.reportDomBlocked(count)
-    } else {
-      ipcRenderer.invoke('shields:report-dom-blocked', count).catch(() => {})
-    }
-  } catch {}
-})
 
 /* ── Video timestamp tracking + resume ── */
 

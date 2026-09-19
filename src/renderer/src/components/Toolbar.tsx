@@ -133,11 +133,16 @@ export default function Toolbar(props: Props): React.ReactElement {
       setExistingBookmarkId(null)
       return
     }
-    if (hostname) window.aura.shields.isEnabled(hostname).then(setShieldsEnabled)
+    let cancelled = false
+    window.aura.shields.getState(null).then(
+      (s) => { if (!cancelled && s) setShieldsEnabled(s.level !== 'off') },
+      () => { if (!cancelled) setShieldsEnabled(true) }
+    )
     void window.aura.bookmarks.list().then((list: Bookmark[]) => {
       const existing = list.find((b) => b.url === url)
       setExistingBookmarkId(existing ? existing.id : null)
     })
+    return () => { cancelled = true }
   }, [url, hostname, isWebPage])
 
   useEffect(() => {
@@ -223,10 +228,14 @@ export default function Toolbar(props: Props): React.ReactElement {
     e.stopPropagation()
     if (!hostname || !isWebPage) return
     const rect = e.currentTarget.getBoundingClientRect()
-    await window.aura.shields.openPopover(
-      { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-      hostname
-    )
+    try {
+      const ok = await window.aura.shields.openPopover(null, {
+        x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+      })
+      if (!ok) console.warn('[Aura/Shields] openPopover returned false (no active http tab?)')
+    } catch (err) {
+      console.error('[Aura/Shields] openPopover failed:', err)
+    }
   }, [hostname, isWebPage])
 
   const handleBookmarkClick = useCallback((e: React.MouseEvent) => {
