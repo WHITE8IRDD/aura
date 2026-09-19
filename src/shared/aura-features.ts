@@ -81,6 +81,7 @@ export interface AuraFeaturesApi {
   gestures: {
     getSettings(): Promise<GestureSettings>
     setSettings(patch: Partial<GestureSettings>): Promise<GestureSettings>
+    resetSettings(): Promise<GestureSettings>
   }
   darkMode: {
     get(host: string): Promise<{ state: DarkModeState; rule: DarkSiteRule | null; globalPreset: DarkPreset | null }>

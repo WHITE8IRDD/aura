@@ -28,7 +28,7 @@ export function AppearanceSection(): React.ReactElement {
       setForceDark(fd)
       setUseVerticalTabs(vt === 'vertical')
       try {
-        const dg = await window.auraFeatures.darkMode.get('__global__')
+        const dg = await window.auraFeatures?.darkMode.get('__global__')
         const gp = (dg as { globalPreset: string | null }).globalPreset
         if (!cancelled) setDarkGlobal(gp ?? 'off')
       } catch { /* features unavailable */ }
@@ -188,7 +188,7 @@ export function AppearanceSection(): React.ReactElement {
           onChange={(v) => {
             const next = v === 'off' ? null : v
             setDarkGlobal(v)
-            window.auraFeatures.darkMode.setGlobal(next).catch(() => {})
+            window.auraFeatures?.darkMode.setGlobal(next).catch(() => {})
           }}
         />
       </div>

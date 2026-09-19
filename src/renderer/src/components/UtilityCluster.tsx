@@ -200,7 +200,7 @@ export default function UtilityCluster({
       return
     }
     setDarkHost(host)
-    window.auraFeatures.darkMode.get(host).then((res) => {
+    window.auraFeatures?.darkMode.get(host).then((res) => {
       if (cancelled) return
       const preset = (res as { state: { preset: string | null } }).state?.preset ?? null
       setDarkActive(preset !== null)

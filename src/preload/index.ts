@@ -9,6 +9,7 @@ import type { ReadingItem } from '../main/reading-list'
 import type { Boost } from '../main/boosts'
 import type { SidebarPanel } from '../main/sidebar-panels'
 import type { TabGroup } from '../main/tab-groups'
+import type { AuraFeaturesApi, DarkPreset, DarkSiteRule, GestureSettings, SnoozeSettings, TabSnoozeStatePatch } from '../shared/aura-features'
 
 interface CredentialRecord {
   id: number
@@ -237,37 +238,6 @@ const api = {
       const h = (): void => cb()
       ipcRenderer.on('shields:popover-hide', h)
       return () => { ipcRenderer.removeListener('shields:popover-hide', h) }
-    },
-  },
-
-  auraFeatures: {
-    snooze: {
-      getSettings: () => ipcRenderer.invoke('features:snooze-get-settings'),
-      setSettings: (patch: Record<string, unknown>) =>
-        ipcRenderer.invoke('features:snooze-set-settings', patch),
-      snoozeTab: (tabId: string) => ipcRenderer.invoke('features:snooze-tab', tabId),
-      snoozeOthers: (exceptTabId: string | null) =>
-        ipcRenderer.invoke('features:snooze-others', exceptTabId),
-      wakeTab: (tabId: string) => ipcRenderer.invoke('features:snooze-wake', tabId),
-      stats: () => ipcRenderer.invoke('features:snooze-stats'),
-      onTabState: (cb: (p: { tabId: string; snoozed: boolean; approxFreedMB?: number }) => void) => {
-        const h = (_e: unknown, p: { tabId: string; snoozed: boolean; approxFreedMB?: number }): void => cb(p)
-        ipcRenderer.on('features:snooze-state', h)
-        return () => { ipcRenderer.removeListener('features:snooze-state', h) }
-      },
-    },
-    gestures: {
-      getSettings: () => ipcRenderer.invoke('features:gestures-get-settings'),
-      setSettings: (patch: Record<string, unknown>) =>
-        ipcRenderer.invoke('features:gestures-set-settings', patch),
-      resetSettings: () => ipcRenderer.invoke('features:gestures-reset-settings'),
-    },
-    darkMode: {
-      get: (host: string) => ipcRenderer.invoke('features:dark-get', host),
-      setSite: (host: string, rule: string | null) =>
-        ipcRenderer.invoke('features:dark-set-site', host, rule),
-      setGlobal: (preset: string | null) =>
-        ipcRenderer.invoke('features:dark-set-global', preset),
     },
   },
 
@@ -968,3 +938,45 @@ const api = {
 
 contextBridge.exposeInMainWorld('aura', api)
 export type AuraApi = typeof api
+
+// Exposed as a SEPARATE top-level key: renderer code (and types.ts) uses
+// `window.auraFeatures.*`. Nesting it inside `api` would publish it as
+// `window.aura.auraFeatures` instead and crash every consumer.
+const auraFeaturesApi: AuraFeaturesApi = {
+  snooze: {
+    getSettings: () => ipcRenderer.invoke('features:snooze-get-settings'),
+    setSettings: (patch: Partial<SnoozeSettings>) =>
+      ipcRenderer.invoke('features:snooze-set-settings', patch),
+    snoozeTab: (tabId: string) => ipcRenderer.invoke('features:snooze-tab', tabId),
+    snoozeOthers: (exceptTabId: string | null) =>
+      ipcRenderer.invoke('features:snooze-others', exceptTabId),
+    wakeTab: (tabId: string) => ipcRenderer.invoke('features:snooze-wake', tabId),
+    stats: () => ipcRenderer.invoke('features:snooze-stats'),
+    onTabState: (cb: (p: TabSnoozeStatePatch) => void) => {
+      const h = (_e: unknown, p: TabSnoozeStatePatch): void => cb(p)
+      ipcRenderer.on('features:snooze-state', h)
+      return () => { ipcRenderer.removeListener('features:snooze-state', h) }
+    },
+  },
+  gestures: {
+    getSettings: () => ipcRenderer.invoke('features:gestures-get-settings'),
+    setSettings: (patch: Partial<GestureSettings>) =>
+      ipcRenderer.invoke('features:gestures-set-settings', patch),
+    resetSettings: () => ipcRenderer.invoke('features:gestures-reset-settings'),
+  },
+  darkMode: {
+    get: (host: string) => ipcRenderer.invoke('features:dark-get', host),
+    setSite: (host: string, rule: DarkSiteRule | null) =>
+      ipcRenderer.invoke('features:dark-set-site', host, rule),
+    setGlobal: (preset: DarkPreset | null) =>
+      ipcRenderer.invoke('features:dark-set-global', preset),
+  },
+}
+
+try {
+  contextBridge.exposeInMainWorld('auraFeatures', auraFeaturesApi)
+} catch (err) {
+  // Key already registered (e.g. preload re-executed in dev): log loudly so
+  // a missing bridge is never again mistaken for working code.
+  console.error('[Aura/preload] Failed to expose window.auraFeatures:', err)
+}

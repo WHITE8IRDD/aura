@@ -57,7 +57,7 @@ function TabSnoozingCard(): React.ReactElement {
 
   useEffect(() => {
     let alive = true
-    window.auraFeatures.snooze.getSettings().then((s) => {
+    window.auraFeatures?.snooze.getSettings().then((s) => {
       if (!alive) return
       setSnooze(s)
       setHostsText(s.neverSnoozeHosts.join('\n'))
@@ -66,7 +66,7 @@ function TabSnoozingCard(): React.ReactElement {
       }
     }).catch(() => {})
     const loadStats = () => {
-      window.auraFeatures.snooze.stats().then((st) => { if (alive) setStats(st) }).catch(() => {})
+      window.auraFeatures?.snooze.stats().then((st) => { if (alive) setStats(st) }).catch(() => {})
     }
     loadStats()
     const id = window.setInterval(loadStats, 5000)
@@ -75,7 +75,7 @@ function TabSnoozingCard(): React.ReactElement {
 
   const patch = (p: Partial<SnoozeSettings>): void => {
     setSnooze((prev) => (prev ? { ...prev, ...p } : prev))
-    window.auraFeatures.snooze.setSettings(p).then((next) => setSnooze(next)).catch(() => {})
+    window.auraFeatures?.snooze.setSettings(p).then((next) => setSnooze(next)).catch(() => {})
   }
 
   const isCustom = snooze !== null && !['5', '10', '15', '30', '60'].includes(String(snooze.idleMinutes))

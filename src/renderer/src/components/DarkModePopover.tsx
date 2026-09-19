@@ -38,7 +38,7 @@ export default function DarkModePopover(): JSX.Element {
   useEffect(() => {
     let alive = true
     if (!host) return
-    window.auraFeatures.darkMode.get(host).then((res) => {
+    window.auraFeatures?.darkMode.get(host).then((res) => {
       if (!alive) return
       const r = (res as DarkGet).rule
       setRule(r === null ? 'default' : r)
@@ -50,7 +50,7 @@ export default function DarkModePopover(): JSX.Element {
     if (!host || busy) return
     setBusy(true)
     try {
-      await window.auraFeatures.darkMode.setSite(host, value === 'default' ? null : value)
+      await window.auraFeatures?.darkMode.setSite(host, value === 'default' ? null : value)
       setRule(value)
       window.close()
     } catch {

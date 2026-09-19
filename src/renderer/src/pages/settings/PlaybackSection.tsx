@@ -8,7 +8,7 @@ export const PlaybackSection: React.FC = () => {
 
   useEffect(() => {
     let alive = true
-    window.auraFeatures.gestures.getSettings().then((s) => {
+    window.auraFeatures?.gestures.getSettings().then((s) => {
       if (!alive) return
       setGestures(s as GestureSettings)
       setHostsText((s as GestureSettings).disabledHosts.join('\n'))
@@ -18,7 +18,7 @@ export const PlaybackSection: React.FC = () => {
 
   const patch = (p: Partial<GestureSettings>): void => {
     setGestures((prev) => (prev ? { ...prev, ...p } : prev))
-    window.auraFeatures.gestures.setSettings(p).then((next) => setGestures(next as GestureSettings)).catch(() => {})
+    window.auraFeatures?.gestures.setSettings(p).then((next) => setGestures(next as GestureSettings)).catch(() => {})
   }
 
   const commitHosts = (): void => {
@@ -27,7 +27,7 @@ export const PlaybackSection: React.FC = () => {
   }
 
   const reset = (): void => {
-    window.auraFeatures.gestures.resetSettings().then((next) => {
+    window.auraFeatures?.gestures.resetSettings().then((next) => {
       const s = next as GestureSettings
       setGestures(s)
       setHostsText(s.disabledHosts.join('\n'))
