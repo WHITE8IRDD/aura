@@ -46,7 +46,7 @@ export default function DarkModePopover(): JSX.Element {
       setRule(r === null ? 'default' : r)
     }).catch((err) => {
       console.error('[Aura/DarkMode] get failed:', err)
-      if (alive) setErrText('Could not load this site\u2019s setting.')
+      if (alive) setErrText(`Could not load: ${err instanceof Error ? err.message : String(err)}`)
     })
     return () => { alive = false }
   }, [host])
@@ -69,7 +69,7 @@ export default function DarkModePopover(): JSX.Element {
     } catch (err) {
       console.error('[Aura/DarkMode] setSite failed:', err)
       setRule(prev)
-      setErrText('Could not save. Restart Aura and try again.')
+      setErrText(`Could not save (${err instanceof Error ? err.message : String(err)}). Restart Aura and try again.`)
       setBusy(false)
     }
   }, [host, busy, rule])
