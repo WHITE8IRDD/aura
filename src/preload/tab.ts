@@ -5,8 +5,14 @@ import './videoDownloadDetector'
 import { initYouTubeFastPlayback, isYouTubePage as isYTPage1 } from './youtube-fast-playback'
 import { initYouTubeMaxQuality, isYouTubePage as isYTPage2 } from './youtube-max-quality'
 import { initShieldsScriptlets } from './shields-scriptlets'
+import { initVideoGestures } from './video-gestures'
 
 initShieldsScriptlets()
+
+/* ── Universal video gestures (skips YouTube internally) ── */
+try {
+  initVideoGestures()
+} catch {}
 
 /* ── YouTube Performance + Quality ── */
 if (isYTPage1()) {

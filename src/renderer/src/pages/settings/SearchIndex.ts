@@ -37,6 +37,10 @@ export const SEARCH_INDEX: SearchEntry[] = [
   { section: 'privacy', label: 'Suggest bookmarks', keywords: ['suggest', 'bookmarks', 'autocomplete'] },
   { section: 'privacy', label: 'Suggest open tabs', keywords: ['suggest', 'tab', 'open tabs', 'autocomplete'] },
 
+  { section: 'performance', label: 'Tab snoozing', keywords: ['snooze', 'snoozing', 'tabs', 'ram', 'memory', 'idle', 'unload'] },
+  { section: 'playback', label: 'Video gestures', keywords: ['gestures', 'video', 'seek', 'volume', 'speed', 'double tap', 'intro', 'skip'] },
+  { section: 'appearance', label: 'Dark mode for websites', keywords: ['dark', 'mode', 'oled', 'charcoal', 'amber', 'night', 'websites'] },
+
   { section: 'autofill', label: 'Autofill', keywords: ['autofill', 'form', 'save', 'fill', 'profile'] },
   { section: 'autofill', label: 'Saved passwords', keywords: ['password', 'passwords', 'vault', 'credentials'] }
 ]

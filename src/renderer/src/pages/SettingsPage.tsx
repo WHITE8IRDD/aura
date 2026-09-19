@@ -10,6 +10,7 @@ import { DownloadsSection } from './settings/DownloadsSection'
 import { AccessibilitySection } from './settings/AccessibilitySection'
 import { SystemSection } from './settings/SystemSection'
 import { PerformanceSection } from './settings/PerformanceSection'
+import { PlaybackSection } from './settings/PlaybackSection'
 import { DefaultBrowserSection } from './settings/DefaultBrowserSection'
 import { AboutSection } from './settings/AboutSection'
 import { YouAndAuraSection } from './settings/YouAndAuraSection'
@@ -105,6 +106,12 @@ const SECTION_ICONS: Record<string, JSX.Element> = {
       <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
     </svg>
   ),
+  playback: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <polygon points="10 8 16 12 10 16 10 8"/>
+    </svg>
+  ),
   defaultBrowser: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10"/>
@@ -139,6 +146,7 @@ const SECTIONS: Section[] = [
   { id: 'downloads', label: 'Downloads' },
   { id: 'accessibility', label: 'Accessibility' },
   { id: 'performance', label: 'Performance' },
+  { id: 'playback', label: 'Playback' },
   { id: 'languages', label: 'Languages' },
   { id: 'system', label: 'System' },
   { id: 'defaultBrowser', label: 'Default browser' },
@@ -228,7 +236,10 @@ export default function SettingsPage({ onClose }: Props): React.ReactElement {
           {activeSection === 'autofill' && <AutofillSection />}
           {activeSection === 'downloads' && <DownloadsSection />}
           {activeSection === 'accessibility' && <AccessibilitySection />}
-          {activeSection === 'performance' && <PerformanceSection />}
+          {activeSection === 'performance' &&
+          <PerformanceSection />}
+          {activeSection === 'playback' &&
+          <PlaybackSection />}
           {activeSection === 'languages' && <LanguagesSection />}
           {activeSection === 'system' && <SystemSection />}
           {activeSection === 'defaultBrowser' && <DefaultBrowserSection />}

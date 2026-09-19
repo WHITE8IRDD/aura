@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron'
 import { TabManager } from '../tabs'
 import { isChromeUi } from './guard'
 import { TabSnoozer, getSnoozeSettings, setSnoozeSettings } from './snooze'
+import { getGestureSettings, setGestureSettings, resetGestureSettings } from './gestures'
 
 let snoozer: TabSnoozer | null = null
 
@@ -76,5 +77,31 @@ function registerSnoozeIpc(): void {
   ipcMain.handle('features:snooze-stats', (e) => {
     if (!isChromeUi(e.sender)) throw new Error('features: untrusted sender')
     return snoozer ? snoozer.stats() : { snoozedCount: 0, approxFreedMB: 0 }
+  })
+  registerGesturesIpc()
+}
+
+function registerGesturesIpc(): void {
+  // Sync config for tab preloads. Read-only: intentionally NOT chrome-gated.
+  // MUST always set returnValue (else the renderer hangs).
+  ipcMain.on('features:gestures-get-sync', (e) => {
+    try {
+      e.returnValue = getGestureSettings()
+    } catch {
+      e.returnValue = null
+    }
+  })
+  ipcMain.handle('features:gestures-get-settings', (e) => {
+    if (!isChromeUi(e.sender)) throw new Error('features: untrusted sender')
+    return getGestureSettings()
+  })
+  ipcMain.handle('features:gestures-set-settings', (e, patch: unknown) => {
+    if (!isChromeUi(e.sender)) throw new Error('features: untrusted sender')
+    const p = (patch ?? {}) as Partial<ReturnType<typeof getGestureSettings>>
+    return setGestureSettings(p)
+  })
+  ipcMain.handle('features:gestures-reset-settings', (e) => {
+    if (!isChromeUi(e.sender)) throw new Error('features: untrusted sender')
+    return resetGestureSettings()
   })
 }

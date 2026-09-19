@@ -256,6 +256,12 @@ const api = {
         return () => { ipcRenderer.removeListener('features:snooze-state', h) }
       },
     },
+    gestures: {
+      getSettings: () => ipcRenderer.invoke('features:gestures-get-settings'),
+      setSettings: (patch: Record<string, unknown>) =>
+        ipcRenderer.invoke('features:gestures-set-settings', patch),
+      resetSettings: () => ipcRenderer.invoke('features:gestures-reset-settings'),
+    },
   },
 
   keyboard: {
