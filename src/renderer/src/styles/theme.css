@@ -7110,6 +7110,12 @@ body > .gcm-menu {
 .tab .snooze-icon { display: none; width: 14px; height: 14px; flex: none; margin-left: 4px; }
 .tab.snoozed .snooze-icon { display: inline-block; }
 
+/* Aura mark is white-on-transparent: invert it on light themes */
+:root[data-theme='light'] .toolbar-brand-mark,
+:root[data-theme='light'] .about-hero-logo,
+:root[data-theme='light'] .ntp-hero-mark-img,
+:root[data-theme='light'] .tab-favicon-aura { filter: invert(1); }
+
 /* ========================================================================
    DEVTOOLS QUICK-TOGGLE (animated emerald pulse when open)
    ======================================================================== */

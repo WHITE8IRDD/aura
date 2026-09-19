@@ -426,7 +426,7 @@ function Tab({
         <img className="tab-favicon" src={tab.favicon} alt=""
           onError={(e) => { e.currentTarget.style.display = 'none' }} />
       ) : tab.internal ? (
-        <img className="tab-favicon" src={auraFavicon} alt="" />
+        <img className="tab-favicon tab-favicon-aura" src={auraFavicon} alt="" />
       ) : (
         <span className="tab-favicon-placeholder" aria-hidden="true" />
       )}
