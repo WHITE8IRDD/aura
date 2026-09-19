@@ -1,6 +1,6 @@
 {
   "name": "aura",
-  "version": "0.11.1",
+  "version": "1.0.0",
   "description": "Aura — the fastest and most secure consumer browser, with AI built in.",
   "author": "Aura",
   "main": "out/main/index.js",
@@ -29,6 +29,14 @@
   "build": {
     "appId": "com.aura.browser",
     "productName": "Aura",
+    "executableName": "Aura",
+    "copyright": "Copyright © 2025 Aura Browser",
+    "artifactName": "Aura-Setup-${version}.exe",
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node",
+      "node_modules/better-sqlite3/**"
+    ],
     "win": {
       "icon": "resources/icons/icon-256.png",
       "target": [
@@ -36,16 +44,25 @@
       ]
     },
     "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Aura Browser",
+      "uninstallDisplayName": "Aura Browser",
+      "runAfterFinish": true,
       "installerIcon": "resources/icons/icon.ico",
       "uninstallerIcon": "resources/icons/icon.ico",
-      "installerHeader": "resources/WITH BACKGROUND.png"
+      "installerHeader": "resources/icons/WITH BACKGROUND.png"
     },
     "directories": {
       "output": "dist"
     },
     "files": [
       "out/**/*",
-      "resources/**/*"
+      "resources/**/*",
+      "!**/*.map",
+      "!node_modules/**/*.map"
     ]
   },
   "overrides": {
