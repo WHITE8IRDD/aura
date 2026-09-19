@@ -23,6 +23,7 @@ import { registerMediaHubMenuIPC } from './mediaHubMenu'
 import { registerMediaHubWindowIPC } from './mediaHubWindow'
 import { registerShieldsIpc } from './blocker/ipc'
 import { prewarmShieldsPopover } from './blocker/shields-popover'
+import { initFeatures, getSnoozer } from './features/ipc'
 import { registerToolbarContextMenuIPC } from './toolbarContextMenu'
 import { registerWindowControls, wireMaximizeEvents } from './window-controls'
 import { registerShortcuts } from './shortcuts'
@@ -313,6 +314,11 @@ async function createWindow(): Promise<void> {
     splitManager.closeSplitForTabAndEmit(tabs!, id)
   }
 
+  // Aura Features (snooze / gestures / dark mode): register IPC + attach
+  // TabManager hooks after the main manager exists. Late managers (Ninja)
+  // are attached lazily by the snoozer on first sight.
+  initFeatures({ getMainWindow: () => mainWindow })
+
   ninja = new NinjaWindowManager(CHROME_HEIGHT, SIDEBAR_WIDTH_DEFAULT)
 
   iconPath = resolveIcon('icon-32.png')
@@ -567,6 +573,19 @@ ipcMain.handle('tabs:show-context-menu', async (event, tabId: string) => {
     new MenuItem({
       label: tab.muted ? 'Unmute Tab' : 'Mute Tab',
       click: () => { tm.toggleMute(tab.id) }
+    })
+  )
+  menu.append(
+    new MenuItem({
+      label: 'Snooze tab',
+      enabled: !tab.snoozed && tab.id !== tm.getActiveId(),
+      click: () => { void getSnoozer()?.snooze(tab.id, 'manual') }
+    })
+  )
+  menu.append(
+    new MenuItem({
+      label: 'Snooze other tabs',
+      click: () => { void getSnoozer()?.snoozeOthers(tab.id) }
     })
   )
   menu.append(new MenuItem({ type: 'separator' }))

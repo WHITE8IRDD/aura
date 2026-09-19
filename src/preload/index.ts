@@ -240,6 +240,24 @@ const api = {
     },
   },
 
+  auraFeatures: {
+    snooze: {
+      getSettings: () => ipcRenderer.invoke('features:snooze-get-settings'),
+      setSettings: (patch: Record<string, unknown>) =>
+        ipcRenderer.invoke('features:snooze-set-settings', patch),
+      snoozeTab: (tabId: string) => ipcRenderer.invoke('features:snooze-tab', tabId),
+      snoozeOthers: (exceptTabId: string | null) =>
+        ipcRenderer.invoke('features:snooze-others', exceptTabId),
+      wakeTab: (tabId: string) => ipcRenderer.invoke('features:snooze-wake', tabId),
+      stats: () => ipcRenderer.invoke('features:snooze-stats'),
+      onTabState: (cb: (p: { tabId: string; snoozed: boolean; approxFreedMB?: number }) => void) => {
+        const h = (_e: unknown, p: { tabId: string; snoozed: boolean; approxFreedMB?: number }): void => cb(p)
+        ipcRenderer.on('features:snooze-state', h)
+        return () => { ipcRenderer.removeListener('features:snooze-state', h) }
+      },
+    },
+  },
+
   keyboard: {
     getLayout: (): Promise<any> => ipcRenderer.invoke('vk:getLayout'),
     getCategories: (): Promise<any[]> => ipcRenderer.invoke('vk:getCategories'),

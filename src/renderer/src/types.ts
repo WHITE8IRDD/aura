@@ -1,8 +1,10 @@
 import type { AuraApi } from '../../preload/index'
+import type { AuraFeaturesApi } from '../../shared/aura-features'
 
 declare global {
   interface Window {
     aura: AuraApi
+    auraFeatures: AuraFeaturesApi
   }
 }
 
@@ -24,6 +26,8 @@ export interface TabState {
   groupId: string | null
   hasAudio: boolean
   fullscreen: boolean
+  snoozed?: boolean
+  snoozedFreedMB?: number
 }
 
 export interface ReadingItem {

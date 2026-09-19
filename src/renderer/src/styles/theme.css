@@ -7102,3 +7102,11 @@ body > .gcm-menu {
   font-family: monospace;
 }
 
+/* ========================================================================
+   FEATURE 1 — TAB SNOOZING (dim + moon, cursor untouched per Commandment #6)
+   ======================================================================== */
+.tab.snoozed { opacity: 0.55; }
+.tab.snoozed .tab-favicon { filter: grayscale(1); }
+.tab .snooze-icon { display: none; width: 14px; height: 14px; flex: none; margin-left: 4px; }
+.tab.snoozed .snooze-icon { display: inline-block; }
+

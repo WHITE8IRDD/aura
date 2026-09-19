@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useSettings } from '../../hooks/useSettings'
-import { Select } from './SettingsControls'
+import { Select, Toggle } from './SettingsControls'
+import type { SnoozeSettings } from '../../../shared/aura-features'
 import './PerformanceSection.css'
 
 interface GPUInfo {
@@ -39,6 +40,120 @@ function statusBadge(status: string): { label: string; color: string } {
   return { label: status, color: 'tertiary' }
 }
 
+const SNOOZE_IDLE_OPTIONS = [
+  { value: '5', label: 'After 5 minutes idle' },
+  { value: '10', label: 'After 10 minutes idle' },
+  { value: '15', label: 'After 15 minutes idle' },
+  { value: '30', label: 'After 30 minutes idle' },
+  { value: '60', label: 'After 60 minutes idle' },
+  { value: 'custom', label: 'Custom…' },
+]
+
+function TabSnoozingCard(): React.ReactElement {
+  const [snooze, setSnooze] = useState<SnoozeSettings | null>(null)
+  const [stats, setStats] = useState<{ snoozedCount: number; approxFreedMB: number }>({ snoozedCount: 0, approxFreedMB: 0 })
+  const [hostsText, setHostsText] = useState('')
+  const [customMinutes, setCustomMinutes] = useState('45')
+
+  useEffect(() => {
+    let alive = true
+    window.auraFeatures.snooze.getSettings().then((s) => {
+      if (!alive) return
+      setSnooze(s)
+      setHostsText(s.neverSnoozeHosts.join('\n'))
+      if (!['5', '10', '15', '30', '60'].includes(String(s.idleMinutes))) {
+        setCustomMinutes(String(s.idleMinutes))
+      }
+    }).catch(() => {})
+    const loadStats = () => {
+      window.auraFeatures.snooze.stats().then((st) => { if (alive) setStats(st) }).catch(() => {})
+    }
+    loadStats()
+    const id = window.setInterval(loadStats, 5000)
+    return () => { alive = false; window.clearInterval(id) }
+  }, [])
+
+  const patch = (p: Partial<SnoozeSettings>): void => {
+    setSnooze((prev) => (prev ? { ...prev, ...p } : prev))
+    window.auraFeatures.snooze.setSettings(p).then((next) => setSnooze(next)).catch(() => {})
+  }
+
+  const isCustom = snooze !== null && !['5', '10', '15', '30', '60'].includes(String(snooze.idleMinutes))
+
+  const commitHosts = (): void => {
+    const hosts = hostsText.split('\n').map((h) => h.trim().toLowerCase()).filter(Boolean)
+    patch({ neverSnoozeHosts: hosts })
+  }
+
+  const commitCustomMinutes = (): void => {
+    const n = Math.min(1440, Math.max(1, Math.floor(Number(customMinutes) || 0)))
+    if (n > 0) {
+      setCustomMinutes(String(n))
+      patch({ idleMinutes: n })
+    }
+  }
+
+  return (
+    <div className="setting-card">
+      <h3 className="setting-card-title">TAB SNOOZING</h3>
+      <Toggle
+        label="Enable tab snoozing"
+        description="Idle background tabs are unloaded to free RAM; scroll position and form text are restored when you revisit"
+        checked={snooze?.enabled ?? true}
+        onChange={(v) => patch({ enabled: v })}
+      />
+      <Select
+        label="Snooze tabs after"
+        value={isCustom ? 'custom' : String(snooze?.idleMinutes ?? 15)}
+        onChange={(v) => {
+          if (v === 'custom') commitCustomMinutes()
+          else patch({ idleMinutes: Number(v) })
+        }}
+        options={SNOOZE_IDLE_OPTIONS}
+      />
+      {isCustom && (
+        <div className="sett-field">
+          <div className="sett-field-label">Custom idle minutes (1–1440)</div>
+          <input
+            type="number" min={1} max={1440} value={customMinutes}
+            onChange={(e) => setCustomMinutes(e.target.value)}
+            onBlur={commitCustomMinutes}
+            style={{ maxWidth: 120 }}
+          />
+        </div>
+      )}
+      <Toggle
+        label="Snooze pinned tabs"
+        checked={snooze?.snoozePinned ?? false}
+        onChange={(v) => patch({ snoozePinned: v })}
+      />
+      <Toggle
+        label="Snooze tabs playing audio"
+        description="Off by default so music and calls keep running"
+        checked={snooze?.snoozeAudible ?? false}
+        onChange={(v) => patch({ snoozeAudible: v })}
+      />
+      <div className="sett-field">
+        <div className="sett-field-label">Never-snooze hosts (one per line)</div>
+        <div className="sett-field-desc">Mail, docs, chat and similar live apps stay loaded</div>
+        <textarea
+          rows={5} value={hostsText}
+          onChange={(e) => setHostsText(e.target.value)}
+          onBlur={commitHosts}
+          spellCheck={false}
+          style={{ width: '100%', resize: 'vertical' }}
+        />
+      </div>
+      <div className="perf-memory-summary">
+        <span className="perf-memory-label">Snooze savings:</span>
+        <span className="perf-memory-value">
+          ~{stats.approxFreedMB} MB saved by {stats.snoozedCount} snoozed tab{stats.snoozedCount === 1 ? '' : 's'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export const PerformanceSection: React.FC = () => {
   const { settings } = useSettings()
   const [gpu, setGpu] = useState<GPUInfo | null>(null)
@@ -70,6 +185,8 @@ export const PerformanceSection: React.FC = () => {
   return (
     <div className="settings-section-content">
       <h2>Performance</h2>
+
+      <TabSnoozingCard />
 
       <div className="setting-card">
         <h3 className="setting-card-title">ENERGY</h3>

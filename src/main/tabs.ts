@@ -38,6 +38,8 @@ export interface TabState {
   hasAudio: boolean
   fullscreen: boolean
   workspaceId: string
+  snoozed: boolean
+  snoozedFreedMB?: number
 }
 
 export interface TabRecord {
@@ -56,6 +58,7 @@ export interface TabRecord {
   hasAudio: boolean
   fullscreen: boolean
   workspaceId: string
+  snoozed: boolean
 }
 
 interface ClosedTab { url: string; title: string; closedAt: number }
@@ -180,6 +183,15 @@ export class TabManager {
   /** Callback invoked before a tab is closed */
   onBeforeClose: ((id: number) => void) | null = null
 
+  /** Feature hook: fired after a tab record is removed (snooze state cleanup). */
+  onTabClosed: ((id: number) => void) | null = null
+  /** Feature hook: fired when a tab's view finishes loading (post-load restore). */
+  onViewLoaded: ((id: number) => void) | null = null
+  /** Feature hook: fired at the top of activate() when the tab is snoozed. */
+  onSnoozedActivate: ((id: number) => void) | null = null
+  /** Feature hook: snoozed state + freed MB for snapshot(). Avoids import cycles. */
+  snoozeInfoProvider: ((id: number) => { snoozed: boolean; freedMB: number } | null) | null = null
+
   setSidebarWidth(w: number): void { this.sidebarWidth = Math.max(0, w); this.layout() }
 
   getMediaTabs(): Array<{
@@ -233,7 +245,8 @@ export class TabManager {
       loadingTimeout: null,
       hasAudio: false,
       fullscreen: false,
-      workspaceId: '00000000-0000-0000-0000-000000000001'
+      workspaceId: '00000000-0000-0000-0000-000000000001',
+      snoozed: false
     }
     this.records.set(id, rec)
     if (afterId !== undefined) {
@@ -263,6 +276,7 @@ export class TabManager {
     if (rec.loadingTimeout) clearTimeout(rec.loadingTimeout)
     if (rec.view) this.destroyView(rec)
     this.records.delete(id)
+    try { this.onTabClosed?.(id) } catch { /* feature hook must never break close */ }
     this.order = this.order.filter((x) => x !== id)
     if (this.activeId === id) {
       this.activeId = null
@@ -284,6 +298,10 @@ export class TabManager {
 
   activate(id: number): void {
     const rec = this.records.get(id); if (!rec) return
+    // Feature hook: snoozing wakes the tab (clears flag, arms restore).
+    if (rec.snoozed) {
+      try { this.onSnoozedActivate?.(id) } catch { /* must never break activate */ }
+    }
     // STAGE 8.8: if there's an active fullscreen tab on a different tab,
     // exit fullscreen when switching away
     if (this.fullscreenTabId !== null && this.fullscreenTabId !== id) {
@@ -553,6 +571,7 @@ export class TabManager {
 
     for (const rec of this.records.values()) {
       if (!rec.view) continue
+      if (rec.snoozed) continue
       if (rec.id === this.activeId) continue
       if (rec.pinned) continue
       if (rec.hasAudio) continue
@@ -586,6 +605,7 @@ export class TabManager {
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
+        nodeIntegrationInSubFrames: true,
         backgroundThrottling: false,
         autoplayPolicy: 'no-user-gesture-required' as const,
         plugins: true,
@@ -646,6 +666,21 @@ export class TabManager {
     rec.view = null
   }
 
+  /**
+   * Feature hook (tab snoozing): destroy the tab's view but keep the record
+   * so activating the tab later re-attaches a fresh view. Returns false when
+   * there is no live view to suspend.
+   */
+  suspendView(id: number): boolean {
+    const rec = this.records.get(id)
+    if (!rec || !rec.view) return false
+    this.destroyView(rec)
+    rec.loading = false
+    this.layout()
+    this.emit()
+    return true
+  }
+
   private wireEvents(rec: TabRecord): void {
     const wc = rec.view!.webContents
 
@@ -673,7 +708,10 @@ export class TabManager {
     }
 
     wc.on('did-start-loading', () => { rec.loading = true; clearLoadingTimeout(); this.emit() })
-    wc.on('did-stop-loading', () => { rec.loading = false; clearLoadingTimeout(); syncUrl() })
+    wc.on('did-stop-loading', () => {
+      rec.loading = false; clearLoadingTimeout(); syncUrl()
+      try { this.onViewLoaded?.(rec.id) } catch { /* feature hook must never break load */ }
+    })
     wc.on('did-finish-load', () => {
       console.log('[aura:tabs] did-finish-load', { url: rec.url, isPrivate: this._isPrivate })
       armLoadingTimeout()
@@ -753,6 +791,7 @@ export class TabManager {
       const r = this.records.get(id)!
       const wc = r.view?.webContents
       const group = getGroupForTab(r.id)
+      const snooze = this.snoozeInfoProvider?.(r.id)
       return {
         id: r.id, url: r.url, title: r.title || 'New Tab',
         favicon: r.favicon, loading: r.loading,
@@ -766,7 +805,9 @@ export class TabManager {
         groupId: group?.id ?? null,
         hasAudio: r.hasAudio,
         fullscreen: r.fullscreen,
-        workspaceId: r.workspaceId
+        workspaceId: r.workspaceId,
+        snoozed: snooze?.snoozed ?? r.snoozed,
+        snoozedFreedMB: snooze?.freedMB
       } satisfies TabState
     })
     return { tabs, activeId: this.activeId }

@@ -410,11 +410,15 @@ function Tab({
   }
 
   const dragClass = isDragging && dragTabId === tab.id ? ' dragging' : ''
-  const baseClass = 'tab' + (isActive ? ' active' : '') + dragClass
+  const snoozeClass = tab.snoozed ? ' snoozed' : ''
+  const baseClass = 'tab' + (isActive ? ' active' : '') + dragClass + snoozeClass
+  const tabTitle = tab.snoozed
+    ? `Snoozed${tab.snoozedFreedMB ? ` (~${tab.snoozedFreedMB} MB freed)` : ''} — click to wake`
+    : tab.title || tab.url
 
   return (
     <div className={baseClass} onMouseDown={handleMouseDown} onContextMenu={handleContextMenuLocal}
-      role="tab" aria-selected={isActive} title={tab.title || tab.url}>
+      role="tab" aria-selected={isActive} title={tabTitle}>
       {tab.groupId && <GroupStripe groupId={tab.groupId} />}
       {tab.loading ? (
         <span className="spinner" aria-label="Loading" />
@@ -437,6 +441,12 @@ function Tab({
       )}
 
       {tab.muted && <span className="tab-muted-indicator" title="Muted">🔇</span>}
+
+      {tab.snoozed && (
+        <svg className="snooze-icon" viewBox="0 0 24 24" fill="currentColor" aria-label="Snoozed">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
+        </svg>
+      )}
 
       {!tab.pinned && <span className="tab-title">{tab.title || 'New Tab'}</span>}
 

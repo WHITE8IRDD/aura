@@ -234,7 +234,30 @@ const MIGRATIONS: Migration[] = [
         installed_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
     `)
-  }
+  },
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS kv (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS snoozed_tabs (
+        tab_id          TEXT PRIMARY KEY,
+        url             TEXT NOT NULL,
+        title           TEXT NOT NULL DEFAULT '',
+        favicon         TEXT,
+        scroll_x        REAL NOT NULL DEFAULT 0,
+        scroll_y        REAL NOT NULL DEFAULT 0,
+        form_state      TEXT,
+        snoozed_at      INTEGER NOT NULL,
+        approx_freed_kb INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE IF NOT EXISTS dark_sites (
+        host TEXT PRIMARY KEY,
+        mode TEXT NOT NULL
+      );
+    `)
+  },
 ]
 
 export function runMigrations(db: Database.Database): void {
