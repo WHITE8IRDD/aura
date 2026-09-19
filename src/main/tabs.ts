@@ -658,10 +658,16 @@ export class TabManager {
   }
 
   private destroyView(rec: TabRecord): void {
-    if (!rec.view) return
+    const view = rec.view
+    if (!view) return
     try {
-      this.win.contentView.removeChildView(rec.view)
-      rec.view.webContents.close()
+      this.win.contentView.removeChildView(view)
+    } catch { /* already removed */ }
+    try {
+      // Electron 28+: closes the renderer without destroying the record.
+      // If close() ever throws, the view is already detached above, so the
+      // tab is at worst a detached (leaked) view, never a broken state.
+      view.webContents.close()
     } catch { /* already destroyed */ }
     rec.view = null
   }
