@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Tab</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <main class="container">
+    <!-- Fixed Contrast Brand Logo -->
+    <div class="brand">
+      <svg class="aura-icon" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M50 15L15 85H35L50 50L65 85H85L50 15Z" fill="#FFFFFF"/>
+        <path d="M50 35L30 75H40L50 55L60 75H70L50 35Z" fill="#09090B"/>
+      </svg>
+      <h1 class="aura-text">Aura</h1>
+    </div>
+
+    <!-- Improved Search Bar -->
+    <form class="search-form" action="https://www.google.com/search" method="GET">
+      <div class="search-wrapper">
+        <input
+          type="text"
+          name="q"
+          class="search-input"
+          placeholder="Search Google or type a URL..."
+          autofocus
+          autocomplete="off"
+        />
+        <button type="submit" class="search-button" aria-label="Search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
+      </div>
+    </form>
+  </main>
+
+  <!-- Clean Bottom Bar -->
+  <footer class="bottom-bar">
+    <button class="icon-btn" id="downloadBtn" title="Downloads">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+    </button>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

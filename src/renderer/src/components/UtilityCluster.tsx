@@ -5,6 +5,7 @@ import {
 } from './Icons'
 import NinjaAvatar from './NinjaAvatar'
 import { MediaHub } from './MediaHub'
+import type { AutoRefreshState } from '../../../shared/aura-features'
 
 interface TabState {
   id: number
@@ -222,6 +223,59 @@ export default function UtilityCluster({
     } catch { /* popover failed: no-op */ }
   }, [darkHost])
 
+  // === AUTO-REFRESH (per-tab native timers, floating popover) ===
+  const [refresh, setRefresh] = useState<AutoRefreshState | null>(null)
+  const [bursting, setBursting] = useState(false)
+
+  useEffect(() => {
+    if (!activeTab || !window.aura?.autoRefresh) {
+      setRefresh(null)
+      setBursting(false)
+      return
+    }
+    const id = activeTab.id
+    let cancelled = false
+    const update = (): void => {
+      window.aura.autoRefresh.get(id).then((s) => {
+        if (!cancelled) setRefresh(s && typeof s.intervalSec === 'number' ? s : null)
+      }).catch(() => {
+        if (!cancelled) setRefresh(null)
+      })
+    }
+    update()
+    const unsubState = window.aura.autoRefresh.onChange(update)
+    const unsubBurst = window.aura.autoRefresh.onBurst((info) => {
+      if (!cancelled && info.tabId === id) setBursting(info.active)
+    })
+    return () => { cancelled = true; unsubState(); unsubBurst() }
+  }, [activeTab?.id])
+
+  const handleAutoRefreshClick = useCallback(async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation()
+    if (!activeTab) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    try {
+      await window.aura.autoRefreshPopover.open(
+        { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        activeTab.id
+      )
+    } catch { /* popover failed: no-op */ }
+  }, [activeTab])
+
+  const handleBurstClick = useCallback(async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation()
+    if (!activeTab || bursting) return
+    try {
+      await window.aura.autoRefresh.burst(activeTab.id, 6)
+    } catch { /* burst failed: pulse clears via burst-changed(false) */ }
+  }, [activeTab, bursting])
+
+  const refreshBadge = (() => {
+    if (!refresh) return ''
+    const base = refresh.intervalSec >= 60 ? `${refresh.intervalSec / 60}m` : `${refresh.intervalSec}s`
+    return refresh.remaining !== null ? `${base}×${refresh.remaining}` : base
+  })()
+
   return (
     <div className="utility-cluster">
       {/* Group A — Global tools */}
@@ -383,6 +437,79 @@ export default function UtilityCluster({
         >
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
         </svg>
+      </button>
+
+      <div className="toolbar-group-separator" />
+
+      {/* BURST REFRESH ×6 — one click, no menu; independent of any schedule */}
+      <button
+        onClick={handleBurstClick}
+        className="util-btn"
+        title={bursting ? 'Bursting…' : 'Burst refresh ×6'}
+        aria-pressed={bursting}
+        disabled={bursting || !activeTab}
+        style={bursting ? {
+          boxShadow: '0 0 10px 2px rgba(52,211,153,0.55)',
+          transform: 'scale(1.15)',
+          pointerEvents: 'none'
+        } : undefined}
+      >
+        <span style={{ position: 'relative', display: 'inline-flex' }}>
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={bursting ? { color: 'var(--success, #34d399)', opacity: 1 } : undefined}
+          >
+            <path d="M21 2v6h-6" />
+            <path d="M3 12a9 9 0 1 0 2.13-5.87L21 8" />
+          </svg>
+          <span style={{
+            position: 'absolute',
+            right: -9,
+            bottom: -6,
+            fontSize: 8,
+            fontWeight: 800,
+            lineHeight: 1,
+            color: bursting ? 'var(--success, #34d399)' : 'var(--text-muted, #a1a1aa)'
+          }}>
+            ×6
+          </span>
+        </span>
+      </button>
+
+      {/* AUTO-REFRESH — native per-tab timers, floating popover picker */}
+      <button
+        onClick={handleAutoRefreshClick}
+        className={`util-btn${refresh !== null ? ' active' : ''}`}
+        title={refresh !== null ? `Auto-refreshing every ${refreshBadge} — click to change` : 'Auto-refresh this tab'}
+        aria-pressed={refresh !== null}
+        style={refresh !== null ? { boxShadow: '0 0 8px 1px var(--accent-soft, rgba(52,211,153,0.45))' } : undefined}
+      >
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={refresh !== null ? { color: 'var(--success, #34d399)' } : undefined}
+        >
+          <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+          <path d="M21 3v6h-6" />
+        </svg>
+        {refresh !== null && (
+          <span style={{ fontSize: 10, marginLeft: 3, fontWeight: 700, lineHeight: 1 }}>
+            {refreshBadge}
+          </span>
+        )}
       </button>
 
       <div className="toolbar-group-separator" />

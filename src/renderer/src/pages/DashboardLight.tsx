@@ -7,12 +7,10 @@ import auraMarkBlack from '../assets/brand/aura-mark-colored.png'
 
 interface Props {
   onNavigate: (url: string) => void
-  onSwitchLayout: () => void
 }
 
 export default function DashboardLight({
-  onNavigate,
-  onSwitchLayout
+  onNavigate
 }: Props): React.ReactElement {
   const [prompt, setPrompt] = useState('')
   const [editing, setEditing] = useState(false)
@@ -59,7 +57,6 @@ export default function DashboardLight({
   return (
     <div className={`dash-light-v2 ntp-layout-${ntpLayout} ntp-search-${searchPosition}`}>
       <div className="dash-light-bg-glow" />
-      <button className="layout-toggle-floating" onClick={onSwitchLayout}>Switch layout</button>
       <div className="dash-light-inner">
         <div className="ntp-hero">
           <img src={auraMarkBlack} alt="" className="ntp-hero-mark-img" draggable={false} />

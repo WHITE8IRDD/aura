@@ -27,6 +27,7 @@ import PasswordsPage from './pages/PasswordsPage'
 import ExtensionsPage from './pages/ExtensionsPage'
 import { VirtualKeyboard } from './components/VirtualKeyboard/VirtualKeyboard'
 import DarkModePopover from './components/DarkModePopover'
+import AutoRefreshPopover from './components/AutoRefreshPopover'
 
 import PasswordSavePrompt from './components/PasswordSavePrompt'
 import PasswordFillDropdown from './components/PasswordFillDropdown'
@@ -643,6 +644,10 @@ export default function App(): React.ReactElement {
 
   if (typeof window !== 'undefined' && window.location.hash.startsWith('#/darkmode-popover')) {
     return <DarkModePopover />
+  }
+
+  if (typeof window !== 'undefined' && window.location.hash.startsWith('#/autorefresh-popover')) {
+    return <AutoRefreshPopover />
   }
 
   return (

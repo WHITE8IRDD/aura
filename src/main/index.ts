@@ -25,6 +25,7 @@ import { registerShieldsIpc } from './blocker/ipc'
 import { prewarmShieldsPopover } from './blocker/shields-popover'
 import { initFeatures, getSnoozer } from './features/ipc'
 import { registerDarkModeWindowIPC } from './darkModeWindow'
+import { registerAutoRefreshWindowIPC } from './autoRefreshWindow'
 import { registerExtensionIpc } from './extensionIpc'
 import { registerToolbarContextMenuIPC } from './toolbarContextMenu'
 import { registerWindowControls, wireMaximizeEvents } from './window-controls'
@@ -321,6 +322,7 @@ async function createWindow(): Promise<void> {
   // are attached lazily by the snoozer on first sight.
   initFeatures({ getMainWindow: () => mainWindow })
   registerDarkModeWindowIPC(() => mainWindow)
+  registerAutoRefreshWindowIPC(() => mainWindow)
   registerExtensionIpc(() => mainWindow)
 
   ninja = new NinjaWindowManager(CHROME_HEIGHT, SIDEBAR_WIDTH_DEFAULT)

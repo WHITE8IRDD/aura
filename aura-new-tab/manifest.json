@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Aura New Tab",
+  "version": "1.0.0",
+  "description": "Minimalist OLED Dark New Tab page for Aura layout",
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "permissions": []
+}

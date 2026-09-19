@@ -86,6 +86,20 @@ export interface ExtensionItem {
   popupPath: string | null
 }
 
+// ---------- New Tab Page: Quick Links (Top Sites) ----------
+export interface QuickLink {
+  id: string
+  title: string
+  url: string
+}
+
+// ---------- Auto-refresh: per-tab interval + burst state ----------
+export interface AutoRefreshState {
+  intervalSec: number
+  maxRefreshes: number | null // null = infinite
+  remaining: number | null // countdown when maxRefreshes is set
+}
+
 // ---------- API exposed to Browser UI (Chrome) only ----------
 export interface AuraFeaturesApi {
   snooze: {
@@ -106,6 +120,10 @@ export interface AuraFeaturesApi {
     get(host: string): Promise<{ state: DarkModeState; rule: DarkSiteRule | null; globalPreset: DarkPreset | null }>
     setSite(host: string, rule: DarkSiteRule | null): Promise<void>
     setGlobal(preset: DarkPreset | null): Promise<void>
+  }
+  newtab: {
+    getLinks(): Promise<QuickLink[]>
+    setLinks(links: QuickLink[]): Promise<boolean>
   }
   extensions: {
     list(): Promise<ExtensionItem[]>

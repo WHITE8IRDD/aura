@@ -9,7 +9,7 @@ import type { ReadingItem } from '../main/reading-list'
 import type { Boost } from '../main/boosts'
 import type { SidebarPanel } from '../main/sidebar-panels'
 import type { TabGroup } from '../main/tab-groups'
-import type { AuraFeaturesApi, DarkPreset, DarkSiteRule, GestureSettings, SnoozeSettings, TabSnoozeStatePatch } from '../shared/aura-features'
+import type { AuraFeaturesApi, AutoRefreshState, DarkPreset, DarkSiteRule, GestureSettings, QuickLink, SnoozeSettings, TabSnoozeStatePatch } from '../shared/aura-features'
 
 interface CredentialRecord {
   id: number
@@ -264,6 +264,35 @@ const api = {
   darkmodePopover: {
     open: (anchor: { x: number; y: number; width: number; height: number }, hostname: string): Promise<boolean> =>
       ipcRenderer.invoke('darkmode:open-popover', anchor, hostname),
+  },
+
+  autoRefresh: {
+    start: (tabId: number, seconds: number, maxRefreshes?: number | null): Promise<boolean> =>
+      ipcRenderer.invoke('autorefresh:start', tabId, seconds, maxRefreshes ?? null),
+    stop: (tabId: number): Promise<boolean> =>
+      ipcRenderer.invoke('autorefresh:stop', tabId),
+    get: (tabId: number): Promise<AutoRefreshState | null> =>
+      ipcRenderer.invoke('autorefresh:get', tabId),
+    burst: (tabId: number, times = 6): Promise<boolean> =>
+      ipcRenderer.invoke('autorefresh:burst', tabId, times),
+    onChange: (cb: () => void): (() => void) => {
+      const handler = (): void => cb()
+      ipcRenderer.on('autorefresh:state-changed', handler)
+      return () => ipcRenderer.removeListener('autorefresh:state-changed', handler)
+    },
+    onBurst: (cb: (info: { tabId: number; active: boolean }) => void): (() => void) => {
+      const handler = (
+        _e: Electron.IpcRendererEvent,
+        info: { tabId: number; active: boolean }
+      ): void => cb(info)
+      ipcRenderer.on('autorefresh:burst-changed', handler)
+      return () => ipcRenderer.removeListener('autorefresh:burst-changed', handler)
+    }
+  },
+
+  autoRefreshPopover: {
+    open: (anchor: { x: number; y: number; width: number; height: number }, tabId: number): Promise<boolean> =>
+      ipcRenderer.invoke('autorefresh:open-popover', anchor, tabId),
   },
 
   // STAGE 6
@@ -972,6 +1001,11 @@ const auraFeaturesApi: AuraFeaturesApi = {
       ipcRenderer.invoke('features:dark-set-site', host, rule),
     setGlobal: (preset: DarkPreset | null) =>
       ipcRenderer.invoke('features:dark-set-global', preset),
+  },
+  newtab: {
+    getLinks: (): Promise<QuickLink[]> => ipcRenderer.invoke('newtab:get-links'),
+    setLinks: (links: QuickLink[]): Promise<boolean> =>
+      ipcRenderer.invoke('newtab:set-links', links),
   },
   extensions: {
     list: () => ipcRenderer.invoke('extensions:list'),

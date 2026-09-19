@@ -3,14 +3,21 @@ import type { WebContents } from 'electron'
 import { TabManager } from '../tabs'
 import { isChromeUi } from './guard'
 import { TabSnoozer, getSnoozeSettings, setSnoozeSettings } from './snooze'
+import { AutoRefreshManager } from './auto-refresh'
 import { getGestureSettings, setGestureSettings, resetGestureSettings } from './gestures'
 import { setGlobalPreset, setSiteRule, resolveDark } from './darkmode'
-import type { DarkPreset, DarkSiteRule } from '../../shared/aura-features'
+import { ensureFeaturesTables, kvGet, kvSet } from './kv'
+import type { DarkPreset, DarkSiteRule, QuickLink } from '../../shared/aura-features'
 
 let snoozer: TabSnoozer | null = null
+let autoRefresh: AutoRefreshManager | null = null
 
 export function getSnoozer(): TabSnoozer | null {
   return snoozer
+}
+
+export function getAutoRefresh(): AutoRefreshManager | null {
+  return autoRefresh
 }
 
 export interface FeaturesDeps {
@@ -41,7 +48,12 @@ export function initFeatures(_deps: FeaturesDeps): void {
   })
   for (const m of TabManager.getAll()) snoozer.attachManager(m)
   snoozer.start()
+  if (!autoRefresh) {
+    autoRefresh = new AutoRefreshManager()
+    autoRefresh.attachAll()
+  }
   registerSnoozeIpc()
+  registerAutoRefreshIpc()
 }
 
 function toTabId(raw: unknown): number | null {
@@ -82,6 +94,40 @@ function registerSnoozeIpc(): void {
     return snoozer ? snoozer.stats() : { snoozedCount: 0, approxFreedMB: 0 }
   })
   registerGesturesIpc()
+}
+
+function registerAutoRefreshIpc(): void {
+  ipcMain.handle('autorefresh:start', (e, tabId: unknown, seconds: unknown, maxRefreshes: unknown) => {
+    if (!isChromeUi(e.sender)) throw new Error('autorefresh: untrusted sender')
+    const id = toTabId(tabId)
+    const secs = typeof seconds === 'number' ? seconds : Number(seconds)
+    const max =
+      maxRefreshes === null || maxRefreshes === undefined ? null : Number(maxRefreshes)
+    if (id === null || !autoRefresh) return false
+    autoRefresh.attachAll() // cover managers created after init (ninja)
+    return autoRefresh.start(id, secs, max)
+  })
+  ipcMain.handle('autorefresh:stop', (e, tabId: unknown) => {
+    if (!isChromeUi(e.sender)) throw new Error('autorefresh: untrusted sender')
+    const id = toTabId(tabId)
+    if (id === null || !autoRefresh) return false
+    autoRefresh.stop(id)
+    return true
+  })
+  ipcMain.handle('autorefresh:get', (e, tabId: unknown) => {
+    if (!isChromeUi(e.sender)) throw new Error('autorefresh: untrusted sender')
+    const id = toTabId(tabId)
+    if (id === null || !autoRefresh) return null
+    return autoRefresh.getState(id)
+  })
+  ipcMain.handle('autorefresh:burst', (e, tabId: unknown, times: unknown) => {
+    if (!isChromeUi(e.sender)) throw new Error('autorefresh: untrusted sender')
+    const id = toTabId(tabId)
+    const n = typeof times === 'number' ? times : Number(times)
+    if (id === null || !autoRefresh) return false
+    autoRefresh.attachAll()
+    return autoRefresh.burst(id, Number.isFinite(n) ? n : 6)
+  })
 }
 
 function registerGesturesIpc(): void {
@@ -171,5 +217,55 @@ function registerDarkIpc(): void {
     }
     setGlobalPreset(p)
     broadcastDarkChanged()
+  })
+  registerNewTabIpc()
+}
+
+const NEWTAB_LINKS_KEY = 'newtab.links'
+const NEWTAB_MAX_LINKS = 8
+
+const DEFAULT_NEWTAB_LINKS: QuickLink[] = [
+  { id: '1', title: 'YouTube', url: 'https://youtube.com' },
+  { id: '2', title: 'GitHub', url: 'https://github.com' },
+  { id: '3', title: 'Reddit', url: 'https://reddit.com' },
+  { id: '4', title: 'X', url: 'https://x.com' },
+]
+
+/** Validate + normalize renderer-supplied links before they touch SQLite. */
+function sanitizeNewTabLinks(raw: unknown): QuickLink[] | null {
+  if (!Array.isArray(raw)) return null
+  const out: QuickLink[] = []
+  for (const item of raw.slice(0, NEWTAB_MAX_LINKS)) {
+    if (!item || typeof item !== 'object') continue
+    const rec = item as Record<string, unknown>
+    const title = String(rec.title ?? '').trim().slice(0, 40)
+    let url = String(rec.url ?? '').trim().slice(0, 2048)
+    if (!title || !url) continue
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`
+    try {
+      const parsed = new URL(url)
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue
+      url = parsed.toString()
+    } catch {
+      continue
+    }
+    out.push({ id: String(rec.id ?? `${Date.now()}-${out.length}`).slice(0, 64), title, url })
+  }
+  return out
+}
+
+function registerNewTabIpc(): void {
+  ipcMain.handle('newtab:get-links', (e) => {
+    if (!isChromeUi(e.sender)) throw new Error('newtab: untrusted sender')
+    ensureFeaturesTables()
+    return kvGet<QuickLink[]>(NEWTAB_LINKS_KEY, DEFAULT_NEWTAB_LINKS)
+  })
+  ipcMain.handle('newtab:set-links', (e, links: unknown) => {
+    if (!isChromeUi(e.sender)) throw new Error('newtab: untrusted sender')
+    const clean = sanitizeNewTabLinks(links)
+    if (!clean) throw new Error('newtab: invalid links')
+    ensureFeaturesTables()
+    kvSet(NEWTAB_LINKS_KEY, clean)
+    return true
   })
 }

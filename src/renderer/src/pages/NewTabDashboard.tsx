@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import DashboardLight from './DashboardLight'
-import DashboardDark from './DashboardDark'
+import NewTabGlass from './NewTabGlass'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 
 interface Props {
@@ -50,16 +50,9 @@ export default function NewTabDashboard({ onNavigate }: Props): React.ReactEleme
   const effectiveLayout: 'light' | 'dark' =
     layout === 'auto' ? browserTheme : layout
 
-  const toggle = (): void => {
-    // Cycle: auto -> light -> dark -> auto
-    setLayout((m) =>
-      m === 'auto' ? 'light' : m === 'light' ? 'dark' : 'auto'
-    )
-  }
-
   return effectiveLayout === 'light' ? (
-    <DashboardLight onNavigate={onNavigate} onSwitchLayout={toggle} />
+    <DashboardLight onNavigate={onNavigate} />
   ) : (
-    <DashboardDark onNavigate={onNavigate} onSwitchLayout={toggle} />
+    <NewTabGlass onNavigate={onNavigate} />
   )
 }

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor">
+  <!-- Outer ring, open at the bottom -->
+  <path d="M33.0 75.1 A32 32 0 1 1 67.0 75.1" stroke-width="8.5" stroke-linecap="butt"/>
+  <!-- Inner A-peak -->
+  <path d="M31 86 L50 36 L69 86" stroke-width="10" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="4"/>
+</svg>
