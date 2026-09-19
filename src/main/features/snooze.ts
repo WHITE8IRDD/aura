@@ -3,7 +3,7 @@ import { app } from 'electron'
 import { getDb } from '../db'
 import { TabManager } from '../tabs'
 import { DEFAULT_SNOOZE_SETTINGS, type SnoozeSettings, type TabSnoozeStatePatch } from '../../shared/aura-features'
-import { kvGet, kvSet } from './kv'
+import { ensureFeaturesTables, kvGet, kvSet } from './kv'
 
 const SETTINGS_KEY = 'features:snooze-settings'
 const SCAN_INTERVAL_MS = 60 * 1000
@@ -190,6 +190,7 @@ export class TabSnoozer {
 
   stats(): { snoozedCount: number; approxFreedMB: number } {
     try {
+      ensureFeaturesTables()
       const rows = getDb().prepare('SELECT approx_freed_kb FROM snoozed_tabs').all() as { approx_freed_kb: number }[]
       const kb = rows.reduce((s, r) => s + (r.approx_freed_kb || 0), 0)
       return { snoozedCount: rows.length, approxFreedMB: Math.round((kb / 1024) * 10) / 10 }
@@ -324,6 +325,7 @@ export class TabSnoozer {
   }
 
   private writeRow(tabId: number, rec: { url: string; title: string; favicon: string | null }, cap: PageCapture, freedKb: number): void {
+    ensureFeaturesTables()
     getDb()
       .prepare(
         `INSERT INTO snoozed_tabs (tab_id, url, title, favicon, scroll_x, scroll_y, form_state, snoozed_at, approx_freed_kb)
@@ -341,6 +343,7 @@ export class TabSnoozer {
 
   private readRow(tabId: number): SnoozedRow | undefined {
     try {
+      ensureFeaturesTables()
       return getDb().prepare('SELECT * FROM snoozed_tabs WHERE tab_id = ?').get(String(tabId)) as SnoozedRow | undefined
     } catch {
       return undefined

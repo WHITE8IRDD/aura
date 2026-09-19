@@ -1,6 +1,6 @@
 import { getDb } from '../db'
 import { DARK_PRESETS, type DarkModeState, type DarkPreset, type DarkSiteRule } from '../../shared/aura-features'
-import { kvGet, kvSet } from './kv'
+import { ensureFeaturesTables, kvGet, kvSet } from './kv'
 
 const GLOBAL_KEY = 'features:dark-global'
 
@@ -24,6 +24,7 @@ export function getSiteRule(host: string): DarkSiteRule | null {
   const clean = cleanHost(host)
   if (!clean) return null
   try {
+    ensureFeaturesTables()
     const row = getDb().prepare('SELECT mode FROM dark_sites WHERE host = ?').get(clean) as { mode: string } | undefined
     if (!row) return null
     if (row.mode === 'off') return 'off'
@@ -40,6 +41,7 @@ export function setSiteRule(host: string, rule: DarkSiteRule | null): void {
   if (rule !== null && rule !== 'off' && !(DARK_PRESETS as string[]).includes(rule)) {
     throw new Error('invalid dark rule')
   }
+  ensureFeaturesTables()
   const db = getDb()
   if (rule === null) {
     db.prepare('DELETE FROM dark_sites WHERE host = ?').run(clean)
