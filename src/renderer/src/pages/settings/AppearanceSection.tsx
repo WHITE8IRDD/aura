@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { THEME_PRESETS } from '../../lib/themePresets'
+import { RadioGroup } from './SettingsControls'
 import './ThemePicker.css'
 
 export function AppearanceSection(): React.ReactElement {
@@ -10,6 +11,7 @@ export function AppearanceSection(): React.ReactElement {
   const [forceDark, setForceDark] = useState(false)
   const [showRestartBanner, setShowRestartBanner] = useState(false)
   const [useVerticalTabs, setUseVerticalTabs] = useState(false)
+  const [darkGlobal, setDarkGlobal] = useState<string>('off')
 
   useEffect(() => {
     let cancelled = false
@@ -25,6 +27,11 @@ export function AppearanceSection(): React.ReactElement {
       setResolved(r)
       setForceDark(fd)
       setUseVerticalTabs(vt === 'vertical')
+      try {
+        const dg = await window.auraFeatures.darkMode.get('__global__')
+        const gp = (dg as { globalPreset: string | null }).globalPreset
+        if (!cancelled) setDarkGlobal(gp ?? 'off')
+      } catch { /* features unavailable */ }
       setLoaded(true)
     }
     load()
@@ -165,6 +172,25 @@ export function AppearanceSection(): React.ReactElement {
             <span className="sett-toggle-knob" />
           </div>
         </label>
+      </div>
+
+      <div className="sett-card">
+        <RadioGroup
+          label="Dark mode for all websites"
+          description="Aura's native per-site engine. Individual sites can still override this from the moon button in the toolbar."
+          value={darkGlobal}
+          options={[
+            { value: 'off', label: 'Off' },
+            { value: 'oled', label: 'OLED' },
+            { value: 'charcoal', label: 'Charcoal' },
+            { value: 'amber', label: 'Amber' },
+          ]}
+          onChange={(v) => {
+            const next = v === 'off' ? null : v
+            setDarkGlobal(v)
+            window.auraFeatures.darkMode.setGlobal(next).catch(() => {})
+          }}
+        />
       </div>
     </div>
   )

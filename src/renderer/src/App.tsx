@@ -25,6 +25,7 @@ import BoostsPage from './pages/BoostsPage'
 import SettingsPage from './pages/SettingsPage'
 import PasswordsPage from './pages/PasswordsPage'
 import { VirtualKeyboard } from './components/VirtualKeyboard/VirtualKeyboard'
+import DarkModePopover from './components/DarkModePopover'
 
 import PasswordSavePrompt from './components/PasswordSavePrompt'
 import PasswordFillDropdown from './components/PasswordFillDropdown'
@@ -636,6 +637,10 @@ export default function App(): React.ReactElement {
   // early return is Rules-of-Hooks safe.
   if (typeof window !== 'undefined' && window.location.hash.startsWith('#/virtual-keyboard')) {
     return <VirtualKeyboard />
+  }
+
+  if (typeof window !== 'undefined' && window.location.hash.startsWith('#/darkmode-popover')) {
+    return <DarkModePopover />
   }
 
   return (

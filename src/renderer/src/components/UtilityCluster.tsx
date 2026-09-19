@@ -178,6 +178,50 @@ export default function UtilityCluster({
     }
   }, [])
 
+  // === DARK MODE TOGGLE (per-site picker popover) ===
+  const [darkActive, setDarkActive] = useState(false)
+  const [darkHost, setDarkHost] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    const url = activeTab?.url ?? ''
+    let host = ''
+    try {
+      const u = new URL(url)
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        setDarkActive(false)
+        setDarkHost('')
+        return
+      }
+      host = u.hostname.toLowerCase()
+    } catch {
+      setDarkActive(false)
+      setDarkHost('')
+      return
+    }
+    setDarkHost(host)
+    window.auraFeatures.darkMode.get(host).then((res) => {
+      if (cancelled) return
+      const preset = (res as { state: { preset: string | null } }).state?.preset ?? null
+      setDarkActive(preset !== null)
+    }).catch(() => {
+      if (!cancelled) setDarkActive(false)
+    })
+    return () => { cancelled = true }
+  }, [activeTab?.id, activeTab?.url])
+
+  const handleDarkModeClick = useCallback(async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation()
+    if (!darkHost) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    try {
+      await window.aura.darkmodePopover.open(
+        { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        darkHost
+      )
+    } catch { /* popover failed: no-op */ }
+  }, [darkHost])
+
   return (
     <div className="utility-cluster">
       {/* Group A — Global tools */}
@@ -316,6 +360,29 @@ export default function UtilityCluster({
             boxShadow: '0 0 4px rgba(251, 191, 36, 0.6)',
           }} />
         )}
+      </button>
+
+      {/* DARK MODE TOGGLE — per-site picker popover */}
+      <button
+        onClick={handleDarkModeClick}
+        className={`util-btn${darkActive ? ' active' : ''}`}
+        title={darkActive ? `Dark mode on for ${darkHost} — click to change` : 'Dark mode for this site'}
+        aria-pressed={darkActive}
+        style={darkActive ? { boxShadow: '0 0 8px 1px var(--accent-soft, rgba(99,102,241,0.5))' } : undefined}
+      >
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill={darkActive ? 'currentColor' : 'none'}
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ color: darkActive ? 'var(--accent, #a5b4fc)' : undefined }}
+        >
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
       </button>
 
       <div className="toolbar-group-separator" />

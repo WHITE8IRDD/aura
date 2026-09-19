@@ -262,6 +262,13 @@ const api = {
         ipcRenderer.invoke('features:gestures-set-settings', patch),
       resetSettings: () => ipcRenderer.invoke('features:gestures-reset-settings'),
     },
+    darkMode: {
+      get: (host: string) => ipcRenderer.invoke('features:dark-get', host),
+      setSite: (host: string, rule: string | null) =>
+        ipcRenderer.invoke('features:dark-set-site', host, rule),
+      setGlobal: (preset: string | null) =>
+        ipcRenderer.invoke('features:dark-set-global', preset),
+    },
   },
 
   keyboard: {
@@ -280,6 +287,11 @@ const api = {
     toggle: (): Promise<void> => ipcRenderer.invoke('vk:toggle'),
     close: (): Promise<void> => ipcRenderer.invoke('vk:close'),
     setAlwaysOnTop: (flag: boolean): Promise<void> => ipcRenderer.invoke('vk:setAlwaysOnTop', flag),
+  },
+
+  darkmodePopover: {
+    open: (anchor: { x: number; y: number; width: number; height: number }, hostname: string): Promise<boolean> =>
+      ipcRenderer.invoke('darkmode:open-popover', anchor, hostname),
   },
 
   // STAGE 6

@@ -24,6 +24,7 @@ import { registerMediaHubWindowIPC } from './mediaHubWindow'
 import { registerShieldsIpc } from './blocker/ipc'
 import { prewarmShieldsPopover } from './blocker/shields-popover'
 import { initFeatures, getSnoozer } from './features/ipc'
+import { registerDarkModeWindowIPC } from './darkModeWindow'
 import { registerToolbarContextMenuIPC } from './toolbarContextMenu'
 import { registerWindowControls, wireMaximizeEvents } from './window-controls'
 import { registerShortcuts } from './shortcuts'
@@ -318,6 +319,7 @@ async function createWindow(): Promise<void> {
   // TabManager hooks after the main manager exists. Late managers (Ninja)
   // are attached lazily by the snoozer on first sight.
   initFeatures({ getMainWindow: () => mainWindow })
+  registerDarkModeWindowIPC(() => mainWindow)
 
   ninja = new NinjaWindowManager(CHROME_HEIGHT, SIDEBAR_WIDTH_DEFAULT)
 
