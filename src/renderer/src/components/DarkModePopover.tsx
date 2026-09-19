@@ -42,21 +42,24 @@ export default function DarkModePopover(): JSX.Element {
       if (!alive) return
       const r = (res as DarkGet).rule
       setRule(r === null ? 'default' : r)
-    }).catch(() => {})
+    }).catch((err) => console.error('[Aura/DarkMode] get failed:', err))
     return () => { alive = false }
   }, [host])
 
   const choose = useCallback(async (value: DarkSiteRule | 'default') => {
     if (!host || busy) return
+    const prev = rule
+    setRule(value) // instant visual feedback; rolled back if the save fails
     setBusy(true)
     try {
       await window.auraFeatures?.darkMode.setSite(host, value === 'default' ? null : value)
-      setRule(value)
       window.close()
-    } catch {
+    } catch (err) {
+      console.error('[Aura/DarkMode] setSite failed:', err)
+      setRule(prev)
       setBusy(false)
     }
-  }, [host, busy])
+  }, [host, busy, rule])
 
   return (
     <div className="dm-shell">
