@@ -218,6 +218,10 @@ export default function UtilityCluster({
           <path d="M15 15h6" />
         </svg>
       </button>
+      <button className="util-btn vk-btn" title="Aura Keys (Ctrl+Alt+K)"
+        onClick={() => (window as any).aura?.keyboard?.toggle()}>
+        <span style={{ fontSize: 15, lineHeight: 1 }}>⌨️</span>
+      </button>
 
       {/* TRANSLATE BUTTON — gold glow when translating, no popup */}
       <button

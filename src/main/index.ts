@@ -42,12 +42,19 @@ import {
   initBlocker,
   setSiteShields,
   areShieldsEnabledFor,
-  getTabBlockedStats
+  registerNetworkAdBlocker,
+  initAdBlockEngine,
+  incrementWcBlockedCount,
+  getWcBlockedStats
 } from './blocker'
+import { applyPopupInterceptor } from './blocker/popup-interceptor'
+import { applyCosmeticHiding } from './blocker/cosmetics'
 import {
   getSiteShields,
   setSiteShieldsLevel,
-  initShieldsDatabase
+  initShieldsDatabase,
+  incrementSiteBlockedCount,
+  cleanDomain
 } from './blocker/shields-store'
 import { setupHttpsOnly, allowInsecureHost } from './security/https-only'
 import { setupAntiFingerprintFlags, setupSessionFingerprintDefenses } from './security/fingerprint'
@@ -108,6 +115,12 @@ import {
   addTabToGroup, removeTabFromAnyGroup, listGroups, snapshot as snapshotGroups
 } from './tab-groups'
 import { getAllSettings, getSetting, setSetting, resetSettings, getDefaults } from './settings'
+import { initFocusTracker } from './focusTracker'
+import {
+  setupKeyboardIPC,
+  registerKeyboardShortcut,
+  cleanupKeyboard
+} from './virtualKeyboard'
 import { initThemeManager, getResolvedTheme, handleThemeSettingChange } from './themeManager'
 import { setAsDefaultBrowser, isDefaultBrowser } from './default-browser'
 import { registerSession, broadcastSettingChange, applyStartupFlags, applyHardwareAccelLater, applyForceDarkFlag } from './settings-bridge'
@@ -199,7 +212,10 @@ const startupReady = app.whenReady().then(async () => {
   applyForceDarkFlag()
   console.log('[Aura/settings] Loaded settings')
   console.log('[Aura] Pre-initializing blocker engine…')
+  await initAdBlockEngine()
   await setupDefaultSessionBlocking()
+  // Register network ad blocker (uBlock Origin grade)
+  registerNetworkAdBlocker(session.defaultSession)
   setupHttpsOnly(session.defaultSession)
   setupSessionFingerprintDefenses(session.defaultSession)
   setupPermissionPrompts(session.defaultSession)
@@ -222,6 +238,9 @@ const startupReady = app.whenReady().then(async () => {
   registerMediaHubMenuIPC()
   registerMediaHubWindowIPC()
   registerShieldsWindowIPC()
+  initFocusTracker()
+  setupKeyboardIPC()
+  registerKeyboardShortcut()
   console.log('[aura:media] registering media resume IPC handlers')
   registerMediaResumeHandlers()
   cleanCorruptedEntries()
@@ -918,25 +937,46 @@ ipcMain.handle('shields:toggle', (_e, hostname: string) => {
 ipcMain.handle('shields:isEnabled', (_e, hostname: string) => areShieldsEnabledFor(hostname))
 ipcMain.handle('shields:get-settings', (_e, domain: string) => getSiteShields(domain))
 ipcMain.handle('shields:set-level', (_e, domain: string, level: any) => setSiteShieldsLevel(domain, level))
+// 1. Report DOM blocks from preloads/scriptlets via IPC
+ipcMain.handle('shields:report-dom-blocked', (event, count: number) => {
+  if (!count || count <= 0) return
+  const wcId = event.sender.id // Exact WebContents ID of the sender
+  incrementWcBlockedCount(wcId, count)
+
+  try {
+    const url = event.sender.getURL()
+    if (url) {
+      const domain = cleanDomain(new URL(url).hostname)
+      incrementSiteBlockedCount(domain, count)
+    }
+  } catch {}
+})
 ipcMain.handle('shields:get-page-stats', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow()
-  if (!win) return { ads: 0, trackers: 0, total: 0 }
-  const tabs = getTabsForEvent(event)
-  if (!tabs) return { ads: 0, trackers: 0, total: 0 }
-  const activeId = tabs.getActiveId()
+  let tm = getTabsForEvent(event)
+  if (!tm && mainWindow && !mainWindow.isDestroyed() && tabs) {
+    // Sender is the floating Shields popover (its own BrowserWindow), which
+    // has no TabManager — resolve the MAIN window's active tab instead.
+    tm = tabs
+  }
+  if (!tm) return { ads: 0, trackers: 0, total: 0 }
+  const activeId = tm.getActiveId()
   if (!activeId) return { ads: 0, trackers: 0, total: 0 }
-  const tab = tabs.getTab(activeId)
-  if (!tab || tab.id === undefined) return { ads: 0, trackers: 0, total: 0 }
-  return getTabBlockedStats(tab.id)
+  const tab = tm.getTab(activeId)
+  const wcId = tab?.view?.webContents?.id
+  if (wcId === undefined || wcId === null) return { ads: 0, trackers: 0, total: 0 }
+  // Query stats by WebContents ID (activeTab.webContents.id)
+  return getWcBlockedStats(wcId)
 })
 ipcMain.handle('tabs:reload-active', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow()
-  if (!win) return
-  const tabs = getTabsForEvent(event)
-  if (!tabs) return
-  const activeId = tabs.getActiveId()
+  let tm = getTabsForEvent(event)
+  if (!tm && mainWindow && !mainWindow.isDestroyed() && tabs) {
+    // Sender may be the floating Shields popover — use the main window's tabs.
+    tm = tabs
+  }
+  if (!tm) return
+  const activeId = tm.getActiveId()
   if (!activeId) return
-  const tab = tabs.getTab(activeId)
+  const tab = tm.getTab(activeId)
   if (tab?.view?.webContents) tab.view.webContents.reload()
 })
 
@@ -1299,6 +1339,7 @@ app.on('before-quit', (event) => {
 
 app.on('will-quit', () => {
   try { forceFlushMediaResume() } catch {}
+  try { cleanupKeyboard() } catch {}
   globalShortcut.unregisterAll()
 })
 
@@ -1325,5 +1366,22 @@ app.on('web-contents-created', (_e, contents) => {
     if (url.startsWith('javascript:') || url.startsWith('data:text/html')) {
       event.preventDefault()
     }
+  })
+
+  // AUTOMATICALLY HOOK EVERY TAB/WINDOW: network blocking (deduped per
+  // session), popup + navigation hijack guards (deduped per WebContents),
+  // and cosmetic CSS on every load. Guarantees coverage even for views
+  // created outside TabManager (split panes, popovers, ninja windows).
+  try {
+    registerNetworkAdBlocker(contents.session)
+  } catch {}
+  try {
+    applyPopupInterceptor(contents)
+  } catch {}
+  contents.on('dom-ready', () => {
+    applyCosmeticHiding(contents)
+  })
+  contents.on('did-finish-load', () => {
+    applyCosmeticHiding(contents)
   })
 })

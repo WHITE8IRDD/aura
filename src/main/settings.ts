@@ -70,6 +70,9 @@ export interface AuraSettings {
   translatorEngine: 'libretranslate' | 'google'
   translatorTargetLang: string
   translatorLibreEndpoint: string
+  vkFavorites: string[]
+  'vk-position': { x: number; y: number } | null
+  'vk-size': { width: number; height: number } | null
 }
 
 const DEFAULTS: AuraSettings = {
@@ -140,7 +143,10 @@ const DEFAULTS: AuraSettings = {
   profileAvatar: '',
   translatorEngine: 'libretranslate',
   translatorTargetLang: 'en',
-  translatorLibreEndpoint: 'https://translate.argosopentech.com/translate'
+  translatorLibreEndpoint: 'https://translate.argosopentech.com/translate',
+  vkFavorites: [],
+  'vk-position': null,
+  'vk-size': null,
 }
 
 let cache: Record<string, unknown> = {}

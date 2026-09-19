@@ -4,6 +4,8 @@ import { TabManager } from './tabs'
 import { isInternal, normalizeInput } from './url'
 import { getAccessibilityWebPreferences, applyDefaultZoom } from './accessibility'
 import { attachContextMenu } from './contextMenu'
+import { applyPopupInterceptor } from './blocker/popup-interceptor'
+import { applyCosmeticHiding } from './blocker/cosmetics'
 import { getSetting, setSetting } from './settings'
 
 export interface SplitState {
@@ -50,6 +52,8 @@ export class SplitManager {
 
     applyDefaultZoom(view.webContents)
     attachContextMenu(view.webContents, this.win, tm)
+    applyPopupInterceptor(view.webContents)
+    view.webContents.on('did-finish-load', () => { applyCosmeticHiding(view.webContents) })
 
     const state: SplitState = {
       tabId,

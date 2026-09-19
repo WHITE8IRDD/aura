@@ -10,6 +10,9 @@ import {
   setSiteShieldsLevel,
   type ShieldsLevel
 } from './shields-store'
+import { registerNetworkAdBlocker, initAdBlockEngine, incrementWcBlockedCount, getWcBlockedStats, incrementTabBlockedCount, getTabBlockedStats } from './adblock-engine'
+
+export { registerNetworkAdBlocker, initAdBlockEngine, incrementWcBlockedCount, getWcBlockedStats, incrementTabBlockedCount, getTabBlockedStats }
 
 interface BlockerStats {
   trackers: number
@@ -55,7 +58,11 @@ const AD_DOMAINS = [
   'doubleclick', 'googlesyndication', 'googleadservices', 'pubmatic',
   'criteo', 'taboola', 'outbrain', 'openx', 'rubiconproject', 'adnxs',
   'casalemedia', 'gumgum', 'indexww', 'media.net', 'adsystem', 'adserver',
-  'adsbygoogle', 'pagead2'
+  'adsbygoogle', 'pagead2',
+  // Streaming/Anime site ad & popunder networks
+  'adsterra', 'popads', 'popcash', 'propellerads', 'exoclick', 'juicyads',
+  'clickadilla', 'monetag', 'hilltopads', 'ad-maven', 'mydrive', 'videas',
+  'streamtape', 'filemoon', 'vidoza', 'doodstream'
 ]
 
 const FINGERPRINT_DOMAINS = ['fingerprintjs', 'fpcollect', 'castle.io', 'perimeterx', 'datadome']
@@ -190,10 +197,6 @@ export function installBlocker(targetSession: Session): void {
   }
 
   console.log('[Aura/blocker] Multi-list engine installed on session')
-}
-
-export function getTabBlockedStats(tabId: number) {
-  return tabBlockedCounts.get(tabId) || { ads: 0, trackers: 0, total: 0 }
 }
 
 export function resetTabBlockedStats(tabId: number) {

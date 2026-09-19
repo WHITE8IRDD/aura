@@ -221,8 +221,28 @@ const api = {
       ipcRenderer.invoke('shields:set-level', domain, level),
     getPageStats: (): Promise<PageBlockedStats> =>
       ipcRenderer.invoke('shields:get-page-stats'),
+    reportDomBlocked: (count: number): Promise<void> =>
+      ipcRenderer.invoke('shields:report-dom-blocked', count),
     openPopover: (bounds: { x: number; y: number; width: number; height: number }, domain: string): Promise<void> =>
       ipcRenderer.invoke('shields:open-popover', bounds, domain),
+  },
+
+  keyboard: {
+    getLayout: (): Promise<any> => ipcRenderer.invoke('vk:getLayout'),
+    getCategories: (): Promise<any[]> => ipcRenderer.invoke('vk:getCategories'),
+    getCategory: (catId: string): Promise<any[]> => ipcRenderer.invoke('vk:getCategory', catId),
+    search: (query: string): Promise<any[]> => ipcRenderer.invoke('vk:search', query),
+    copy: (char: string): Promise<boolean> => ipcRenderer.invoke('vk:copy', char),
+    insert: (char: string): Promise<boolean> => ipcRenderer.invoke('vk:insert', char),
+    type: (char: string): Promise<boolean> => ipcRenderer.invoke('vk:type', char),
+    sendKey: (code: string): Promise<boolean> => ipcRenderer.invoke('vk:sendKey', code),
+    getFavorites: (): Promise<string[]> => ipcRenderer.invoke('vk:getFavorites'),
+    addFavorite: (code: string): Promise<string[]> => ipcRenderer.invoke('vk:addFavorite', code),
+    removeFavorite: (code: string): Promise<string[]> => ipcRenderer.invoke('vk:removeFavorite', code),
+    reorderFavorites: (codes: string[]): Promise<string[]> => ipcRenderer.invoke('vk:reorderFavorites', codes),
+    toggle: (): Promise<void> => ipcRenderer.invoke('vk:toggle'),
+    close: (): Promise<void> => ipcRenderer.invoke('vk:close'),
+    setAlwaysOnTop: (flag: boolean): Promise<void> => ipcRenderer.invoke('vk:setAlwaysOnTop', flag),
   },
 
   // STAGE 6

@@ -42,6 +42,11 @@ export function initShieldsDatabase(db: Database.Database): void {
   `)
 }
 
+export function cleanDomain(hostname: string): string {
+  if (!hostname) return ''
+  return hostname.toLowerCase().replace(/^www\./, '').split(':')[0].trim()
+}
+
 export function getSiteShields(domain: string): SiteShieldSettings {
   const clean = cleanDomain(domain)
   if (!clean || !dbInstance) return { domain: clean, ...DEFAULT_SETTINGS }
@@ -123,9 +128,4 @@ export function incrementSiteBlockedCount(domain: string, count = 1): void {
         blocked_count = blocked_count + ?
     `).run(clean, count, count)
   } catch {}
-}
-
-function cleanDomain(hostname: string): string {
-  if (!hostname) return ''
-  return hostname.toLowerCase().replace(/^www\./, '').trim()
 }

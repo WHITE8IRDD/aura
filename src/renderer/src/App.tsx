@@ -24,6 +24,7 @@ import ReadingListPage from './pages/ReadingListPage'
 import BoostsPage from './pages/BoostsPage'
 import SettingsPage from './pages/SettingsPage'
 import PasswordsPage from './pages/PasswordsPage'
+import { VirtualKeyboard } from './components/VirtualKeyboard/VirtualKeyboard'
 
 import PasswordSavePrompt from './components/PasswordSavePrompt'
 import PasswordFillDropdown from './components/PasswordFillDropdown'
@@ -628,6 +629,13 @@ export default function App(): React.ReactElement {
     if (chromePage === 'settings') return <SettingsPage onClose={onClose} />
     if (chromePage === 'passwords') return <PasswordsPage />
     return null
+  }
+
+  // Aura Keys virtual keyboard runs as a standalone hash route inside its
+  // own floating BrowserWindow. All hooks above have already run, so this
+  // early return is Rules-of-Hooks safe.
+  if (typeof window !== 'undefined' && window.location.hash.startsWith('#/virtual-keyboard')) {
+    return <VirtualKeyboard />
   }
 
   return (

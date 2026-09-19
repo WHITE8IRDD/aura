@@ -27,22 +27,39 @@ export const ShieldsPopoverWindow: React.FC = () => {
     const params = new URLSearchParams(window.location.search)
     const d = params.get('domain') || ''
     setDomain(d)
-
-    if (d && window.aura?.shields?.getSettings) {
-      window.aura.shields.getSettings(d).then((settings: SiteShieldSettings | null) => {
-        if (settings) {
-          setLevel(settings.level === 'off' ? 'off' : settings.level === 'aggressive' ? 'aggressive' : 'standard')
-          setTotalLifetime(settings.blockedCount || 0)
-        }
-      })
-    }
-
-    if (window.aura?.shields?.getPageStats) {
-      window.aura.shields.getPageStats().then((stats: PageBlockedStats | null) => {
-        if (stats) setBlockedStats(stats)
-      })
-    }
   }, [])
+
+  useEffect(() => {
+    if (!domain) return
+
+    let cancelled = false
+
+    const fetchStats = async () => {
+      if (window.aura?.shields?.getSettings) {
+        try {
+          const settings: SiteShieldSettings | null = await window.aura.shields.getSettings(domain)
+          if (!cancelled && settings) {
+            setLevel(settings.level === 'off' ? 'off' : settings.level === 'aggressive' ? 'aggressive' : 'standard')
+            setTotalLifetime(settings.blockedCount || 0)
+          }
+        } catch {}
+      }
+      if (window.aura?.shields?.getPageStats) {
+        try {
+          const pageStats: PageBlockedStats | null = await window.aura.shields.getPageStats()
+          if (!cancelled && pageStats) setBlockedStats(pageStats)
+        } catch {}
+      }
+    }
+
+    fetchStats()
+    // Poll stats every 500ms while popover is open so live blocks update in real time!
+    const interval = setInterval(fetchStats, 500)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [domain])
 
   const handleLevelChange = async (newLevel: 'off' | 'standard' | 'aggressive') => {
     setLevel(newLevel)

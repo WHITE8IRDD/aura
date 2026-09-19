@@ -4,12 +4,55 @@ import './pageTranslator'
 import './videoDownloadDetector'
 import { initYouTubeFastPlayback, isYouTubePage as isYTPage1 } from './youtube-fast-playback'
 import { initYouTubeMaxQuality, isYouTubePage as isYTPage2 } from './youtube-max-quality'
+import { injectStealthAdBlockScriptlet, nukeStreamingAds } from './stealth-adblock'
 
 /* ── YouTube Performance + Quality ── */
 if (isYTPage1()) {
   initYouTubeFastPlayback()
   initYouTubeMaxQuality()
 }
+
+/* ── Stealth AdBlock (uBlock Origin + Privacy Badger grade) ── */
+// Page-world window.open trap (best-effort: page CSP may refuse it).
+// Wrapped so a hostile page can NEVER kill this preload.
+try {
+  injectStealthAdBlockScriptlet()
+} catch {}
+
+// Isolated-world DOM nuker: runs HERE (not page world), so page CSP and
+// Trusted Types cannot stop it. Reports removals straight over IPC.
+try {
+  const runNuke = (): void => {
+    try {
+      const removed = nukeStreamingAds()
+      if (removed > 0) {
+        ipcRenderer.invoke('shields:report-dom-blocked', removed).catch(() => {})
+      }
+    } catch {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runNuke)
+  } else {
+    runNuke()
+  }
+  setInterval(runNuke, 300)
+} catch {}
+
+// Listen for aura-dom-blocked from scriptlet and send to main process via IPC.
+// The isolated preload has direct ipcRenderer access (primary path); the
+// context-bridge aura.shields path is tried first for API consistency.
+window.addEventListener('aura-dom-blocked', (e: any) => {
+  try {
+    const count = e?.detail?.count
+    if (typeof count !== 'number' || count <= 0) return
+    const w = window as any
+    if (w.aura?.shields?.reportDomBlocked) {
+      w.aura.shields.reportDomBlocked(count)
+    } else {
+      ipcRenderer.invoke('shields:report-dom-blocked', count).catch(() => {})
+    }
+  } catch {}
+})
 
 /* ── Video timestamp tracking + resume ── */
 
@@ -450,3 +493,77 @@ new MutationObserver(() => {
     setTimeout(initPasswords, 500)
   }
 }).observe(document.body, { childList: true, subtree: true })
+
+/* ── Streaming/Anime Site Ad Defuser: Invisible Overlays, Popunders, Click-Jacking ── */
+function injectStreamingAdDefuser() {
+  const script = document.createElement('script')
+  script.textContent = `
+    (function() {
+      'use strict'
+
+      // 1. Defuse window.open popunder click-jacking
+      const origOpen = window.open
+      let lastClickTime = 0
+      document.addEventListener('click', () => { lastClickTime = Date.now() }, true)
+
+      window.open = function(url, target, features) {
+        const timeSinceClick = Date.now() - lastClickTime
+        const strUrl = String(url || '').toLowerCase()
+
+        // If window.open is called automatically or on an ad redirect -> BLOCK
+        const isAdDomain = ['pop', 'ad', 'bet', 'click', 'cash', 'redirect', 'link', 'promo']
+          .some(k => strUrl.includes(k))
+
+        if (isAdDomain || timeSinceClick > 1000 || !url) {
+          console.log('[Aura/Shields] Defused popunder window.open call:', url)
+          return null
+        }
+
+        return origOpen.apply(window, arguments)
+      }
+
+      // 2. Remove invisible player click-jacking overlays
+      function nukeInvisibleOverlays() {
+        const overlays = document.querySelectorAll('div, a, span, iframe')
+        overlays.forEach(el => {
+          const style = window.getComputedStyle(el)
+          const isFixed = style.position === 'fixed' || style.position === 'absolute'
+          const highZ = parseInt(style.zIndex || '0', 10) > 100
+          const isTransparent = style.opacity === '0' || style.backgroundColor === 'transparent' || style.visibility === 'hidden'
+
+          // If element is a transparent full-page overlay sitting on top of a video
+          if (isFixed && highZ && isTransparent && el.tagName !== 'VIDEO') {
+            const rect = el.getBoundingClientRect()
+            if (rect.width > 300 && rect.height > 200 && !el.querySelector('video')) {
+              (el as HTMLElement).style.setProperty('display', 'none', 'important')
+              (el as HTMLElement).style.setProperty('pointer-events', 'none', 'important')
+            }
+          }
+        })
+
+        // Specific streaming ad container classes
+        const adSelectors = [
+          '[id*="popunder"]', '[class*="popunder"]',
+          '[id*="adsterra"]', '[class*="adsterra"]',
+          '[id*="propeller"]', '[class*="propeller"]',
+          '#player-overlay', '.player-overlay',
+          '.video-ad-overlay', '#video-ad-overlay'
+        ]
+        adSelectors.forEach(sel => {
+          document.querySelectorAll(sel).forEach(el => {
+            (el as HTMLElement).style.setProperty('display', 'none', 'important')
+            (el as HTMLElement).style.setProperty('pointer-events', 'none', 'important')
+          })
+        })
+      }
+
+      // Loop overlay defuser during initial page load & player mount
+      setInterval(nukeInvisibleOverlays, 300)
+    })()
+  `
+
+  ;(document.head || document.documentElement).appendChild(script)
+  script.remove()
+}
+
+injectStreamingAdDefuser()
