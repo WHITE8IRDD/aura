@@ -18,6 +18,7 @@ export interface ExtensionRecord {
   sourcePath: string
   enabled: number
   installed_at: number
+  popup_path: string | null
 }
 
 function extensionsDir(): string {
@@ -148,6 +149,37 @@ export function findBestIconPath(extensionDir: string, manifest: any): string | 
   return null
 }
 
+// ─── Action popup resolution ────────────────────────────────────
+
+/** Relative popup path from manifest action keys, or null. Path-traversal safe. */
+export function findPopupPath(extensionDir: string, manifest: any): string | null {
+  const action = manifest?.action ?? manifest?.browser_action ?? manifest?.page_action
+  if (!action || typeof action !== 'object') return null
+  const popup = (action as Record<string, unknown>).default_popup
+  if (typeof popup !== 'string' || !popup) return null
+  const safeRelPath = popup.replace(/^\/+/, '')
+  const absPath = normalize(join(extensionDir, safeRelPath))
+  if (!absPath.startsWith(normalize(extensionDir))) return null
+  return existsSync(absPath) ? safeRelPath : null
+}
+
+/** Backfill popup_path for rows installed before the column existed. */
+export function ensurePopupPath(rec: ExtensionRecord): ExtensionRecord {
+  if (rec.popup_path) return rec
+  try {
+    const dir = extDir(rec.id)
+    if (!existsSync(join(dir, 'manifest.json'))) return { ...rec, popup_path: null }
+    const manifest = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf-8'))
+    const popup = findPopupPath(dir, manifest)
+    if (popup) {
+      db().prepare('UPDATE extensions SET popup_path = ? WHERE id = ?').run(popup, rec.id)
+    }
+    return { ...rec, popup_path: popup }
+  } catch {
+    return { ...rec, popup_path: null }
+  }
+}
+
 // ─── Database ─────────────────────────────────────────────────
 
 function listDB(): ExtensionRecord[] {
@@ -160,12 +192,12 @@ function getDB(id: string): ExtensionRecord | undefined {
 
 function upsertDB(rec: ExtensionRecord): void {
   db().prepare(`
-    INSERT INTO extensions (id, name, version, description, author, homeUrl, iconPath, sourceType, sourcePath, enabled, installed_at)
-    VALUES (@id, @name, @version, @description, @author, @homeUrl, @iconPath, @sourceType, @sourcePath, @enabled, @installed_at)
+    INSERT INTO extensions (id, name, version, description, author, homeUrl, iconPath, sourceType, sourcePath, enabled, installed_at, popup_path)
+    VALUES (@id, @name, @version, @description, @author, @homeUrl, @iconPath, @sourceType, @sourcePath, @enabled, @installed_at, @popup_path)
     ON CONFLICT(id) DO UPDATE SET
       name=@name, version=@version, description=@description, author=@author, homeUrl=@homeUrl,
-      iconPath=@iconPath, sourceType=@sourceType, sourcePath=@sourcePath, enabled=@enabled
-  `).run(rec)
+      iconPath=@iconPath, sourceType=@sourceType, sourcePath=@sourcePath, enabled=@enabled, popup_path=@popup_path
+  `).run({ ...rec, popup_path: rec.popup_path ?? null })
 }
 
 function deleteDB(id: string): void {
@@ -243,11 +275,13 @@ export async function installUnpacked(sourcePath: string): Promise<{ success: bo
   const author = typeof manifest.author === 'string' ? manifest.author : ''
   const homeUrl = String(manifest.homepage_url ?? '')
   const iconPath = findBestIconPath(final, manifest) || ''
+  const popup_path = findPopupPath(final, manifest)
 
   upsertDB({
     id, name, version, description, author, homeUrl,
     iconPath, sourceType: 'unpacked', sourcePath,
-    enabled: 1, installed_at: Math.floor(Date.now() / 1000)
+    enabled: 1, installed_at: Math.floor(Date.now() / 1000),
+    popup_path
   })
 
   return { success: true, id }
@@ -340,11 +374,13 @@ export async function installCrx(crxPath: string): Promise<{ success: boolean; i
   const author = typeof manifest.author === 'string' ? manifest.author : ''
   const homeUrl = String(manifest.homepage_url ?? '')
   const iconPath = findBestIconPath(final, manifest) || ''
+  const popup_path = findPopupPath(final, manifest)
 
   upsertDB({
     id, name, version, description, author, homeUrl,
     iconPath, sourceType: 'crx', sourcePath: crxPath,
-    enabled: 1, installed_at: Math.floor(Date.now() / 1000)
+    enabled: 1, installed_at: Math.floor(Date.now() / 1000),
+    popup_path
   })
 
   return { success: true, id }

@@ -67,6 +67,25 @@ export interface DarkModeState {
   forced: boolean // true when user set a per-site rule (skips auto-dark detection)
 }
 
+// ---------- Toolbar extension cluster ----------
+// Mirrors the management-page record shape (enabled is 1/0) plus a
+// camelCase popupPath alias used by the toolbar cluster.
+export interface ExtensionItem {
+  id: string
+  name: string
+  version: string
+  description: string
+  author: string
+  homeUrl: string
+  iconPath: string
+  sourceType: string
+  sourcePath: string
+  enabled: number
+  installed_at: number
+  popup_path: string | null
+  popupPath: string | null
+}
+
 // ---------- API exposed to Browser UI (Chrome) only ----------
 export interface AuraFeaturesApi {
   snooze: {
@@ -87,5 +106,9 @@ export interface AuraFeaturesApi {
     get(host: string): Promise<{ state: DarkModeState; rule: DarkSiteRule | null; globalPreset: DarkPreset | null }>
     setSite(host: string, rule: DarkSiteRule | null): Promise<void>
     setGlobal(preset: DarkPreset | null): Promise<void>
+  }
+  extensions: {
+    list(): Promise<ExtensionItem[]>
+    openPopup(extId: string, anchorX: number, anchorY: number): Promise<boolean>
   }
 }

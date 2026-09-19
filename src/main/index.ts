@@ -25,6 +25,7 @@ import { registerShieldsIpc } from './blocker/ipc'
 import { prewarmShieldsPopover } from './blocker/shields-popover'
 import { initFeatures, getSnoozer } from './features/ipc'
 import { registerDarkModeWindowIPC } from './darkModeWindow'
+import { registerExtensionIpc } from './extensionIpc'
 import { registerToolbarContextMenuIPC } from './toolbarContextMenu'
 import { registerWindowControls, wireMaximizeEvents } from './window-controls'
 import { registerShortcuts } from './shortcuts'
@@ -320,6 +321,7 @@ async function createWindow(): Promise<void> {
   // are attached lazily by the snoozer on first sight.
   initFeatures({ getMainWindow: () => mainWindow })
   registerDarkModeWindowIPC(() => mainWindow)
+  registerExtensionIpc(() => mainWindow)
 
   ninja = new NinjaWindowManager(CHROME_HEIGHT, SIDEBAR_WIDTH_DEFAULT)
 
@@ -598,6 +600,29 @@ ipcMain.handle('tabs:show-context-menu', async (event, tabId: string) => {
     })
   )
   menu.popup({ window: win })
+})
+
+ipcMain.handle('tabs:toggle-devtools', () => {
+  if (!tabs) return false
+  const activeId = tabs.getActiveId()
+  if (activeId === null) return false
+  const tab = tabs.getTab(activeId)
+  const wc = tab?.view?.webContents
+  if (!wc || wc.isDestroyed()) return false
+  if (wc.isDevToolsOpened()) {
+    wc.closeDevTools()
+    return false
+  }
+  wc.openDevTools({ mode: 'detach' })
+  return true
+})
+
+ipcMain.handle('tabs:is-devtools-open', () => {
+  if (!tabs) return false
+  const activeId = tabs.getActiveId()
+  if (activeId === null) return false
+  const wc = tabs.getTab(activeId)?.view?.webContents
+  return wc && !wc.isDestroyed() ? wc.isDevToolsOpened() : false
 })
 
 ipcMain.handle('tabs:setZoom', (e, id: number, factor: number) =>

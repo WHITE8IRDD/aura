@@ -262,6 +262,12 @@ const MIGRATIONS: Migration[] = [
   (db) => {
     db.exec(FEATURES_TABLES_DDL)
   },
+  (db) => {
+    // Extension action popups (toolbar icons open them in floating windows).
+    try {
+      db.exec(`ALTER TABLE extensions ADD COLUMN popup_path TEXT`)
+    } catch { /* column already exists */ }
+  },
 ]
 
 export function runMigrations(db: Database.Database): void {

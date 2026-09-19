@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { TabState, Suggestion, Bookmark } from '../types'
+import type { ExtensionItem } from '../../shared/aura-features'
 import Suggestions from './Suggestions'
 import BookmarkDialog from './BookmarkDialog'
 import ZoomIndicator from './ZoomIndicator'
@@ -253,9 +254,49 @@ export default function Toolbar(props: Props): React.ReactElement {
     })
   }, [url])
 
+  const [devToolsActive, setDevToolsActive] = useState(false)
+  const [extensions, setExtensions] = useState<ExtensionItem[]>([])
+
+  useEffect(() => {
+    let alive = true
+    window.aura.tabs.isDevToolsOpen().then((v) => { if (alive) setDevToolsActive(!!v) }).catch(() => {})
+    return () => { alive = false }
+  }, [tab?.id, url])
+
+  const handleToggleDevTools = useCallback(async () => {
+    try {
+      const open = await window.aura.tabs.toggleDevTools()
+      setDevToolsActive(!!open)
+    } catch { /* devtools unavailable */ }
+  }, [])
+
+  useEffect(() => {
+    let alive = true
+    window.auraFeatures?.extensions.list().then((list) => {
+      if (alive) setExtensions((list ?? []) as ExtensionItem[])
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+
+  const handleExtensionClick = useCallback((extId: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    void window.auraFeatures?.extensions.openPopup(extId, rect.left + rect.width / 2, rect.bottom)?.catch(() => {})
+  }, [])
+
   return (
     <div className="toolbar" onContextMenu={(e) => showToolbarMenu(e, toolbarMenuHandlers)}>
       <div className="nav-group">
+        <button
+          className={`aura-devtools-btn${devToolsActive ? ' active' : ''}`}
+          onClick={handleToggleDevTools}
+          title="Toggle Developer Tools (Ctrl+Shift+I)"
+          aria-label="Developer Tools"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+        </button>
         <button className="nav-btn toolbar-nav-btn" disabled={!tab?.canGoBack}
           onClick={(e) => { e.currentTarget.blur(); onBack() }} title="Back (Alt+\u2190)">
           <IconBack size={17} />
@@ -399,6 +440,37 @@ export default function Toolbar(props: Props): React.ReactElement {
       </div>
 
       <div className="toolbar-actions">
+        {extensions.filter((ext) => ext.enabled === 1 && ext.popupPath).length > 0 && (
+          <div className="extension-cluster" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            {extensions.filter((ext) => ext.enabled === 1 && ext.popupPath).map((ext) => (
+              <button
+                key={ext.id}
+                onClick={(e) => handleExtensionClick(ext.id, e)}
+                title={ext.name}
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <img
+                  src={`chrome-extension://${ext.id}/${ext.iconPath || 'icon.png'}`}
+                  alt={ext.name}
+                  style={{ width: '18px', height: '18px' }}
+                  onError={(e) => {
+                    ;(e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23aaa" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>'
+                  }}
+                />
+              </button>
+            ))}
+          </div>
+        )}
         {tab && !tab.internal && tab.zoomFactor !== 1.0 && (
           <ZoomIndicator
             factor={tab.zoomFactor ?? 1.0}

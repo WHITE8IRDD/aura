@@ -113,6 +113,8 @@ const api = {
     zoomOut: (id: number): Promise<void> => ipcRenderer.invoke('tabs:zoomOut', id),
     zoomReset: (id: number): Promise<void> => ipcRenderer.invoke('tabs:zoomReset', id),
     print: (id: number): Promise<void> => ipcRenderer.invoke('tabs:print', id),
+    toggleDevTools: (): Promise<boolean> => ipcRenderer.invoke('tabs:toggle-devtools'),
+    isDevToolsOpen: (): Promise<boolean> => ipcRenderer.invoke('tabs:is-devtools-open'),
     pip: (id: number): Promise<boolean> => ipcRenderer.invoke('tabs:pip', id),
     sendMessage: (tabId: number, channel: string, ...args: unknown[]): Promise<void> =>
       ipcRenderer.invoke('tabs:sendMessage', tabId, channel, ...args),
@@ -970,6 +972,11 @@ const auraFeaturesApi: AuraFeaturesApi = {
       ipcRenderer.invoke('features:dark-set-site', host, rule),
     setGlobal: (preset: DarkPreset | null) =>
       ipcRenderer.invoke('features:dark-set-global', preset),
+  },
+  extensions: {
+    list: () => ipcRenderer.invoke('extensions:list'),
+    openPopup: (extId: string, anchorX: number, anchorY: number): Promise<boolean> =>
+      ipcRenderer.invoke('extensions:open-popup', extId, anchorX, anchorY),
   },
 }
 
