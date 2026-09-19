@@ -4,6 +4,7 @@ import { join } from 'path'
 import { app } from 'electron'
 import { mkdirSync } from 'fs'
 import { TabManager } from './tabs'
+import { isChromeUi } from './features/guard'
 import {
   listExtensions,
   getExtension,
@@ -76,7 +77,21 @@ export function registerExtensionIpc(getMainWindow: () => BrowserWindow | null):
     return r
   })
 
-  ipcMain.handle('extensions:install-store-url', async (_e, input: string) => {
+  ipcMain.handle('extensions:install-store-url', async (e, input: string) => {
+    // Allowed from chrome UI, plus store pages themselves (the tab preload's
+    // "Add to Aura" injector calls this from the page context).
+    if (!isChromeUi(e.sender)) {
+      let host = ''
+      try {
+        host = new URL(e.sender.getURL()).hostname.toLowerCase()
+      } catch { /* no URL */ }
+      const onStore =
+        host === 'chromewebstore.google.com' ||
+        host.endsWith('.chromewebstore.google.com') ||
+        host === 'chrome.google.com' ||
+        host.endsWith('.chrome.google.com')
+      if (!onStore) throw new Error('extensions: untrusted sender')
+    }
     const q = String(input ?? '').trim()
     const m = q.match(/([a-p]{32})/i)
     if (!m) return { success: false, error: 'Could not parse extension ID from URL' }

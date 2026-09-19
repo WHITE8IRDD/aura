@@ -13,9 +13,9 @@ interface InstallResult {
 }
 
 const STORE_SUGGESTIONS = [
-  { label: 'Bitwarden', url: 'https://chromewebstore.google.com/detail/bitwarden/cjpalhdlnbpafiamejdnhcphjbkeiagm' },
-  { label: 'Dark Reader', url: 'https://chromewebstore.google.com/detail/dark-reader/eimfamddlgamimgfonpumjcpkolpddjj' },
-  { label: 'Stylus', url: 'https://chromewebstore.google.com/detail/stylus/clngdbkpkpeebahjckkjfobkbiopenh' },
+  { label: 'Bitwarden', url: 'https://chromewebstore.google.com/detail/bitwarden/nngceckbapebfimnlniiiahkandclblb' },
+  { label: 'Dark Reader', url: 'https://chromewebstore.google.com/detail/dark-reader/eimadpbcbfnmbkopoojfekhnkhdbieeh' },
+  { label: 'Stylus', url: 'https://chromewebstore.google.com/detail/stylus/clngdbkpkpeebahjckkjfobafhncgmne' },
 ]
 
 const STORE_URL_RE = /chromewebstore\.google\.com|chrome\.google\.com\/webstore|[a-p]{32}/i
@@ -207,7 +207,7 @@ export default function ExtensionsPage({ onClose }: Props): React.ReactElement {
           <input
             type="text"
             className="extp-install-input"
-            placeholder="https://chromewebstore.google.com/detail/…"
+            placeholder="Paste a Chrome Web Store URL — or click “Add to Aura” on any Store page"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') installFromQuery() }}

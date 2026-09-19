@@ -301,7 +301,10 @@ export async function installCrx(crxPath: string): Promise<{ success: boolean; i
   try {
     zipOffset = parseCrxHeader(crxBuf).zipOffset
   } catch (err) {
-    return { success: false, error: (err as Error).message }
+    // Surface the magic bytes + size so a bad download (e.g. an HTML
+    // interstitial from Google) is diagnosable instead of opaque.
+    const magic = crxBuf.slice(0, 4).toString('utf8').replace(/[^\x20-\x7e]/g, '?')
+    return { success: false, error: `${(err as Error).message} (magic: ${JSON.stringify(magic)}, size: ${crxBuf.length})` }
   }
 
   const zipBuf = crxBuf.slice(zipOffset)

@@ -7,6 +7,7 @@ import { initYouTubeMaxQuality, isYouTubePage as isYTPage2 } from './youtube-max
 import { initShieldsScriptlets } from './shields-scriptlets'
 import { initVideoGestures } from './video-gestures'
 import { initDarkMode } from './dark-mode'
+import { initStoreButton } from './chrome-webstore'
 
 initShieldsScriptlets()
 
@@ -18,6 +19,11 @@ try {
 /* ── Native per-site dark mode ── */
 try {
   initDarkMode()
+} catch {}
+
+/* ── Chrome Web Store "Add to Aura" button ── */
+try {
+  initStoreButton()
 } catch {}
 
 /* ── YouTube Performance + Quality ── */
