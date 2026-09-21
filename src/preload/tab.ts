@@ -4,6 +4,8 @@ import './pageTranslator'
 import './videoDownloadDetector'
 import { initYouTubeFastPlayback, isYouTubePage as isYTPage1 } from './youtube-fast-playback'
 import { initYouTubeMaxQuality, isYouTubePage as isYTPage2 } from './youtube-max-quality'
+import { initYouTubeFeedCurator, isYouTubeHost } from './youtube-feed-curator'
+import { initAuraSub } from './youtube/aura-sub'
 import { initShieldsScriptlets } from './shields-scriptlets'
 import { initVideoGestures } from './video-gestures'
 import { initDarkMode } from './dark-mode'
@@ -31,6 +33,19 @@ if (isYTPage1()) {
   initYouTubeFastPlayback()
   initYouTubeMaxQuality()
 }
+
+/* ── YouTube feed curator: filters only (Shorts/rules/home/focus) ── */
+/* Runs in this isolated world only — nothing is exposed to the page. */
+if (isYouTubeHost()) {
+  try {
+    initYouTubeFeedCurator()
+  } catch {}
+}
+
+/* ── Aura Sub button: Shadow-DOM controller (own mount lifecycle) ── */
+try {
+  initAuraSub()
+} catch {}
 
 /* ── Video timestamp tracking + resume ── */
 
