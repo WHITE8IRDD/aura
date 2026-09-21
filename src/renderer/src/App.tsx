@@ -25,6 +25,7 @@ import BoostsPage from './pages/BoostsPage'
 import SettingsPage from './pages/SettingsPage'
 import PasswordsPage from './pages/PasswordsPage'
 import ExtensionsPage from './pages/ExtensionsPage'
+import YouTubeFeedPage from './pages/youtube/YouTubeFeedPage'
 import { VirtualKeyboard } from './components/VirtualKeyboard/VirtualKeyboard'
 import DarkModePopover from './components/DarkModePopover'
 import AutoRefreshPopover from './components/AutoRefreshPopover'
@@ -52,7 +53,7 @@ const CHROME_HEIGHT_BASE = 80                  // 36 (tabs) + 44 (toolbar)
 const BOOKMARKS_BAR_HEIGHT = 30                // .bookmarks-bar height
 const CHROME_HEIGHT_VERTICAL_COMPACT = 74      // 30 (compact top) + 44 (toolbar)
 
-type ChromePage = null | 'privacy' | 'history' | 'bookmarks' | 'downloads' | 'readingList' | 'boosts' | 'settings' | 'passwords' | 'extensions'
+type ChromePage = null | 'privacy' | 'history' | 'bookmarks' | 'downloads' | 'readingList' | 'boosts' | 'settings' | 'passwords' | 'extensions' | 'youtube'
 
 export default function App(): React.ReactElement {
   useTheme()
@@ -632,6 +633,7 @@ export default function App(): React.ReactElement {
     if (chromePage === 'settings') return <SettingsPage onClose={onClose} />
     if (chromePage === 'passwords') return <PasswordsPage />
     if (chromePage === 'extensions') return <ExtensionsPage onClose={onClose} />
+    if (chromePage === 'youtube') return <YouTubeFeedPage onClose={onClose} />
     return null
   }
 
@@ -697,6 +699,7 @@ export default function App(): React.ReactElement {
             onOpenHistory={() => setChromePage(chromePage === 'history' ? null : 'history')}
             onOpenDownloads={() => setChromePage(chromePage === 'downloads' ? null : 'downloads')}
             onOpenExtensions={() => setChromePage(chromePage === 'extensions' ? null : 'extensions')}
+            onOpenYouTube={() => setChromePage(chromePage === 'youtube' ? null : 'youtube')}
             onOpenSettings={() => setChromePage(chromePage === 'settings' ? null : 'settings')}
             onOpenProfile={() => {
               setPanelMessage('Profile switcher arrives in Stage 10')

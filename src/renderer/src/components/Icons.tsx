@@ -187,4 +187,10 @@ export const IconSplit: React.FC<SplitIconProps> = ({ size = 16, filled = false 
     <line x1="12" y1="4" x2="12" y2="20" />
   </svg>
 )
+export const IconPlay = (p: IconProps): React.ReactElement => (
+  <I {...p}>
+    <rect x="2.5" y="5" width="19" height="14" rx="4" />
+    <path d="M10.5 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none" />
+  </I>
+)
 

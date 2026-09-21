@@ -75,6 +75,7 @@
     "adm-zip": "^0.5.17",
     "better-sqlite3": "11.7.0",
     "cross-fetch": "^4.1.0",
+    "fast-xml-parser": "^5.11.1",
     "framer-motion": "^12.40.0",
     "linkedom": "^0.18.12",
     "react": "^18.3.1",

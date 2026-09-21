@@ -10,6 +10,7 @@ import type { Boost } from '../main/boosts'
 import type { SidebarPanel } from '../main/sidebar-panels'
 import type { TabGroup } from '../main/tab-groups'
 import type { AuraFeaturesApi, AutoRefreshState, DarkPreset, DarkSiteRule, GestureSettings, QuickLink, SnoozeSettings, TabSnoozeStatePatch } from '../shared/aura-features'
+import type { YtChannel, YtFeedItem, YtRule, YtRuleType, YtSettings, YtWatchLaterItem } from '../shared/youtube'
 
 interface CredentialRecord {
   id: number
@@ -186,6 +187,41 @@ const api = {
     stats: (): Promise<PrivacyStats> => ipcRenderer.invoke('privacy:stats'),
     isPhishing: (hostname: string): Promise<boolean> =>
       ipcRenderer.invoke('privacy:isPhishing', hostname)
+  },
+
+  // NOTE: this preload (index.js) loads ONLY in Aura's own chrome windows
+  // (main window + floating popovers). Tab views load preload/tab.js, so
+  // youtube.com and every other website never receives window.aura.youtube.
+  youtube: {
+    getFeed: (): Promise<YtFeedItem[]> => ipcRenderer.invoke('yt:getFeed'),
+    refreshFeed: (force: boolean): Promise<YtFeedItem[]> =>
+      ipcRenderer.invoke('yt:refreshFeed', force),
+    getSubscriptions: (): Promise<YtChannel[]> => ipcRenderer.invoke('yt:getSubscriptions'),
+    subscribe: (input: { input: string }): Promise<YtChannel[]> =>
+      ipcRenderer.invoke('yt:subscribe', input),
+    unsubscribe: (channelId: string): Promise<YtChannel[]> =>
+      ipcRenderer.invoke('yt:unsubscribe', channelId),
+    importSubscriptions: (text: string): Promise<{ added: number; skipped: number }> =>
+      ipcRenderer.invoke('yt:importSubscriptions', text),
+    getWatchLater: (): Promise<YtWatchLaterItem[]> => ipcRenderer.invoke('yt:getWatchLater'),
+    addWatchLater: (item: { videoId: string; title: string; channelTitle?: string }): Promise<boolean> =>
+      ipcRenderer.invoke('yt:addWatchLater', item),
+    removeWatchLater: (videoId: string): Promise<boolean> =>
+      ipcRenderer.invoke('yt:removeWatchLater', videoId),
+    markWatched: (videoId: string, watched: boolean): Promise<boolean> =>
+      ipcRenderer.invoke('yt:markWatched', videoId, watched),
+    getRules: (): Promise<YtRule[]> => ipcRenderer.invoke('yt:getRules'),
+    addRule: (rule: { ruleType: YtRuleType; value: string }): Promise<YtRule[]> =>
+      ipcRenderer.invoke('yt:addRule', rule),
+    removeRule: (id: number): Promise<YtRule[]> => ipcRenderer.invoke('yt:removeRule', id),
+    getSettings: (): Promise<YtSettings> => ipcRenderer.invoke('yt:getSettings'),
+    setSetting: <K extends keyof YtSettings>(key: K, value: YtSettings[K]): Promise<YtSettings> =>
+      ipcRenderer.invoke('yt:setSetting', key, value),
+    onChanged: (cb: () => void): (() => void) => {
+      const handler = (): void => cb()
+      ipcRenderer.on('yt:changed', handler)
+      return () => ipcRenderer.removeListener('yt:changed', handler)
+    }
   },
 
   security: {

@@ -50,6 +50,7 @@ import {
   flushBlockedCounts,
 } from './blocker/shields-store'
 import { allowInsecureHost } from './blocker'
+import { setupYouTubeFeedIPC } from './youtubeFeed'
 import { setupAntiFingerprintFlags, setupSessionFingerprintDefenses } from './security/fingerprint'
 import { setupPermissionPrompts, respondToPermission } from './security/permissions'
 import { isPhishingDomain } from './blocker/phishing'
@@ -155,6 +156,11 @@ app.commandLine.appendSwitch('enable-gpu-rasterization')
 app.commandLine.appendSwitch('enable-accelerated-video-decode')
 app.commandLine.appendSwitch('enable-quic')
 
+// Suppress Chromium's native fullscreen notice overlays & popups so
+// entering/exiting fullscreen is instant and silent (no "Press Esc" banner).
+app.commandLine.appendSwitch('disable-features', 'FullscreenNoticeView,FullscreenPopup,SimplifyingUserAgent')
+app.commandLine.appendSwitch('disable-fullscreen-tab-before-exec')
+
 setupAntiFingerprintFlags()
 
 process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true'
@@ -201,6 +207,7 @@ const startupReady = app.whenReady().then(async () => {
   console.log('[Aura] Opening database…')
   const db = getDb()
   initShieldsDatabase(db)
+  setupYouTubeFeedIPC(db)
   applyHardwareAccelLater()
   applyForceDarkFlag()
   console.log('[Aura/settings] Loaded settings')
@@ -269,6 +276,8 @@ async function createWindow(): Promise<void> {
     ...(process.platform === 'win32' && { thickFrame: true }),
     transparent: false,
     icon: resolveIcon('icon-256.png'),
+    autoHideMenuBar: true,
+    fullscreenable: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -281,6 +290,8 @@ async function createWindow(): Promise<void> {
   })
 
   mainWindow.on('page-title-updated', (e) => e.preventDefault())
+  // No native menubar ever: shortcuts run via globalShortcut + context menus.
+  mainWindow.setMenu(null)
   mainWindow.once('ready-to-show', () => mainWindow?.show())
   prewarmShieldsPopover(mainWindow, {
     preload: join(__dirname, '../preload/index.js'),

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
   IconSearch, IconPlus, IconHistory, IconBookmark,
-  IconSettings, IconDownload, IconSidebar, IconUser
+  IconSettings, IconDownload, IconSidebar, IconUser, IconPlay
 } from './Icons'
 
 interface Command {
@@ -77,6 +77,13 @@ export default function CommandPalette({
       hint: 'Ctrl+J',
       icon: <IconDownload size={16} />,
       run: act(() => onOpenPage('downloads'))
+    },
+    {
+      id: 'youtube',
+      label: 'Open YouTube Feed',
+      hint: '',
+      icon: <IconPlay size={16} />,
+      run: act(() => onOpenPage('youtube'))
     },
     {
       id: 'reading-list',

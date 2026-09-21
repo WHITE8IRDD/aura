@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   IconHistory, IconDownload, IconExtension, IconSettings,
-  IconUser, IconSidebar, IconSplit, IconReader
+  IconUser, IconSidebar, IconSplit, IconReader, IconPlay
 } from './Icons'
 import NinjaAvatar from './NinjaAvatar'
 import { MediaHub } from './MediaHub'
@@ -17,6 +17,7 @@ interface Props {
   onOpenHistory: () => void
   onOpenDownloads: () => void
   onOpenExtensions: () => void
+  onOpenYouTube: () => void
   onOpenSettings: () => void
   onOpenProfile: () => void
   onOpenNinja: () => void
@@ -30,7 +31,7 @@ interface Props {
 
 export default function UtilityCluster({
   onOpenHistory, onOpenDownloads, onOpenExtensions,
-  onOpenSettings, onOpenProfile, onOpenNinja,
+  onOpenYouTube, onOpenSettings, onOpenProfile, onOpenNinja,
   onOpenCommandPalette, onToggleVerticalTabs,
   verticalTabs, activeTab,
   readerActive: propReaderActive, onToggleReader: propOnToggleReader
@@ -284,6 +285,9 @@ export default function UtilityCluster({
       </button>
       <button className="util-btn" title="Downloads" onClick={onOpenDownloads}>
         <IconDownload size={15} />
+      </button>
+      <button className="util-btn" title="YouTube Feed (private subscriptions)" onClick={onOpenYouTube}>
+        <IconPlay size={15} />
       </button>
       <MediaHub />
       <button className={`util-btn reader-toggle-btn${effectiveReaderActive ? ' active' : ''}${!readerAvailable ? ' hidden' : ''}`}

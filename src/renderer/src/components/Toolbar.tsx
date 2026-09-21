@@ -34,6 +34,7 @@ interface Props {
   onOpenHistory: () => void
   onOpenDownloads: () => void
   onOpenExtensions: () => void
+  onOpenYouTube: () => void
   onOpenSettings: () => void
   onOpenProfile: () => void
   onOpenNinja: () => void
@@ -90,7 +91,7 @@ export default function Toolbar(props: Props): React.ReactElement {
   const {
     tab, onBack, onForward, onReload, onNavigate, focusSignal,
     onOpenHistory, onOpenDownloads,
-    onOpenExtensions, onOpenSettings, onOpenProfile, onOpenNinja,
+    onOpenExtensions, onOpenYouTube, onOpenSettings, onOpenProfile, onOpenNinja,
     onOpenCommandPalette,
     onToggleVerticalTabs, verticalTabs, bookmarkSignal, onSaveToReadingList,
     onOpenFindBar, onToggleReader, readerActive, toolbarMenuHandlers
@@ -510,6 +511,7 @@ export default function Toolbar(props: Props): React.ReactElement {
           onOpenHistory={onOpenHistory}
           onOpenDownloads={onOpenDownloads}
           onOpenExtensions={onOpenExtensions}
+          onOpenYouTube={onOpenYouTube}
           onOpenSettings={onOpenSettings}
           onOpenProfile={onOpenProfile}
           onOpenNinja={onOpenNinja}
