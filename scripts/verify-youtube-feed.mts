@@ -23,7 +23,9 @@ import {
   isValidChannelId,
   isValidHandle,
   isValidVideoId,
+  normalizeRuleValue,
   parseChannelFeedXml,
+  parseChannelReference,
   parseSubscriptionCsv,
   rankFeedItems,
   resolveChannelInput,
@@ -59,6 +61,32 @@ assert.ok(isValidVideoId('dQw4w9WgXcQ'))
 assert.ok(!isValidVideoId('too-short'))
 assert.ok(isValidHandle('@mkbhd'))
 assert.ok(!isValidHandle('!!!'))
+
+// Channel reference classifier: all accepted input shapes, no network.
+assert.deepEqual(parseChannelReference('UCBa659QWEk1IU5vplA9t9yg'), {
+  kind: 'id',
+  channelId: 'UCBa659QWEk1IU5vplA9t9yg',
+})
+assert.deepEqual(parseChannelReference('https://www.youtube.com/channel/UCBa659QWEk1IU5vplA9t9yg'), {
+  kind: 'id',
+  channelId: 'UCBa659QWEk1IU5vplA9t9yg',
+})
+assert.deepEqual(parseChannelReference('https://www.youtube.com/@hiss666'), {
+  kind: 'handle',
+  handle: 'hiss666',
+})
+assert.deepEqual(parseChannelReference('https://youtube.com/@hiss666'), {
+  kind: 'handle',
+  handle: 'hiss666',
+})
+assert.deepEqual(parseChannelReference('@hiss666'), { kind: 'handle', handle: 'hiss666' })
+assert.deepEqual(parseChannelReference('hiss666'), { kind: 'handle', handle: 'hiss666' })
+assert.deepEqual(parseChannelReference('https://www.youtube.com/c/SomeName'), {
+  kind: 'url',
+  url: 'https://www.youtube.com/c/SomeName',
+})
+assert.equal(parseChannelReference(''), null)
+assert.equal(parseChannelReference('!!!'), null)
 
 // Malformed subscribe input rejects before any network happens.
 await assert.rejects(() => resolveChannelInput(''))

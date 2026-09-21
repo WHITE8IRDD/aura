@@ -49,9 +49,15 @@ export const SubscriptionsPanel: React.FC<{ yt: YouTubeState }> = ({ yt }) => {
     try {
       await yt.subscribe(input)
       setValue('')
-      setNote({ kind: 'ok', text: 'Channel added — its videos will appear in a moment.' })
+      setNote({ kind: 'ok', text: 'Added — videos will appear after Refresh.' })
     } catch (err) {
-      setNote({ kind: 'err', text: errorText(err) })
+      const raw = errorText(err)
+      setNote({
+        kind: 'err',
+        text: /not found|resolv|could not find|blocked|timed out|reach/i.test(raw)
+          ? `Couldn't find that channel. Check the @handle or paste a channel URL. (${raw})`
+          : raw,
+      })
     } finally {
       setBusy(false)
     }
@@ -88,7 +94,7 @@ export const SubscriptionsPanel: React.FC<{ yt: YouTubeState }> = ({ yt }) => {
           spellCheck={false}
         />
         <button type="submit" className="ytf-btn ytf-btn--primary" disabled={busy || !value.trim()}>
-          <Icon name="plus" /> Subscribe
+          <Icon name="plus" /> {busy ? 'Resolving…' : 'Subscribe'}
         </button>
         <button type="button" className="ytf-btn" disabled={busy} onClick={() => fileRef.current?.click()}>
           <Icon name="upload" /> Import CSV

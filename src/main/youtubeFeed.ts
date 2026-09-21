@@ -137,6 +137,7 @@ export function setupYouTubeFeedIPC(db: Database.Database): void {
       const direct = parseButtonRef(input)
       if (direct?.channelId) {
         dbSubscribe(db, direct.channelId, direct.title, direct.handle, direct.avatarUrl)
+        console.log(`[Aura YT] subscribed ${direct.channelId} ${direct.handle ?? ''} ${direct.title}`)
         broadcastChanged()
         return dbListSubscriptions(db)
       }
@@ -144,6 +145,7 @@ export function setupYouTubeFeedIPC(db: Database.Database): void {
       const resolved = await resolveChannelInput(String(input?.input ?? ''))
       const meta = await fetchChannelMeta(resolved.channelId)
       dbSubscribe(db, resolved.channelId, meta.title, resolved.handle, meta.avatarUrl)
+      console.log(`[Aura YT] subscribed ${resolved.channelId} ${resolved.handle ?? ''} ${meta.title}`)
       broadcastChanged()
       return dbListSubscriptions(db)
     },

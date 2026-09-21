@@ -204,10 +204,60 @@ interface ResolvedChannel {
   handle: string | null
 }
 
+export type ChannelReference =
+  | { kind: 'id'; channelId: string }
+  | { kind: 'handle'; handle: string }
+  | { kind: 'url'; url: string }
+  | null
+
+/**
+ * Pure input classifier (no network): UC id anywhere, @handle in a
+ * URL / bare / trailing-@ form, or a full channel URL. Unit-testable.
+ */
+export function parseChannelReference(raw: string): ChannelReference {
+  const input = cleanText(raw, 500)
+  if (!input) return null
+
+  const uc = input.match(/(UC[a-zA-Z0-9_-]{22})/)
+  if (uc?.[1]) return { kind: 'id', channelId: uc[1] }
+
+  const atUrl = input.match(/youtube\.com\/@([^/?#\s]+)/i)
+  if (atUrl?.[1]) {
+    try {
+      return { kind: 'handle', handle: decodeURIComponent(atUrl[1]).replace(/^@/, '') }
+    } catch {
+      return { kind: 'handle', handle: atUrl[1].replace(/^@/, '') }
+    }
+  }
+  const atBare = input.match(/^@([^/?#\s]+)$/)
+  if (atBare?.[1]) return { kind: 'handle', handle: atBare[1] }
+  if (!input.includes('/') && !input.includes(' ') && !input.includes(':')) {
+    const name = input.replace(/^@/, '')
+    if (HANDLE_RE.test(name)) return { kind: 'handle', handle: name }
+  }
+
+  if (/^https?:\/\//i.test(input)) {
+    try {
+      const url = new URL(input)
+      if (url.hostname === 'youtube.com' || url.hostname.endsWith('.youtube.com')) {
+        return { kind: 'url', url: url.toString() }
+      }
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
 function extractChannelId(html: string): string | null {
   const patterns = [
+    /<link rel="canonical" href="https:\/\/www\.youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})"/i,
     /<meta[^>]+itemprop=["']channelId["'][^>]+content=["'](UC[a-zA-Z0-9_-]{22})["']/i,
+    /<meta[^>]+property=["']og:url["'][^>]+content=["'][^"']*\/channel\/(UC[a-zA-Z0-9_-]{22})["']/i,
     /"channelId":"(UC[a-zA-Z0-9_-]{22})"/i,
+    /"externalId":"(UC[a-zA-Z0-9_-]{22})"/i,
+    /"browseId":"(UC[a-zA-Z0-9_-]{22})"/i,
+    /channel\/(UC[a-zA-Z0-9_-]{22})/i,
   ]
   for (const pattern of patterns) {
     const match = html.match(pattern)
@@ -216,62 +266,111 @@ function extractChannelId(html: string): string | null {
   return null
 }
 
-function extractMeta(html: string, property: string): string | null {
-  const match = html.match(
-    new RegExp(`<meta[^>]+property=["']${property}["'][^>]+content=["']([^"']+)["']`, 'i'),
+function looksLikeBotCheck(html: string): boolean {
+  return (
+    /consent\.youtube\.com/i.test(html) ||
+    /confirm you('|’)re not a bot/i.test(html) ||
+    /sign in to confirm/i.test(html)
   )
-  return match?.[1]?.trim() || null
 }
 
-async function fetchHtml(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: {
-      'user-agent': 'Mozilla/5.0 AuraBrowser/1.0',
-      accept: 'text/html,application/xhtml+xml',
-    },
-  })
-  if (!response.ok) throw new Error(`[yt] Request failed (HTTP ${response.status})`)
+function extractTitle(html: string, fallback: string): string {
+  const patterns = [
+    /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
+    /"title":\{"runs":\[\{"text":"((?:[^"\\]|\\.)+)"/i,
+    /"title":"((?:[^"\\]|\\.)+)"/i,
+    /<title>([^<]+)<\/title>/i,
+  ]
+  for (const pattern of patterns) {
+    const match = html.match(pattern)
+    const title = match?.[1]?.replace(/\\u0026/g, '&').replace(/\s*-\s*YouTube\s*$/, '').trim()
+    if (title) return cleanText(title, 200)
+  }
+  return fallback
+}
+
+function extractAvatar(html: string): string | null {
+  const patterns = [
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+    /"avatar":\{"thumbnails":\[\{"url":"([^"]+)"/i,
+  ]
+  for (const pattern of patterns) {
+    const match = html.match(pattern)
+    if (match?.[1]?.startsWith('https://')) return match[1].slice(0, 1000)
+  }
+  return null
+}
+
+async function fetchHtml(url: string, label: string): Promise<string> {
+  let response: Response
+  try {
+    response = await fetch(url, {
+      headers: {
+        'user-agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'accept-language': 'en-US,en;q=0.9',
+        accept: 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(10000),
+    })
+  } catch (err) {
+    if (err instanceof Error && err.name === 'TimeoutError') {
+      throw new Error(`[yt] YouTube timed out while looking up ${label}`)
+    }
+    throw new Error(`[yt] Could not reach YouTube while looking up ${label}`)
+  }
+  if (response.status === 404) throw new Error(`[yt] Channel ${label} was not found`)
+  if (response.status === 429 || response.status === 403) {
+    throw new Error('[yt] YouTube blocked the lookup — try again in a minute')
+  }
+  if (!response.ok) throw new Error(`[yt] Lookup failed (HTTP ${response.status})`)
   return response.text()
 }
 
-/** Accept a UC id, @handle, or channel URL and resolve it to a channel ID. */
+/**
+ * Resolve any accepted input to a UC channel id. Tries the handle page
+ * and its /about variant (YouTube serves bot-check/consent shells too
+ * often to trust a single fetch), with specific errors per failure mode.
+ */
 export async function resolveChannelInput(raw: string): Promise<ResolvedChannel> {
-  const input = cleanText(raw, 500)
-  if (!input) throw new Error('[yt] Enter a channel URL, @handle or channel ID')
+  const ref = parseChannelReference(raw)
+  if (!ref) throw new Error('[yt] Enter a channel URL, @handle or channel ID')
+  if (ref.kind === 'id') return { channelId: ref.channelId, handle: null }
 
-  if (CHANNEL_ID_RE.test(input)) return { channelId: input, handle: null }
-
-  let handle: string | null = null
-  try {
-    const url = new URL(input.startsWith('http') ? input : `https://${input}`)
-    if (url.hostname === 'youtube.com' || url.hostname.endsWith('.youtube.com')) {
-      const chan = url.pathname.match(/^\/channel\/(UC[a-zA-Z0-9_-]{22})/)
-      if (chan?.[1]) return { channelId: chan[1], handle: null }
-      const at = url.pathname.match(/^\/(@[a-zA-Z0-9._-]{1,100})/)
-      if (at?.[1]) handle = at[1]
-      else {
-        const slug = url.pathname.match(/^\/(c|user)\/([a-zA-Z0-9._-]{1,100})/)
-        if (slug?.[2]) {
-          const html = await fetchHtml(url.toString())
-          const id = extractChannelId(html)
-          if (!id) throw new Error('[yt] Could not resolve that channel URL')
-          return { channelId: id, handle: null }
-        }
+  if (ref.kind === 'url') {
+    const html = await fetchHtml(ref.url, 'that channel URL')
+    const id = extractChannelId(html)
+    if (!id) {
+      if (looksLikeBotCheck(html)) {
+        throw new Error('[yt] YouTube blocked the lookup — try again in a minute')
       }
+      throw new Error('[yt] Could not find a channel at that URL')
     }
-  } catch (err) {
-    if (err instanceof Error && err.message.startsWith('[yt]')) throw err
-    // Not a URL — fall through to handle parsing.
+    return { channelId: id, handle: null }
   }
 
-  const bare = handle ?? input
-  const name = bare.replace(/^@/, '')
-  if (!HANDLE_RE.test(name)) throw new Error('[yt] Enter a channel URL, @handle or channel ID')
-
-  const html = await fetchHtml(`https://www.youtube.com/@${encodeURIComponent(name)}`)
-  const id = extractChannelId(html)
-  if (!id) throw new Error('[yt] Could not resolve that handle to a channel')
-  return { channelId: id, handle: `@${name}` }
+  const label = `@${ref.handle}`
+  const candidates = [
+    `https://www.youtube.com/@${encodeURIComponent(ref.handle)}`,
+    `https://www.youtube.com/@${encodeURIComponent(ref.handle)}/about`,
+  ]
+  let lastError: Error | null = null
+  for (const url of candidates) {
+    try {
+      const html = await fetchHtml(url, label)
+      const id = extractChannelId(html)
+      if (id) return { channelId: id, handle: label }
+      if (looksLikeBotCheck(html)) {
+        lastError = new Error('[yt] YouTube blocked the lookup — try again in a minute')
+        continue
+      }
+      lastError = new Error(`[yt] Could not find a channel for ${label}`)
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(`[yt] Lookup failed for ${label}`)
+      if (/timed out|blocked|Could not reach/.test(lastError.message)) break
+    }
+  }
+  throw lastError ?? new Error(`[yt] Could not find a channel for ${label}`)
 }
 
 export async function fetchChannelMeta(
@@ -279,10 +378,9 @@ export async function fetchChannelMeta(
 ): Promise<{ title: string; avatarUrl: string | null }> {
   const html = await fetchHtml(
     `https://www.youtube.com/channel/${encodeURIComponent(channelId)}`,
+    'that channel',
   )
-  const title =
-    extractMeta(html, 'og:title')?.replace(/\s*-\s*YouTube\s*$/, '').trim() || 'YouTube channel'
-  return { title: cleanText(title, 200), avatarUrl: extractMeta(html, 'og:image') }
+  return { title: extractTitle(html, 'YouTube channel'), avatarUrl: extractAvatar(html) }
 }
 
 /* ── Takeout CSV import ── */
