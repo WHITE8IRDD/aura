@@ -26,6 +26,43 @@ export const FEATURES_TABLES_DDL = `
   );
 `
 
+/** Shared DDL for the account-free YouTube feed tables. Used by the
+ *  versioned migration below AND by the features layer's lazy ensure. */
+export const YT_TABLES_DDL = `
+  CREATE TABLE IF NOT EXISTS yt_subscriptions (
+    channel_id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    handle TEXT,
+    avatar_url TEXT,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+  );
+  CREATE TABLE IF NOT EXISTS yt_watch_later (
+    video_id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    channel_title TEXT,
+    thumbnail_url TEXT,
+    duration TEXT,
+    added_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+  );
+  CREATE TABLE IF NOT EXISTS yt_watched (
+    video_id TEXT PRIMARY KEY,
+    watched_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+  );
+  CREATE TABLE IF NOT EXISTS yt_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS yt_feed_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_type TEXT NOT NULL,
+    value TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_yt_feed_rules_unique
+    ON yt_feed_rules(rule_type, lower(value));
+  CREATE INDEX IF NOT EXISTS idx_yt_subs_handle
+    ON yt_subscriptions(handle COLLATE NOCASE);
+`
+
 const MIGRATIONS: Migration[] = [
   (db) => {
     db.exec(`
@@ -267,6 +304,9 @@ const MIGRATIONS: Migration[] = [
     try {
       db.exec(`ALTER TABLE extensions ADD COLUMN popup_path TEXT`)
     } catch { /* column already exists */ }
+  },
+  (db) => {
+    db.exec(YT_TABLES_DDL)
   },
 ]
 
