@@ -78,19 +78,36 @@ function getPlayerEl(): Element | null {
   return document.querySelector('#movie_player') ?? document.querySelector('.html5-video-player')
 }
 
-/** True while any ad UI is visible. Checks several independent signals since YouTube's ad
- *  markup drifts over time — treat this as "probably an ad", not certainty either way. */
+/** An element only counts as an ad signal if it's actually on screen. YouTube frequently
+ *  leaves ad containers in the DOM — hidden, not removed — after an ad ends; checking mere
+ *  existence (as the previous version did) makes every ad "never end," which is what was
+ *  causing the rest of the real video to get muted and sped up too. */
+function isVisible(el: Element | null): boolean {
+  if (!el) return false
+  const style = window.getComputedStyle(el)
+  if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0)
+    return false
+  const rect = el.getBoundingClientRect()
+  return rect.width > 0 && rect.height > 0
+}
+
+/** True while an ad is actually showing. The player's own ad-showing/ad-interrupting class
+ *  is the authoritative, reliably-toggled signal — trust it first. The overlay selectors are
+ *  only a fallback for the moment right before that class lands, so they require visibility. */
 function isAdShowing(): boolean {
   const player = getPlayerEl()
   const classAd =
-    !!player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'))
-  const overlayAd = !!(
-    document.querySelector('.ytp-ad-player-overlay') ||
-    document.querySelector('.ytp-ad-text') ||
-    document.querySelector('.ytp-ad-module') ||
-    document.querySelector('.ytp-ad-skip-button-slot')
-  )
-  return classAd || overlayAd
+    !!player &&
+    (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'))
+  if (classAd) return true
+
+  const overlaySelectors = [
+    '.ytp-ad-player-overlay',
+    '.ytp-ad-text',
+    '.ytp-ad-module',
+    '.ytp-ad-skip-button-slot',
+  ]
+  return overlaySelectors.some((sel) => isVisible(document.querySelector(sel)))
 }
 
 function findSkipButton(): HTMLElement | null {
@@ -111,10 +128,10 @@ function findSkipButton(): HTMLElement | null {
   return null
 }
 
-/** A skip *slot* existing means YouTube intends to offer a skip eventually — that's the
- *  signal used to grant the longer grace period, rather than assuming "unskippable". */
+/** A visibly-present skip *slot* means YouTube intends to offer a skip eventually — that's
+ *  the signal used to grant the longer grace period, rather than assuming "unskippable". */
 function hasSkipSlot(): boolean {
-  return !!document.querySelector('.ytp-ad-skip-button-slot, .ytp-ad-skip-button-container')
+  return isVisible(document.querySelector('.ytp-ad-skip-button-slot, .ytp-ad-skip-button-container'))
 }
 
 function dismissAdBlockWarning(): void {
