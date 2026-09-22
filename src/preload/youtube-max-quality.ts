@@ -24,6 +24,36 @@ export function initYouTubeMaxQuality(): void {
       'use strict';
       var QP = ${JSON.stringify(QUALITY_PRIORITY)};
 
+      // New addition — resolution-aware AV1 cap. Runs alongside the PREF f6=8
+      // cookie logic below, does not replace it.
+      // Default 1080 — this is the NVDEC hardware ceiling for AV1 on pre-Ampere
+      // NVIDIA cards (GTX 16-series and older). Should become a user-facing
+      // setting later; hardcoded for now. Rollback = delete this block.
+      // NOTE: page context, plain JS only. decodingInfo is the API YouTube's
+      // player queries with real resolution data — canPlayType /
+      // isTypeSupported are deliberately untouched.
+      (function capAV1AtHardwareLimit() {
+        var AV1_HEIGHT_LIMIT = 1080;
+        try {
+          if (!navigator.mediaCapabilities || !navigator.mediaCapabilities.decodingInfo) return;
+          var origDecodingInfo = navigator.mediaCapabilities.decodingInfo.bind(navigator.mediaCapabilities);
+          navigator.mediaCapabilities.decodingInfo = function (config) {
+            try {
+              var isAV1 = !!(config && config.video && config.video.contentType && config.video.contentType.indexOf('av01') !== -1);
+              var tooHigh = !!(config && config.video && config.video.height && config.video.height > AV1_HEIGHT_LIMIT);
+              if (isAV1 && tooHigh) {
+                return Promise.resolve({ supported: false, smooth: false, powerEfficient: false });
+              }
+            } catch (e) {
+              // Fall through to real browser behavior, never break playback.
+            }
+            return origDecodingInfo(config);
+          };
+        } catch (e) {
+          // Guard failed (extensions, odd iframes) — leave behavior unchanged.
+        }
+      })();
+
       function forceMaxQuality(player) {
         if (!player || typeof player.getAvailableQualityLevels !== 'function') return;
         try {
