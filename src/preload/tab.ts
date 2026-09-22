@@ -30,18 +30,7 @@ try {
 
 /* ── YouTube Performance + Quality ── */
 if (isYTPage1()) {
-  // Debug logging only in non-production builds; guarded because sandboxed
-  // preloads may not provide process.env.
-  let ytDebug = false
-  try {
-    ytDebug =
-      typeof process !== 'undefined' &&
-      (typeof process.env?.NODE_ENV === 'string' ? process.env.NODE_ENV : 'production') !==
-        'production'
-  } catch {
-    ytDebug = false
-  }
-  initYouTubeFastPlayback(ytDebug)
+  initYouTubeFastPlayback()
   initYouTubeMaxQuality()
 }
 

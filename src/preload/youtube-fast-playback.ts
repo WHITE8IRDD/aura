@@ -1,50 +1,66 @@
 /**
- * YouTube Super Fast Playback & Smart Ad-Refresh Engine.
+ * YouTube Ad Skip & Freeze-Recovery Engine
+ * Runs in the preload context (isolated per tab) to bypass YouTube's CSP.
  *
- * Runs DIRECTLY in the preload isolated world (NOT injected as a page
- * <script> tag) — YouTube's CSP silently blocks inline page scripts, but it
- * cannot block preload-world DOM access. Same document, same navigation,
- * zero CSP surface.
+ * Design goals (fixing the previous version):
+ *  - Never touch currentTime/duration directly — that's what froze the player before.
+ *  - Prefer clicking the real Skip button; escalate to a full reload only as a last resort.
+ *  - Detect an actual freeze (ad currentTime stalled) instead of guessing from elapsed time.
+ *  - Distinguish "skip button not ready yet" from "this ad has no skip option at all" —
+ *    the previous 800ms threshold refreshed the page on almost every normal skippable ad,
+ *    since most skip buttons don't appear until ~5s in.
+ *  - One ordered control loop instead of two timers racing each other.
+ *  - Stop entirely when the tab is hidden or torn down.
  */
 
-const YOUTUBE_HOSTS = ['www.youtube.com', 'youtube.com', 'm.youtube.com', 'music.youtube.com']
+const AD_HOSTS = ['www.youtube.com', 'youtube.com', 'm.youtube.com']
+// music.youtube.com uses a different ad/player pipeline; the selectors below don't apply
+// there, so it's intentionally excluded rather than silently doing nothing on that host.
+
+const TAG = '[Aura YT Playback]'
 
 export function isYouTubePage(): boolean {
-  return YOUTUBE_HOSTS.includes(window.location.hostname)
+  return AD_HOSTS.includes(window.location.hostname)
 }
 
-// Global state in preload context (isolated per tab).
-let lastCleanTimestamp = 0
-let adDetectedAt = 0
-let isRefreshing = false
-let currentVideoId: string | null = null
-let cleanTrackTimer: ReturnType<typeof setInterval> | null = null
-let adCheckTimer: ReturnType<typeof setInterval> | null = null
+const CONFIG = {
+  loopIntervalMs: 200,
+  cleanTrackMinIntervalMs: 500,
+  // A true "no skip option" ad still reserves the skip-button *slot*; only the clickable
+  // button is delayed on normal skippable ads. Wait out the longest common YouTube skip
+  // delay (~5-6s) before concluding an ad is genuinely unskippable.
+  unskippableGraceMs: 6500,
+  // If the ad's own currentTime hasn't moved at all in this window, the player is frozen
+  // regardless of the ad's nominal length — recover immediately rather than waiting.
+  freezeStallMs: 2500,
+  maxRefreshesPerVideo: 2,
+  // Fast, but far less likely to desync/stutter the ad player's internal state than 16x.
+  adPlaybackRate: 8,
+} as const
+
+interface LoopState {
+  videoId: string | null
+  lastCleanTime: number
+  adSeenAt: number // 0 = no ad currently in progress
+  lastAdCurrentTime: number
+  lastAdTimeSeenAt: number
+  refreshing: boolean
+  mutedByUs: boolean
+}
+
+const state: LoopState = {
+  videoId: null,
+  lastCleanTime: 0,
+  adSeenAt: 0,
+  lastAdCurrentTime: -1,
+  lastAdTimeSeenAt: 0,
+  refreshing: false,
+  mutedByUs: false,
+}
+
+let loopTimer: ReturnType<typeof setInterval> | null = null
+let lastCleanTrackAt = 0
 let started = false
-
-const MAX_REFRESHES_PER_VIDEO = 2
-const UNSKIPPABLE_THRESHOLD_MS = 800
-
-// sessionStorage survives the reload loop (module state does not), so the
-// per-video refresh cap lives there. Sandboxed preloads may restrict DOM
-// storage — fall back to memory rather than ever throwing.
-const memFallback = new Map<string, string>()
-
-function storageGet(key: string): string | null {
-  try {
-    return sessionStorage.getItem(key)
-  } catch {
-    return memFallback.get(key) ?? null
-  }
-}
-
-function storageSet(key: string, value: string): void {
-  try {
-    sessionStorage.setItem(key, value)
-  } catch {
-    memFallback.set(key, value)
-  }
-}
 
 function getVideoId(): string | null {
   try {
@@ -54,159 +70,216 @@ function getVideoId(): string | null {
   }
 }
 
+function getVideoEl(): HTMLVideoElement | null {
+  return document.querySelector('video')
+}
+
+function getPlayerEl(): Element | null {
+  return document.querySelector('#movie_player') ?? document.querySelector('.html5-video-player')
+}
+
+/** True while any ad UI is visible. Checks several independent signals since YouTube's ad
+ *  markup drifts over time — treat this as "probably an ad", not certainty either way. */
 function isAdShowing(): boolean {
-  const player =
-    document.querySelector('#movie_player') || document.querySelector('.html5-video-player')
-  if (!player) return false
-
-  const hasAdClass =
-    player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')
-  const hasAdOverlay = !!(
-    document.querySelector('.ytp-ad-text') ||
-    document.querySelector('.ytp-ad-skip-button-container') ||
-    document.querySelector('.ytp-ad-skip-button-slot') ||
+  const player = getPlayerEl()
+  const classAd =
+    !!player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'))
+  const overlayAd = !!(
     document.querySelector('.ytp-ad-player-overlay') ||
-    document.querySelector('.ytp-ad-module')
+    document.querySelector('.ytp-ad-text') ||
+    document.querySelector('.ytp-ad-module') ||
+    document.querySelector('.ytp-ad-skip-button-slot')
   )
-
-  return hasAdClass || hasAdOverlay
+  return classAd || overlayAd
 }
 
-function handleNavigation(): void {
-  const newId = getVideoId()
-  if (newId !== currentVideoId) {
-    currentVideoId = newId
-    lastCleanTimestamp = 0
-    adDetectedAt = 0
-    isRefreshing = false
+function findSkipButton(): HTMLElement | null {
+  const selectors = [
+    '.ytp-skip-ad-button',
+    '.ytp-ad-skip-button-modern',
+    '.ytp-ad-skip-button',
+    'button.ytp-ad-skip-button-modern',
+    '.ytp-ad-skip-button-text',
+    '[class*="ytp-ad-skip-button"]:not([class*="slot"])',
+  ]
+  for (const sel of selectors) {
+    const el = document.querySelector<HTMLElement>(sel)
+    // A real, clickable skip button has layout; the reserved slot exists before the button
+    // is actually clickable and must not be mistaken for it.
+    if (el && el.offsetParent !== null && el.getBoundingClientRect().width > 0) return el
+  }
+  return null
+}
+
+/** A skip *slot* existing means YouTube intends to offer a skip eventually — that's the
+ *  signal used to grant the longer grace period, rather than assuming "unskippable". */
+function hasSkipSlot(): boolean {
+  return !!document.querySelector('.ytp-ad-skip-button-slot, .ytp-ad-skip-button-container')
+}
+
+function dismissAdBlockWarning(): void {
+  const dismiss = document.querySelector<HTMLElement>(
+    'ytd-enforcement-message-view-model #dismiss-button, tp-yt-paper-dialog #dismiss-button',
+  )
+  if (dismiss) {
+    dismiss.click()
+    console.log(`${TAG} dismissed ad-block warning dialog`)
   }
 }
 
-function trackCleanPosition(): void {
+function refreshCountFor(videoId: string): number {
   try {
-    const video = document.querySelector('video')
-    if (!video) return
-
-    // Record timestamp ONLY when playing normal video content (NO ad).
-    if (!isAdShowing() && video.currentTime > 0 && !video.paused) {
-      lastCleanTimestamp = Math.floor(video.currentTime)
-      adDetectedAt = 0
-    }
+    return parseInt(sessionStorage.getItem(`aura_yt_refresh_${videoId}`) || '0', 10)
   } catch {
-    /* DOM in flux — next tick retries */
+    // sessionStorage unavailable (e.g. restricted preload context) — worst
+    // case we refresh more than the cap rather than crashing the loop.
+    return 0
   }
 }
 
-function checkAndBypassAd(): void {
+function bumpRefreshCount(videoId: string): void {
   try {
-    if (isRefreshing) return
+    sessionStorage.setItem(`aura_yt_refresh_${videoId}`, String(refreshCountFor(videoId) + 1))
+  } catch {
+    /* sessionStorage unavailable (e.g. private mode) — worst case we refresh more than the cap */
+  }
+}
 
-    const video = document.querySelector('video') as HTMLVideoElement | null
-    if (!video) return
+function forceReloadAt(resumeSeconds: number): void {
+  const url = new URL(window.location.href)
+  url.searchParams.set('t', `${Math.max(0, Math.floor(resumeSeconds))}s`)
+  console.warn(`${TAG} forcing reload, resuming at ${resumeSeconds}s`)
+  window.location.href = url.toString()
+}
 
-    const videoId = getVideoId()
-    if (!videoId) return
+function onNavigate(): void {
+  const id = getVideoId()
+  if (id === state.videoId) return
+  console.log(`${TAG} navigated to ${id ?? '(no video)'}`)
+  state.videoId = id
+  state.lastCleanTime = 0
+  state.adSeenAt = 0
+  state.lastAdCurrentTime = -1
+  state.lastAdTimeSeenAt = 0
+  state.refreshing = false
+  state.mutedByUs = false
+}
 
-    if (isAdShowing()) {
-      // 1. FAST-FORWARD & MUTE AD.
+function restoreNormalPlaybackState(video: HTMLVideoElement): void {
+  if (video.playbackRate !== 1) video.playbackRate = 1
+  if (state.mutedByUs) {
+    video.muted = false
+    state.mutedByUs = false
+  }
+  // A refresh landing mid-ad-break, or an ad ending, can leave the element paused with
+  // nothing actually blocking it — nudge it forward.
+  if (video.paused && video.readyState >= 2 && !video.ended) {
+    video.play().catch(() => {
+      // Autoplay can be blocked while unmuted; a muted retry at least keeps it moving.
       video.muted = true
-      video.playbackRate = 16.0
-      if (isFinite(video.duration) && video.duration > 0) {
-        video.currentTime = video.duration - 0.05
-      }
-
-      // 2. CLICK MODERN YOUTUBE SKIP BUTTONS IMMEDIATELY.
-      const skipButtonSelectors = [
-        '.ytp-ad-skip-button',
-        '.ytp-ad-skip-button-modern',
-        'button.ytp-ad-skip-button-modern',
-        '.ytp-skip-ad-button',
-        '.ytp-ad-skip-button-text',
-        '[class*="ytp-ad-skip-button"]',
-      ]
-
-      for (const selector of skipButtonSelectors) {
-        const btn = document.querySelector(selector) as HTMLElement | null
-        if (btn) {
-          btn.click()
-          return
-        }
-      }
-
-      // Track how long the unskippable ad has been playing.
-      if (adDetectedAt === 0) {
-        adDetectedAt = Date.now()
-      }
-
-      // 3. UNSKIPPABLE AD STUCK > 800MS -> FORCE REFRESH & RESUME AT TIMESTAMP.
-      if (Date.now() - adDetectedAt > UNSKIPPABLE_THRESHOLD_MS) {
-        const refreshKey = 'aura_yt_refresh_' + videoId
-        const refreshCount = parseInt(storageGet(refreshKey) || '0', 10)
-
-        if (refreshCount < MAX_REFRESHES_PER_VIDEO) {
-          isRefreshing = true
-          storageSet(refreshKey, String(refreshCount + 1))
-
-          const resumeTime = Math.max(0, lastCleanTimestamp - 1)
-          const currentUrl = new URL(window.location.href)
-          currentUrl.searchParams.set('t', resumeTime + 's')
-
-          console.log(
-            `[Aura/YouTube] Unskippable ad detected! Refreshing & resuming at ${resumeTime}s...`,
-          )
-          window.location.href = currentUrl.toString()
-        }
-      }
-    }
-
-    // Auto-close "Ad blocker detected" warning dialog.
-    const dismissBtn = document.querySelector(
-      'ytd-enforcement-message-view-model #dismiss-button, tp-yt-paper-dialog #dismiss-button',
-    ) as HTMLElement | null
-
-    if (dismissBtn) {
-      dismissBtn.click()
-      if (video && video.paused) void video.play().catch(() => {})
-    }
-  } catch {
-    /* DOM in flux — next tick retries */
+      video.play().catch(() => {})
+    })
   }
 }
 
-function startTimers(): void {
-  stopTimers()
-  cleanTrackTimer = setInterval(trackCleanPosition, 500)
-  adCheckTimer = setInterval(checkAndBypassAd, 150)
+function escalateToRefresh(video: HTMLVideoElement): void {
+  const videoId = state.videoId
+  if (!videoId) return
+  const count = refreshCountFor(videoId)
+  if (count >= CONFIG.maxRefreshesPerVideo) {
+    console.warn(`${TAG} refresh cap reached for ${videoId}; letting the ad play out`)
+    return
+  }
+  state.refreshing = true
+  bumpRefreshCount(videoId)
+  forceReloadAt(state.lastCleanTime > 0 ? state.lastCleanTime - 1 : video.currentTime)
 }
 
-function stopTimers(): void {
-  if (cleanTrackTimer) clearInterval(cleanTrackTimer)
-  if (adCheckTimer) clearInterval(adCheckTimer)
-  cleanTrackTimer = null
-  adCheckTimer = null
+function handleAd(video: HTMLVideoElement, now: number): void {
+  if (state.refreshing) return
+  if (state.adSeenAt === 0) state.adSeenAt = now
+
+  // Speed through the ad's own audio without disturbing the main video's mute state later.
+  if (!video.muted) {
+    video.muted = true
+    state.mutedByUs = true
+  }
+  if (video.playbackRate !== CONFIG.adPlaybackRate) {
+    video.playbackRate = CONFIG.adPlaybackRate
+  }
+
+  const skipBtn = findSkipButton()
+  if (skipBtn) {
+    skipBtn.click()
+    return
+  }
+
+  // Freeze detection: if the ad's own currentTime genuinely isn't moving, waiting out the
+  // grace period won't help — recover immediately.
+  if (video.currentTime !== state.lastAdCurrentTime) {
+    state.lastAdCurrentTime = video.currentTime
+    state.lastAdTimeSeenAt = now
+  } else if (now - state.lastAdTimeSeenAt > CONFIG.freezeStallMs) {
+    console.warn(`${TAG} ad appears frozen (currentTime stalled ${CONFIG.freezeStallMs}ms)`)
+    escalateToRefresh(video)
+    return
+  }
+
+  // Only treat as "unskippable" after the normal delayed-skip window has passed AND
+  // YouTube never rendered a skip slot at all (a genuinely non-skippable ad).
+  const graceElapsed = now - state.adSeenAt > CONFIG.unskippableGraceMs
+  if (graceElapsed && !hasSkipSlot()) {
+    escalateToRefresh(video)
+  }
 }
 
-export function initYouTubeFastPlayback(debug = false): void {
-  if (!isYouTubePage()) return
-  if (started) return
+function loop(): void {
+  const video = getVideoEl()
+  if (!video) return
+  const now = Date.now()
+
+  if (isAdShowing()) {
+    handleAd(video, now)
+  } else {
+    state.adSeenAt = 0
+    state.lastAdCurrentTime = -1
+    restoreNormalPlaybackState(video)
+    if (now - lastCleanTrackAt >= CONFIG.cleanTrackMinIntervalMs) {
+      lastCleanTrackAt = now
+      if (video.currentTime > 0 && !video.paused) {
+        state.lastCleanTime = Math.floor(video.currentTime)
+      }
+    }
+  }
+
+  dismissAdBlockWarning()
+}
+
+function startLoop(): void {
+  if (loopTimer) return
+  loopTimer = setInterval(loop, CONFIG.loopIntervalMs)
+}
+
+function stopLoop(): void {
+  if (loopTimer) {
+    clearInterval(loopTimer)
+    loopTimer = null
+  }
+}
+
+export function initYouTubeFastPlayback(): void {
+  if (window.top !== window) return // never run inside embedded iframes
+  if (!isYouTubePage() || started) return
   started = true
 
-  // SPA navigation listener (page-dispatched events reach isolated worlds).
-  window.addEventListener('yt-navigate-finish', () => {
-    handleNavigation()
-  })
-
-  // Pause timers when tab is hidden to save CPU/battery.
+  window.addEventListener('yt-navigate-finish', onNavigate, true)
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      stopTimers()
-    } else {
-      startTimers()
-    }
+    if (document.hidden) stopLoop()
+    else startLoop()
   })
+  window.addEventListener('pagehide', stopLoop, { once: true })
 
-  handleNavigation()
-  startTimers()
-  console.log('[Aura/YouTube] Fast Playback Engine running directly in Preload Context')
-  if (debug) console.log('[Aura/YouTube] debug logging enabled for', currentVideoId)
+  onNavigate()
+  startLoop()
+  console.log(`${TAG} running`)
 }
