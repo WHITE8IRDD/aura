@@ -24,18 +24,22 @@ export function isYouTubePage(): boolean {
 }
 
 const CONFIG = {
-  loopIntervalMs: 200,
+  loopIntervalMs: 100,
   cleanTrackMinIntervalMs: 500,
   // A true "no skip option" ad still reserves the skip-button *slot*; only the clickable
-  // button is delayed on normal skippable ads. Wait out the longest common YouTube skip
-  // delay (~5-6s) before concluding an ad is genuinely unskippable.
-  unskippableGraceMs: 6500,
+  // button is delayed on normal skippable ads. YouTube's own skip-button delay is real-time
+  // based (~5s) and can't be shortened from here without touching currentTime/duration —
+  // which is what caused the original freeze bug. This grace period is a floor just above
+  // that delay, not a target to optimize.
+  unskippableGraceMs: 6000,
   // If the ad's own currentTime hasn't moved at all in this window, the player is frozen
   // regardless of the ad's nominal length — recover immediately rather than waiting.
-  freezeStallMs: 2500,
+  freezeStallMs: 1500,
   maxRefreshesPerVideo: 2,
-  // Fast, but far less likely to desync/stutter the ad player's internal state than 16x.
-  adPlaybackRate: 8,
+  // Max practical rate. Safe to run this hard now because freezeStallMs above catches any
+  // stall this causes and escalates immediately — the original version ran 16x with no
+  // stall detection at all, which is what let a freeze go unnoticed.
+  adPlaybackRate: 16,
   // Auto-resume is only allowed right as an ad ends, or briefly after our own forced
   // refresh lands. Outside that window a paused video is assumed to be a deliberate user
   // pause and must never be overridden.
