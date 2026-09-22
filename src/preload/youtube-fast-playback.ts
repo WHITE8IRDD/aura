@@ -36,6 +36,10 @@ const CONFIG = {
   maxRefreshesPerVideo: 2,
   // Fast, but far less likely to desync/stutter the ad player's internal state than 16x.
   adPlaybackRate: 8,
+  // Auto-resume is only allowed right as an ad ends, or briefly after our own forced
+  // refresh lands. Outside that window a paused video is assumed to be a deliberate user
+  // pause and must never be overridden.
+  resumeWindowMs: 5000,
 } as const
 
 interface LoopState {
@@ -46,6 +50,8 @@ interface LoopState {
   lastAdTimeSeenAt: number
   refreshing: boolean
   mutedByUs: boolean
+  loadedAt: number
+  wasAdShowing: boolean
 }
 
 const state: LoopState = {
@@ -56,6 +62,8 @@ const state: LoopState = {
   lastAdTimeSeenAt: 0,
   refreshing: false,
   mutedByUs: false,
+  loadedAt: 0,
+  wasAdShowing: false,
 }
 
 let loopTimer: ReturnType<typeof setInterval> | null = null
@@ -180,23 +188,31 @@ function onNavigate(): void {
   state.lastAdTimeSeenAt = 0
   state.refreshing = false
   state.mutedByUs = false
+  state.loadedAt = Date.now()
+  state.wasAdShowing = false
 }
 
-function restoreNormalPlaybackState(video: HTMLVideoElement): void {
+function restoreRateAndMute(video: HTMLVideoElement): void {
   if (video.playbackRate !== 1) video.playbackRate = 1
   if (state.mutedByUs) {
     video.muted = false
     state.mutedByUs = false
   }
-  // A refresh landing mid-ad-break, or an ad ending, can leave the element paused with
-  // nothing actually blocking it — nudge it forward.
-  if (video.paused && video.readyState >= 2 && !video.ended) {
-    video.play().catch(() => {
-      // Autoplay can be blocked while unmuted; a muted retry at least keeps it moving.
-      video.muted = true
-      video.play().catch(() => {})
-    })
-  }
+}
+
+/** Resumes playback ONLY in the two cases this feature exists for: the instant an ad ends,
+ *  or briefly after our own forced refresh lands. Outside those, a paused video is a
+ *  deliberate user action and must be left alone — this is what previously made the player
+ *  impossible to pause, since it ran unconditionally on every tick. */
+function maybeAutoResume(video: HTMLVideoElement, now: number, adJustEnded: boolean): void {
+  if (!video.paused || video.ended || video.readyState < 2) return
+  const withinLoadWindow = now - state.loadedAt <= CONFIG.resumeWindowMs
+  if (!adJustEnded && !withinLoadWindow) return
+  video.play().catch(() => {
+    // Autoplay can be blocked while unmuted; a muted retry at least keeps it moving.
+    video.muted = true
+    video.play().catch(() => {})
+  })
 }
 
 function escalateToRefresh(video: HTMLVideoElement): void {
@@ -254,13 +270,18 @@ function loop(): void {
   const video = getVideoEl()
   if (!video) return
   const now = Date.now()
+  const adShowing = isAdShowing()
 
-  if (isAdShowing()) {
+  if (adShowing) {
     handleAd(video, now)
+    state.wasAdShowing = true
   } else {
+    const adJustEnded = state.wasAdShowing
+    state.wasAdShowing = false
     state.adSeenAt = 0
     state.lastAdCurrentTime = -1
-    restoreNormalPlaybackState(video)
+    restoreRateAndMute(video)
+    maybeAutoResume(video, now, adJustEnded)
     if (now - lastCleanTrackAt >= CONFIG.cleanTrackMinIntervalMs) {
       lastCleanTrackAt = now
       if (video.currentTime > 0 && !video.paused) {
